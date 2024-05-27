@@ -1,0 +1,33 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+      "config:recommended",
+      ":dependencyDashboard",
+      ":automergePatch",
+      ":automergePr",
+      ":gitSignOff"
+    ],
+    "gitAuthor": "renovate[bot] <bot@renovateapp.com>",
+    "labels": [
+      "dependencies"
+    ],
+    "dockerfile": {
+      "enabled": true,
+      "fileMatch": ["^Dockerfile$"],
+      "pinDigests": true
+    },
+    "packageRules": [
+      {
+        "managers": ["dockerfile"],
+        "datasources": ["docker"],
+        "packageNames": ["golang"],
+        "updateTypes": ["minor", "patch"],
+        "automerge": true,
+        "automergeType": "branch",
+        "commitMessageTopic": "{{prettyDepType}} version",
+        "commitMessageExtra": "to {{#if isMajor}}{{newMajor}}{{else}}{{newVersion}}{{/if}}",
+        "commitMessageSuffix": "[skip ci]",
+        "schedule": ["before 5am on monday"]
+      }
+    ]
+  }
