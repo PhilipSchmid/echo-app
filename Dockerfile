@@ -1,7 +1,7 @@
 # Build stage
 FROM --platform=$BUILDPLATFORM golang:1.22-alpine@sha256:b8ded51bad03238f67994d0a6b88680609b392db04312f60c23358cc878d4902 AS builder
 
-# Define ARGs and ENVs to specify the target platform
+# Define ARGs to specify the target platform
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 ARG TARGETOS
@@ -23,6 +23,16 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -installsuff
 
 # Final stage
 FROM scratch
+
+# Add metadata to the image using opencontainers labels
+LABEL org.opencontainers.image.title="echo-app" \
+      org.opencontainers.image.description="Tiny golang app which returns a timestamp, a customizable message, the hostname, the request source IP, and optionally the HTTP request headers." \
+      org.opencontainers.image.url="https://github.com/philipschmid/echo-app" \
+      org.opencontainers.image.source="https://github.com/philipschmid/echo-app" \
+      org.opencontainers.image.vendor="philipschmid" \
+      org.opencontainers.image.licenses="Apache-2.0 license" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.created="${BUILD_DATE}"
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /main /main
