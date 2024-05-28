@@ -2,14 +2,21 @@
 
 ![Build and Push Docker Image](https://github.com/philipschmid/echo-app/actions/workflows/build.yaml/badge.svg)
 
-Tiny golang app which returns a customizable message, the hostname, and the request source IP.
+Tiny golang app which returns a timestamp, a customizable message, the hostname, the request source IP, and optionally the HTTP request headers.
+
+## Configuration Options
+- `MESSAGE`: A customizable message to be returned in the JSON response. If not set, no message will be displayed.
+- `PORT`: The port number on which the server listens. Default is `8080`.
+- `PRINT_HTTP_REQUEST_HEADERS`: Set to `true` to include HTTP request headers in the JSON response. By default, headers are not included.
 
 ## Standalone Container
 Shell 1 (server):
 ```bash
 docker run -it -p 8080:8080 ghcr.io/philipschmid/echo-app:main
-# Or optionally with a customized message:
-# docker run -it -p 8080:8080 -e MESSAGE="demo-env" ghcr.io/philipschmid/echo-app:main
+# Optionally with a customized message:
+docker run -it -p 8080:8080 -e MESSAGE="demo-env" ghcr.io/philipschmid/echo-app:main
+# Optionally include HTTP request headers in the response:
+docker run -it -p 8080:8080 -e PRINT_HTTP_REQUEST_HEADERS="true" ghcr.io/philipschmid/echo-app:main
 ```
 
 Shell 2 (client):
@@ -19,8 +26,13 @@ curl http://localhost:8080/
 
 You should see a similar client output like this:
 ```json
-{"message":"Hello, world!","hostname":"e4442ea9e53c","source_ip":"192.168.65.1"}
-{"message":"demo-env","hostname":"f4c4b96e362d","source_ip":"192.168.65.1"}
+{"timestamp":"2024-05-28T19:50:10.289Z","hostname":"83ff0b127ed6","source_ip":"192.168.65.1"}
+{"timestamp":"2024-05-28T19:50:35.022Z","message":"Hello World!","hostname":"4495529ebd32","source_ip":"192.168.65.1"}
+```
+
+If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include the request headers:
+```json
+{"timestamp":"2024-05-28T20:21:23.363Z","hostname":"3f96391b04f2","source_ip":"192.168.65.1","headers":{"Accept":["*/*"],"User-Agent":["curl/8.6.0"]}}
 ```
 
 ## Kubernetes
@@ -33,6 +45,8 @@ metadata:
   name: echo-app-config
 data:
   MESSAGE: "demo-env"
+  # Add the PRINT_HTTP_REQUEST_HEADERS key with a value of "true" to include headers in the response
+  PRINT_HTTP_REQUEST_HEADERS: "true"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -71,6 +85,12 @@ spec:
             configMapKeyRef:
               name: echo-app-config
               key: MESSAGE
+        # Add the PRINT_HTTP_REQUEST_HEADERS environment variable
+        - name: PRINT_HTTP_REQUEST_HEADERS
+          valueFrom:
+            configMapKeyRef:
+              name: echo-app-config
+              key: PRINT_HTTP_REQUEST_HEADERS
 ---
 apiVersion: v1
 kind: Service
