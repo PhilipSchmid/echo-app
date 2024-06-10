@@ -131,4 +131,3 @@ If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include
 
 ## Credit
 Basic idea (& source code) is taken from https://cloud.google.com/kubernetes-engine/docs/samples/container-hello-app.
-```
