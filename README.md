@@ -2,10 +2,11 @@
 
 ![Build and Push Docker Image](https://github.com/philipschmid/echo-app/actions/workflows/build.yaml/badge.svg) ![Go Syntax and Format Check](https://github.com/philipschmid/echo-app/actions/workflows/test.yaml/badge.svg)
 
-Tiny golang app which returns a timestamp, a customizable message, the hostname, the request source IP, and optionally the HTTP request headers.
+Tiny golang app which returns a timestamp, a customizable message, the hostname, the request source IP, the node name (if set), and optionally the HTTP request headers.
 
 ## Configuration Options
 - `MESSAGE`: A customizable message to be returned in the JSON response. If not set, no message will be displayed.
+- `NODE`: The name of the node where the app is running. This is typically used in a Kubernetes environment.
 - `PORT`: The port number on which the server listens. Default is `8080`.
 - `PRINT_HTTP_REQUEST_HEADERS`: Set to `true` to include HTTP request headers in the JSON response. By default, headers are not included.
 
@@ -15,6 +16,8 @@ Shell 1 (server):
 docker run -it -p 8080:8080 ghcr.io/philipschmid/echo-app:main
 # Optionally with a customized message:
 docker run -it -p 8080:8080 -e MESSAGE="demo-env" ghcr.io/philipschmid/echo-app:main
+# Optionally with a node name:
+docker run -it -p 8080:8080 -e NODE="k8s-node-1" ghcr.io/philipschmid/echo-app:main
 # Optionally include HTTP request headers in the response:
 docker run -it -p 8080:8080 -e PRINT_HTTP_REQUEST_HEADERS="true" ghcr.io/philipschmid/echo-app:main
 ```
@@ -27,16 +30,16 @@ curl http://localhost:8080/
 You should see a similar client output like this:
 ```json
 {"timestamp":"2024-05-28T19:50:10.289Z","hostname":"83ff0b127ed6","source_ip":"192.168.65.1"}
-{"timestamp":"2024-05-28T19:50:35.022Z","message":"Hello World!","hostname":"4495529ebd32","source_ip":"192.168.65.1"}
+{"timestamp":"2024-05-28T19:50:35.022Z","message":"Hello World!","hostname":"4495529ebd32","source_ip":"192.168.65.1","node":"k8s-node-1"}
 ```
 
 If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include the request headers:
 ```json
-{"timestamp":"2024-05-28T20:21:23.363Z","hostname":"3f96391b04f2","source_ip":"192.168.65.1","headers":{"Accept":["*/*"],"User-Agent":["curl/8.6.0"]}}
+{"timestamp":"2024-05-28T20:21:23.363Z","hostname":"3f96391b04f2","source_ip":"192.168.65.1","node":"k8s-node-1","headers":{"Accept":["*/*"],"User-Agent":["curl/8.6.0"]}}
 ```
 
 ## Kubernetes
-Apply the following manifests:
+Apply the following manifests to deploy the echo-app with the `NODE` environment variable set to the name of the Kubernetes node using the Downward API:
 ```yaml
 ---
 apiVersion: v1
@@ -91,6 +94,11 @@ spec:
             configMapKeyRef:
               name: echo-app-config
               key: PRINT_HTTP_REQUEST_HEADERS
+        # Add the NODE environment variable using the downward API
+        - name: NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
 ---
 apiVersion: v1
 kind: Service
@@ -111,5 +119,16 @@ Shell 2 (client):
 kubectl run netshoot --rm -it --image=nicolaka/netshoot -- curl http://echo-app-service:8080
 ```
 
+You should see a similar client output like this:
+```json
+{"timestamp":"2024-05-28T19:50:35.022Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1"}
+```
+
+If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include the request headers:
+```json
+{"timestamp":"2024-05-28T20:21:23.363Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1","headers":{"Accept":["*/*"],"User-Agent":["curl/8.6.0"]}}
+```
+
 ## Credit
 Basic idea (& source code) is taken from https://cloud.google.com/kubernetes-engine/docs/samples/container-hello-app.
+```

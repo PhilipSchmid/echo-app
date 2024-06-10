@@ -14,14 +14,16 @@ import (
 type Response struct {
 	Timestamp string              `json:"timestamp"`
 	Message   *string             `json:"message,omitempty"`
-	Hostname  string              `json:"hostname"`
 	SourceIP  string              `json:"source_ip"`
+	Hostname  string              `json:"hostname"`
+	Node      *string             `json:"node,omitempty"`    // Optional field to include node name
 	Headers   map[string][]string `json:"headers,omitempty"` // Optional field to include headers
 }
 
 func main() {
 	// Get MESSAGE and PRINT_HTTP_REQUEST_HEADERS environment variables
 	messagePtr := getMessagePtr()
+	nodePtr := getNodePtr()
 	printHeaders := getPrintHeadersSetting()
 
 	// Prepare the message log
@@ -30,9 +32,25 @@ func main() {
 		messageLog = "MESSAGE environment variable set to: " + *messagePtr
 	}
 
+	// Prepare the node log
+	nodeLog := "No NODE environment variable set"
+	if nodePtr != nil {
+		nodeLog = "NODE environment variable set to: " + *nodePtr
+	}
+
+	// Print optional configs on multiple lines
+	log.Println("Server configuration:")
+	log.Printf("  %s\n", messageLog)
+	log.Printf("  %s\n", nodeLog)
+	if printHeaders {
+		log.Println("  PRINT_HTTP_REQUEST_HEADERS is enabled")
+	} else {
+		log.Println("  PRINT_HTTP_REQUEST_HEADERS is disabled")
+	}
+
 	// Register hello function to handle all requests
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", hello(messagePtr, printHeaders)) // Pass message pointer and printHeaders to the hello function
+	mux.HandleFunc("/", hello(messagePtr, nodePtr, printHeaders)) // Pass message and node pointers and printHeaders to the hello function
 
 	// Use PORT environment variable, or default to 8080
 	port := os.Getenv("PORT")
@@ -41,12 +59,12 @@ func main() {
 	}
 
 	// Start the web server on port and accept requests
-	log.Printf("Server listening on port %s (%s)", port, messageLog)
+	log.Printf("Server listening on port %s\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, mux))
 }
 
 // hello returns a http.HandlerFunc that uses the provided message pointer and printHeaders flag.
-func hello(messagePtr *string, printHeaders bool) http.HandlerFunc {
+func hello(messagePtr *string, nodePtr *string, printHeaders bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the IP address without the port number
 		ip, _, err := net.SplitHostPort(r.RemoteAddr)
@@ -68,6 +86,7 @@ func hello(messagePtr *string, printHeaders bool) http.HandlerFunc {
 			Timestamp: timestamp,
 			Message:   messagePtr,
 			Hostname:  host,
+			Node:      nodePtr,
 			SourceIP:  ip,
 		}
 
@@ -98,6 +117,15 @@ func getMessagePtr() *string {
 		return nil
 	}
 	return &message
+}
+
+// getNodePtr gets the NODE environment variable and returns a pointer to it, or nil if it's not set.
+func getNodePtr() *string {
+	node := os.Getenv("NODE")
+	if node == "" {
+		return nil
+	}
+	return &node
 }
 
 // getPrintHeadersSetting checks the PRINT_HTTP_REQUEST_HEADERS environment variable.
