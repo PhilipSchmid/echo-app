@@ -1,5 +1,5 @@
 # Build stage
-FROM --platform=$BUILDPLATFORM golang:1.22-alpine@sha256:6522f0ca555a7b14c46a2c9f50b86604a234cdc72452bf6a268cae6461d9000b AS builder
+FROM --platform=$BUILDPLATFORM golang:1.22-alpine@sha256:8b55159568bc08a0a5c5cad9f4b342c859ec2c0d26d0737d86fc19159f604a5b AS builder
 
 # Define ARGs to specify the target platform
 ARG TARGETPLATFORM
