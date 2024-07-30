@@ -1,8 +1,15 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"log"
+	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -21,10 +28,11 @@ type Response struct {
 }
 
 func main() {
-	// Get MESSAGE and PRINT_HTTP_REQUEST_HEADERS environment variables
+	// Get MESSAGE, NODE, PRINT_HTTP_REQUEST_HEADERS, and TLS environment variables
 	messagePtr := getMessagePtr()
 	nodePtr := getNodePtr()
 	printHeaders := getPrintHeadersSetting()
+	tlsEnabled := getTLSSetting()
 
 	// Prepare the message log
 	messageLog := "No MESSAGE environment variable set"
@@ -47,6 +55,11 @@ func main() {
 	} else {
 		log.Println("  PRINT_HTTP_REQUEST_HEADERS is disabled")
 	}
+	if tlsEnabled {
+		log.Println("  TLS is enabled")
+	} else {
+		log.Println("  TLS is disabled")
+	}
 
 	// Register hello function to handle all requests
 	mux := http.NewServeMux()
@@ -59,8 +72,41 @@ func main() {
 	}
 
 	// Start the web server on port and accept requests
-	log.Printf("Server listening on port %s\n", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	go func() {
+		log.Printf("Server listening on port %s\n", port)
+		log.Fatal(http.ListenAndServe(":"+port, mux))
+	}()
+
+	if tlsEnabled {
+		// Use TLS_PORT environment variable, or default to 8443
+		tlsPort := os.Getenv("TLS_PORT")
+		if tlsPort == "" {
+			tlsPort = "8443"
+		}
+
+		// Generate in-memory TLS certificate pair
+		cert, err := generateSelfSignedCert()
+		if err != nil {
+			log.Fatalf("Failed to generate self-signed certificate: %v", err)
+		}
+
+		// Start the HTTPS server on the specified TLS port
+		go func() {
+			server := &http.Server{
+				Addr:    ":" + tlsPort,
+				Handler: mux,
+				TLSConfig: &tls.Config{
+					Certificates: []tls.Certificate{cert},
+				},
+			}
+
+			log.Printf("TLS server listening on port %s\n", tlsPort)
+			log.Fatal(server.ListenAndServeTLS("", ""))
+		}()
+	}
+
+	// Block forever
+	select {}
 }
 
 // hello returns a http.HandlerFunc that uses the provided message pointer and printHeaders flag.
@@ -131,4 +177,40 @@ func getNodePtr() *string {
 // getPrintHeadersSetting checks the PRINT_HTTP_REQUEST_HEADERS environment variable.
 func getPrintHeadersSetting() bool {
 	return strings.ToLower(os.Getenv("PRINT_HTTP_REQUEST_HEADERS")) == "true"
+}
+
+// getTLSSetting checks the TLS environment variable.
+func getTLSSetting() bool {
+	return strings.ToLower(os.Getenv("TLS")) == "true"
+}
+
+// generateSelfSignedCert generates a self-signed TLS certificate.
+func generateSelfSignedCert() (tls.Certificate, error) {
+	priv, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			Organization: []string{"echo Inc."},
+		},
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().Add(10 * 365 * 24 * time.Hour), // 10 years validity
+
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+
+	return tls.X509KeyPair(certPEM, keyPEM)
 }
