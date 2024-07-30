@@ -2,7 +2,7 @@
 
 ![Build and Push Docker Image](https://github.com/philipschmid/echo-app/actions/workflows/build.yaml/badge.svg) ![Go Syntax and Format Check](https://github.com/philipschmid/echo-app/actions/workflows/test.yaml/badge.svg)
 
-Tiny golang app which returns a timestamp, a customizable message, the hostname, the request source IP, the node name (if set), and optionally the HTTP request headers.
+This is a simple Go application that responds with a JSON payload containing a timestamp, a message, the source IP, the hostname, and optionally the node name and HTTP request headers. The application also supports optional TLS functionality, generating an in-memory self-signed TLS certificate when enabled. This allows secure communication over a dedicated HTTPS port in addition to the already existing HTTP port.
 
 ## Configuration Options
 - `MESSAGE`: A customizable message to be returned in the JSON response. If not set, no message will be displayed.
