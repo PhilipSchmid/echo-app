@@ -152,6 +152,35 @@ If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include
 {"timestamp":"2024-05-28T20:21:23.363Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1","headers":{"Accept":["*/*"],"User-Agent":["curl/8.6.0"]}}
 ```
 
+### Ingress Example
+For example, if you're running a cluster with Cilium installed like this: https://gist.github.com/PhilipSchmid/bf4e4d2382678959f29f6e0d7b9b4725
+```yaml
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: echo
+  annotations:
+    cert-manager.io/cluster-issuer: "lets-encrypt-prod"
+spec:
+  ingressClassName: cilium
+  rules:
+  - host: echo.<ip-of-ingress-lb-service>.sslip.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: echo-app-service
+            port:
+              number: 8080
+  tls:
+  - hosts:
+    - echo.<ip-of-ingress-lb-service>.sslip.io
+    secretName: echo-app-tls
+```
+
 ### Gateway API Example
 For example, if you're running a cluster with Cilium installed like this: https://gist.github.com/PhilipSchmid/bf4e4d2382678959f29f6e0d7b9b4725
 ```yaml
