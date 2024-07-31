@@ -81,13 +81,13 @@ spec:
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: "app"
-                    operator: In
-                    values:
-                    - echo-app
-              topologyKey: "kubernetes.io/hostname"
+          - labelSelector:
+              matchExpressions:
+              - key: "app"
+                operator: In
+                values:
+                - echo-app
+            topologyKey: "kubernetes.io/hostname"
       containers:
       - name: echo-app
         image: ghcr.io/philipschmid/echo-app:main
@@ -126,12 +126,14 @@ spec:
   selector:
     app: echo-app
   ports:
-    - protocol: TCP
-      port: 8080
-      targetPort: 8080
-    - protocol: TCP
-      port: 8443
-      targetPort: 8443
+  - name: http
+    protocol: TCP
+    port: 8080
+    targetPort: 8080
+  - name: https
+    protocol: TCP
+    port: 8443
+    targetPort: 8443
   type: ClusterIP
 ```
 
@@ -148,6 +150,132 @@ You should see a similar client output like this:
 If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include the request headers:
 ```json
 {"timestamp":"2024-05-28T20:21:23.363Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1","headers":{"Accept":["*/*"],"User-Agent":["curl/8.6.0"]}}
+```
+
+### Gateway API Example
+For example, if you're running a cluster with Cilium installed like this: https://gist.github.com/PhilipSchmid/bf4e4d2382678959f29f6e0d7b9b4725
+```yaml
+# Infrastructure
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: infra
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: echo-gw
+  namespace: infra
+spec:
+  gatewayClassName: cilium
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+    allowedRoutes:
+      namespaces:
+        from: All
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: tls-echo-gw
+  namespace: infra
+spec:
+  gatewayClassName: cilium
+  listeners:
+  - name: tls
+    protocol: TLS
+    port: 443
+    tls:
+      mode: Passthrough
+    allowedRoutes:
+      namespaces:
+        from: All
+# Routes
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: echo
+spec:
+  parentRefs:
+  - name: echo-gw
+    namespace: infra
+  hostnames:
+  - echo.<ip-of-echo-gw-lb-service>.sslip.io
+  rules:
+  - backendRefs:
+    - name: echo-app-service
+      port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TLSRoute
+metadata:
+  name: tls-echo
+spec:
+  parentRefs:
+  - name: tls-echo-gw
+    namespace: infra
+  hostnames:
+  - tls-echo.<ip-of-tls-echo-gw-lb-service>.sslip.io
+  rules:
+  - backendRefs:
+    - name: echo-app-service
+      port: 8443
+```
+
+Testing `HTTPRoute`:
+```bash
+$ while true; curl -sSL http://echo.<ip-of-gateway-lb-service>.sslip.io | jq; sleep 2; end
+{
+  "timestamp": "2024-07-31T09:04:14.801Z",
+  "message": "demo-env",
+  "source_ip": "10.0.0.169",
+  "hostname": "echo-app-deployment-85f85574bb-cbv9p",
+  "node": "aks-nodepool1-15164467-vmss000000",
+  "headers": {
+    "Accept": [
+      "*/*"
+    ],
+    "User-Agent": [
+      "curl/8.6.0"
+    ],
+    "X-Envoy-External-Address": [
+      "85.X.Y.Z"
+    ],
+    "X-Forwarded-For": [
+      "85.X.Y.Z"
+    ],
+    "X-Forwarded-Proto": [
+      "http"
+    ],
+    "X-Request-Id": [
+      "6821c0bc-361c-4f15-837a-be3dc025ff78"
+    ]
+  }
+}
+```
+
+Testing `TLSRoute`:
+```bash
+$ while true; curl -sSLk https://tls-echo.<ip-of-gateway-lb-service>.sslip.io | jq; sleep 2; end
+{
+  "timestamp": "2024-07-31T09:06:43.293Z",
+  "message": "demo-env",
+  "source_ip": "10.0.2.214",
+  "hostname": "echo-app-deployment-85f85574bb-rspj9",
+  "node": "aks-nodepool1-15164467-vmss000002",
+  "headers": {
+    "Accept": [
+      "*/*"
+    ],
+    "User-Agent": [
+      "curl/8.6.0"
+    ]
+  }
+}
 ```
 
 ## Credit
