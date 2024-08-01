@@ -109,6 +109,7 @@ spec:
         ports:
         - containerPort: 8080
         - containerPort: 8443
+        - containerPort: 9090
         env:
         - name: MESSAGE
           valueFrom:
@@ -149,6 +150,10 @@ spec:
     protocol: TCP
     port: 8443
     targetPort: 8443
+  - name: tcp
+    protocol: TCP
+    port: 9090
+    targetPort: 9090
   type: ClusterIP
 ```
 
@@ -220,6 +225,8 @@ spec:
     allowedRoutes:
       namespaces:
         from: All
+      kinds:
+      - kind: HTTPRoute
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -237,6 +244,25 @@ spec:
     allowedRoutes:
       namespaces:
         from: All
+      kinds:
+      - kind: TLSRoute
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: tcp-echo-gw
+  namespace: infra
+spec:
+  gatewayClassName: cilium
+  listeners:
+  - name: tcp
+    protocol: TCP
+    port: 9090
+    allowedRoutes:
+      namespaces:
+        from: All
+      kinds:
+      - kind: TCPRoute
 # Routes
 ---
 apiVersion: gateway.networking.k8s.io/v1
@@ -268,11 +294,25 @@ spec:
   - backendRefs:
     - name: echo-app-service
       port: 8443
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: tcp-echo
+spec:
+  parentRefs:
+  - name: tcp-echo-gw
+    namespace: infra
+    sectionName: tcp
+  rules:
+  - backendRefs:
+    - name: echo-app-service
+      port: 9090
 ```
 
 Testing `HTTPRoute`:
 ```bash
-$ while true; curl -sSL http://echo.<ip-of-gateway-lb-service>.sslip.io | jq; sleep 2; end
+$ while true; curl -sSL http://echo.<ip-of-echo-gw-lb-service>.sslip.io | jq; sleep 2; end
 {
   "timestamp": "2024-07-31T09:04:14.801Z",
   "message": "demo-env",
@@ -304,7 +344,7 @@ $ while true; curl -sSL http://echo.<ip-of-gateway-lb-service>.sslip.io | jq; sl
 
 Testing `TLSRoute`:
 ```bash
-$ while true; curl -sSLk https://tls-echo.<ip-of-gateway-lb-service>.sslip.io | jq; sleep 2; end
+$ while true; curl -sSLk https://tls-echo.<ip-of-tls-echo-gw-lb-service>.sslip.io | jq; sleep 2; end
 {
   "timestamp": "2024-07-31T09:06:43.293Z",
   "message": "demo-env",
@@ -320,6 +360,12 @@ $ while true; curl -sSLk https://tls-echo.<ip-of-gateway-lb-service>.sslip.io | 
     ]
   }
 }
+```
+
+Testing `TCPRoute`:
+```bash
+$ while true; nc <ip-of-tcp-echo-gw-lb-service>.sslip.io:9090 | jq; sleep 2; end
+TODO
 ```
 
 ## Credit
