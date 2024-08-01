@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -15,6 +16,12 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/reflection"
+
+	pb "echo-app/proto"
 )
 
 // Response is the struct for the JSON response
@@ -28,13 +35,59 @@ type Response struct {
 	Headers   map[string][]string `json:"headers,omitempty"` // Optional field to include headers
 }
 
+// EchoServer is the gRPC server that implements the EchoService
+type EchoServer struct {
+	pb.UnimplementedEchoServiceServer
+	messagePtr *string
+	nodePtr    *string
+}
+
+// Echo handles the Echo gRPC request
+func (s *EchoServer) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoResponse, error) {
+	// Get the current time in human-readable format with milliseconds
+	timestamp := time.Now().Format("2006-01-02T15:04:05.999Z07:00")
+	host, _ := os.Hostname()
+
+	// Extract the client's IP address from the context
+	var clientIP string
+	if p, ok := peer.FromContext(ctx); ok {
+		if addr, ok := p.Addr.(*net.TCPAddr); ok {
+			clientIP = addr.IP.String()
+		}
+	}
+
+	// Log the serving request with detailed information
+	log.Printf("Serving gRPC request from %s via gRPC endpoint", clientIP)
+
+	// Create the response struct
+	response := &pb.EchoResponse{
+		Timestamp: timestamp,
+		Hostname:  host,
+		Endpoint:  "gRPC",
+		SourceIp:  clientIP,
+	}
+
+	// Optionally set the message if it's not nil
+	if s.messagePtr != nil {
+		response.Message = *s.messagePtr
+	}
+
+	// Optionally set the node name if it's not nil
+	if s.nodePtr != nil {
+		response.Node = *s.nodePtr
+	}
+
+	return response, nil
+}
+
 func main() {
-	// Get MESSAGE, NODE, PRINT_HTTP_REQUEST_HEADERS, TLS, and TCP environment variables
+	// Get MESSAGE, NODE, PRINT_HTTP_REQUEST_HEADERS, TLS, TCP, and GRPC environment variables
 	messagePtr := getMessagePtr()
 	nodePtr := getNodePtr()
 	printHeaders := getPrintHeadersSetting()
 	tlsEnabled := getTLSSetting()
 	tcpEnabled := getTCPSetting()
+	grpcEnabled := getGRPCSetting()
 
 	// Prepare the message log
 	messageLog := "No MESSAGE environment variable set"
@@ -66,6 +119,11 @@ func main() {
 		log.Println("  TCP is enabled")
 	} else {
 		log.Println("  TCP is disabled")
+	}
+	if grpcEnabled {
+		log.Println("  gRPC is enabled")
+	} else {
+		log.Println("  gRPC is disabled")
 	}
 
 	// Register hello function to handle all requests
@@ -137,6 +195,32 @@ func main() {
 					continue
 				}
 				go handleTCPConnection(conn, messagePtr, nodePtr, "TCP")
+			}
+		}()
+	}
+
+	if grpcEnabled {
+		// Use GRPC_PORT environment variable, or default to 50051
+		grpcPort := os.Getenv("GRPC_PORT")
+		if grpcPort == "" {
+			grpcPort = "50051"
+		}
+
+		// Start the gRPC server on the specified gRPC port
+		go func() {
+			listener, err := net.Listen("tcp", ":"+grpcPort)
+			if err != nil {
+				log.Fatalf("Failed to start gRPC server: %v", err)
+			}
+			defer listener.Close()
+
+			grpcServer := grpc.NewServer()
+			pb.RegisterEchoServiceServer(grpcServer, &EchoServer{messagePtr: messagePtr, nodePtr: nodePtr})
+			reflection.Register(grpcServer)
+
+			log.Printf("gRPC server listening on port %s\n", grpcPort)
+			if err := grpcServer.Serve(listener); err != nil {
+				log.Fatalf("Failed to serve gRPC server: %v", err)
 			}
 		}()
 	}
@@ -259,6 +343,11 @@ func getTLSSetting() bool {
 // getTCPSetting checks the TCP environment variable.
 func getTCPSetting() bool {
 	return strings.ToLower(os.Getenv("TCP")) == "true"
+}
+
+// getGRPCSetting checks the GRPC environment variable.
+func getGRPCSetting() bool {
+	return strings.ToLower(os.Getenv("GRPC")) == "true"
 }
 
 // generateSelfSignedCert generates a self-signed TLS certificate.

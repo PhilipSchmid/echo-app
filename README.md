@@ -2,7 +2,26 @@
 
 ![Build and Push Docker Image](https://github.com/philipschmid/echo-app/actions/workflows/build.yaml/badge.svg) ![Go Syntax and Format Check](https://github.com/philipschmid/echo-app/actions/workflows/test.yaml/badge.svg)
 
-This is a simple Go application that responds with a JSON payload containing a timestamp, a message, the source IP, the hostname, the endpoint name, and optionally the node name and HTTP request headers. The application also supports optional TLS functionality, generating an in-memory self-signed TLS certificate when enabled. This allows secure communication over a dedicated HTTPS port in addition to the already existing HTTP port. Additionally, the application supports a TCP endpoint for serving the same JSON message.
+This is a simple Go application that responds with a JSON payload containing various details. The JSON response includes:
+
+- Timestamp
+- Customizable message
+- Source IP
+- Hostname
+- Endpoint name
+- Optionally, the (Kubernetes) node name and HTTP request headers
+
+The application supports multiple endpoints and functionalities:
+
+- **HTTP Endpoint**: Responds with the JSON payload over HTTP.
+- **HTTPS Endpoint**:
+  - Optional TLS functionality can be enabled.
+  - Generates an in-memory self-signed TLS certificate.
+  - Allows secure communication over a dedicated HTTPS port.
+- **TCP Endpoint**: Serves the same JSON message over a TCP connection (minus the request headers)
+- **gRPC Endpoint**: Provides the same information using gRPC.
+
+These features make the application versatile for different types of network communication.
 
 ## Configuration Options
 - `MESSAGE`: A customizable message to be returned in the JSON response. If not set, no message will be displayed.
@@ -13,6 +32,8 @@ This is a simple Go application that responds with a JSON payload containing a t
 - `TLS_PORT`: The port number on which the TLS server listens. Default is `8443`.
 - `TCP`: Set to `true` to enable the TCP endpoint. By default, TCP is disabled.
 - `TCP_PORT`: The port number on which the TCP server listens. Default is `9090`.
+- `GRPC`: Set to `true` to enable the gRPC endpoint. By default, gRPC is disabled.
+- `GRPC_PORT`: The port number on which the gRPC server listens. Default is `50051`.
 
 ## Standalone Container
 Shell 1 (server):
@@ -28,6 +49,8 @@ docker run -it -p 8080:8080 -e PRINT_HTTP_REQUEST_HEADERS="true" ghcr.io/philips
 docker run -it -p 8080:8080 -p 8443:8443 -e TLS="true" ghcr.io/philipschmid/echo-app:main
 # Optionally enable TCP:
 docker run -it -p 8080:8080 -p 9090:9090 -e TCP="true" ghcr.io/philipschmid/echo-app:main
+# Optionally enable gRPC:
+docker run -it -p 8080:8080 -p 50051:50051 -e GRPC="true" ghcr.io/philipschmid/echo-app:main
 ```
 
 Shell 2 (client):
@@ -37,13 +60,39 @@ curl http://localhost:8080/
 
 You should see a similar client output like this:
 ```json
-{"timestamp":"2024-05-28T19:50:10.289Z","hostname":"83ff0b127ed6","source_ip":"192.168.65.1","endpoint":"HTTP"}
-{"timestamp":"2024-05-28T19:50:35.022Z","message":"Hello World!","hostname":"4495529ebd32","source_ip":"192.168.65.1","node":"k8s-node-1","endpoint":"HTTP"}
+{
+    "timestamp": "2024-05-28T19:50:10.289Z",
+    "hostname": "83ff0b127ed6",
+    "source_ip": "192.168.65.1",
+    "endpoint": "HTTP"
+}
+{
+    "timestamp": "2024-05-28T19:50:35.022Z",
+    "message": "Hello World!",
+    "hostname": "4495529ebd32",
+    "source_ip": "192.168.65.1",
+    "node": "k8s-node-1",
+    "endpoint": "HTTP"
+}
 ```
 
 If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include the request headers:
 ```json
-{"timestamp":"2024-05-28T20:21:23.363Z","hostname":"3f96391b04f2","source_ip":"192.168.65.1","node":"k8s-node-1","endpoint":"HTTP","headers":{"Accept":["*/*"],"User-Agent":["curl/8.6.0"]}}
+{
+    "timestamp": "2024-05-28T20:21:23.363Z",
+    "hostname": "3f96391b04f2",
+    "source_ip": "192.168.65.1",
+    "node": "k8s-node-1",
+    "endpoint": "HTTP",
+    "headers": {
+        "Accept": [
+            "*/*"
+        ],
+        "User-Agent": [
+            "curl/8.6.0"
+        ]
+    }
+}
 ```
 
 If `TLS` is enabled, you can test the HTTPS endpoint:
@@ -58,8 +107,44 @@ nc localhost 9090
 
 You should see a similar output like this:
 ```json
-{"timestamp":"2024-05-28T19:50:10.289Z","hostname":"83ff0b127ed6","source_ip":"127.0.0.1","endpoint":"TCP"}
-{"timestamp":"2024-05-28T19:50:35.022Z","message":"Hello World!","hostname":"4495529ebd32","source_ip":"127.0.0.1","node":"k8s-node-1","endpoint":"TCP"}
+{
+    "timestamp": "2024-05-28T19:50:10.289Z",
+    "hostname": "83ff0b127ed6",
+    "source_ip": "127.0.0.1",
+    "endpoint": "TCP"
+}
+{
+    "timestamp": "2024-05-28T19:50:35.022Z",
+    "message": "Hello World!",
+    "hostname": "4495529ebd32",
+    "source_ip": "127.0.0.1",
+    "node": "k8s-node-1",
+    "endpoint": "TCP"
+}
+```
+
+To test the gRPC endpoint, you can use a gRPC client like `grpcurl`:
+
+```bash
+grpcurl -plaintext localhost:50051 echo.EchoService/Echo
+```
+
+You should see a similar output like this:
+```json
+{
+  "timestamp": "2024-08-01T13:55:45.228Z",
+  "sourceIp": "192.168.65.1",
+  "hostname": "efa892e16a74",
+  "endpoint": "gRPC"
+}
+{
+  "timestamp": "2024-08-01T13:55:45.228Z",
+  "message": "Hello World!",
+  "sourceIp": "192.168.65.1",
+  "hostname": "a96e5c48f68c",
+  "endpoint": "gRPC",
+  "node": "k8s-node-1"
+}
 ```
 
 ## Kubernetes
@@ -110,13 +195,14 @@ spec:
         - containerPort: 8080
         - containerPort: 8443
         - containerPort: 9090
+        - containerPort: 50051
         env:
         - name: MESSAGE
           valueFrom:
             configMapKeyRef:
               name: echo-app-config
               key: MESSAGE
-        # Add the PRINT_HTTP_REQUEST_HEADERS environment variable
+        #  Add the PRINT_HTTP_REQUEST_HEADERS environment variable
         - name: PRINT_HTTP_REQUEST_HEADERS
           valueFrom:
             configMapKeyRef:
@@ -154,6 +240,10 @@ spec:
     protocol: TCP
     port: 9090
     targetPort: 9090
+  - name: grpc
+    protocol: TCP
+    port: 50051
+    targetPort: 50051
   type: ClusterIP
 ```
 
@@ -263,6 +353,23 @@ spec:
         from: All
       kinds:
       - kind: TCPRoute
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: grpc-echo-gw
+  namespace: infra
+spec:
+  gatewayClassName: cilium
+  listeners:
+  - name: grpc
+    protocol: GRPC
+    port: 50051
+    allowedRoutes:
+      namespaces:
+        from: All
+      kinds:
+      - kind: GRPCRoute
 # Routes
 ---
 apiVersion: gateway.networking.k8s.io/v1
@@ -308,11 +415,24 @@ spec:
   - backendRefs:
     - name: echo-app-service
       port: 9090
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: GRPCRoute
+metadata:
+  name: grpc-echo
+spec:
+  parentRefs:
+  - name: grpc-echo-gw
+    namespace: infra
+  rules:
+  - backendRefs:
+    - name: echo-app-service
+      port: 50051
 ```
 
 Testing `HTTPRoute`:
 ```bash
-$ while true; curl -sSL http://echo.<ip-of-echo-gw-lb-service>.sslip.io | jq; sleep 2; end
+$ while true; do curl -sSL http://echo.<ip-of-echo-gw-lb-service>.sslip.io | jq; sleep 2; done
 {
   "timestamp": "2024-07-31T09:04:14.801Z",
   "message": "demo-env",
@@ -344,7 +464,7 @@ $ while true; curl -sSL http://echo.<ip-of-echo-gw-lb-service>.sslip.io | jq; sl
 
 Testing `TLSRoute`:
 ```bash
-$ while true; curl -sSLk https://tls-echo.<ip-of-tls-echo-gw-lb-service>.sslip.io | jq; sleep 2; end
+$ while true; do curl -sSLk https://tls-echo.<ip-of-tls-echo-gw-lb-service>.sslip.io | jq; sleep 2; done
 {
   "timestamp": "2024-07-31T09:06:43.293Z",
   "message": "demo-env",
@@ -364,8 +484,26 @@ $ while true; curl -sSLk https://tls-echo.<ip-of-tls-echo-gw-lb-service>.sslip.i
 
 Testing `TCPRoute`:
 ```bash
-$ while true; nc <ip-of-tcp-echo-gw-lb-service>.sslip.io:9090 | jq; sleep 2; end
-TODO
+$ while true; do nc <ip-of-tcp-echo-gw-lb-service>.sslip.io 9090; sleep 2; done
+{
+  "timestamp": "2024-07-31T09:08:43.293Z",
+  "message": "demo-env",
+  "source_ip": "10.0.2.214",
+  "hostname": "echo-app-deployment-85f85574bb-rspj9",
+  "node": "aks-nodepool1-15164467-vmss000002"
+}
+```
+
+Testing `GRPCRoute`:
+```bash
+$ while true; do grpcurl -plaintext -d '{"message": "Hello"}' <ip-of-grpc-echo-gw-lb-service>.sslip.io:50051 echo.EchoService/Echo; sleep 2; done
+{
+  "timestamp": "2024-07-31T09:10:43.293Z",
+  "message": "Hello",
+  "source_ip": "10.0.2.214",
+  "hostname": "echo-app-deployment-85f85574bb-rspj9",
+  "node": "aks-nodepool1-15164467-vmss000002"
+}
 ```
 
 ## Credit

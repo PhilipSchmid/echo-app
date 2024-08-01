@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option go_package = "./proto;echo";
+
+package echo;
+
+service EchoService {
+  rpc Echo(EchoRequest) returns (EchoResponse);
+}
+
+message EchoRequest {}
+
+message EchoResponse {
+  string timestamp = 1;
+  string message = 2;
+  string source_ip = 3;
+  string hostname = 4;
+  string endpoint = 5;
+  string node = 6;
+}
