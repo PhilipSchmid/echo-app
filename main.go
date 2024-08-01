@@ -23,6 +23,7 @@ type Response struct {
 	Message   *string             `json:"message,omitempty"`
 	SourceIP  string              `json:"source_ip"`
 	Hostname  string              `json:"hostname"`
+	Endpoint  string              `json:"endpoint"`          // Field to include the endpoint name
 	Node      *string             `json:"node,omitempty"`    // Optional field to include node name
 	Headers   map[string][]string `json:"headers,omitempty"` // Optional field to include headers
 }
@@ -63,7 +64,7 @@ func main() {
 
 	// Register hello function to handle all requests
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", hello(messagePtr, nodePtr, printHeaders)) // Pass message and node pointers and printHeaders to the hello function
+	mux.HandleFunc("/", hello(messagePtr, nodePtr, printHeaders, "HTTP")) // Pass message, node pointers, printHeaders, and endpoint name to the hello function
 
 	// Use PORT environment variable, or default to 8080
 	port := os.Getenv("PORT")
@@ -93,8 +94,10 @@ func main() {
 		// Start the HTTPS server on the specified TLS port
 		go func() {
 			server := &http.Server{
-				Addr:    ":" + tlsPort,
-				Handler: mux,
+				Addr: ":" + tlsPort,
+				Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					hello(messagePtr, nodePtr, printHeaders, "HTTPS")(w, r)
+				}),
 				TLSConfig: &tls.Config{
 					Certificates: []tls.Certificate{cert},
 				},
@@ -109,8 +112,8 @@ func main() {
 	select {}
 }
 
-// hello returns a http.HandlerFunc that uses the provided message pointer and printHeaders flag.
-func hello(messagePtr *string, nodePtr *string, printHeaders bool) http.HandlerFunc {
+// hello returns a http.HandlerFunc that uses the provided message pointer, node pointer, printHeaders flag, and endpoint name.
+func hello(messagePtr *string, nodePtr *string, printHeaders bool, endpoint string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the IP address without the port number
 		ip, _, err := net.SplitHostPort(r.RemoteAddr)
@@ -120,8 +123,8 @@ func hello(messagePtr *string, nodePtr *string, printHeaders bool) http.HandlerF
 			return
 		}
 
-		// Log the serving request with the source IP
-		log.Printf("Serving request: %s from %s", r.URL.Path, ip)
+		// Log the serving request with detailed information
+		log.Printf("Serving request: %s %s from %s (User-Agent: %s) via %s endpoint", r.Method, r.URL.Path, ip, r.UserAgent(), endpoint)
 		host, _ := os.Hostname()
 
 		// Get the current time in human-readable format with milliseconds
@@ -132,6 +135,7 @@ func hello(messagePtr *string, nodePtr *string, printHeaders bool) http.HandlerF
 			Timestamp: timestamp,
 			Message:   messagePtr,
 			Hostname:  host,
+			Endpoint:  endpoint,
 			Node:      nodePtr,
 			SourceIP:  ip,
 		}

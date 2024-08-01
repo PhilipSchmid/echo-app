@@ -2,7 +2,7 @@
 
 ![Build and Push Docker Image](https://github.com/philipschmid/echo-app/actions/workflows/build.yaml/badge.svg) ![Go Syntax and Format Check](https://github.com/philipschmid/echo-app/actions/workflows/test.yaml/badge.svg)
 
-This is a simple Go application that responds with a JSON payload containing a timestamp, a message, the source IP, the hostname, and optionally the node name and HTTP request headers. The application also supports optional TLS functionality, generating an in-memory self-signed TLS certificate when enabled. This allows secure communication over a dedicated HTTPS port in addition to the already existing HTTP port.
+This is a simple Go application that responds with a JSON payload containing a timestamp, a message, the source IP, the hostname, the endpoint name, and optionally the node name and HTTP request headers. The application also supports optional TLS functionality, generating an in-memory self-signed TLS certificate when enabled. This allows secure communication over a dedicated HTTPS port in addition to the already existing HTTP port.
 
 ## Configuration Options
 - `MESSAGE`: A customizable message to be returned in the JSON response. If not set, no message will be displayed.
@@ -33,13 +33,13 @@ curl http://localhost:8080/
 
 You should see a similar client output like this:
 ```json
-{"timestamp":"2024-05-28T19:50:10.289Z","hostname":"83ff0b127ed6","source_ip":"192.168.65.1"}
-{"timestamp":"2024-05-28T19:50:35.022Z","message":"Hello World!","hostname":"4495529ebd32","source_ip":"192.168.65.1","node":"k8s-node-1"}
+{"timestamp":"2024-05-28T19:50:10.289Z","hostname":"83ff0b127ed6","source_ip":"192.168.65.1","endpoint":"HTTP"}
+{"timestamp":"2024-05-28T19:50:35.022Z","message":"Hello World!","hostname":"4495529ebd32","source_ip":"192.168.65.1","node":"k8s-node-1","endpoint":"HTTP"}
 ```
 
 If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include the request headers:
 ```json
-{"timestamp":"2024-05-28T20:21:23.363Z","hostname":"3f96391b04f2","source_ip":"192.168.65.1","node":"k8s-node-1","headers":{"Accept":["*/*"],"User-Agent":["curl/8.6.0"]}}
+{"timestamp":"2024-05-28T20:21:23.363Z","hostname":"3f96391b04f2","source_ip":"192.168.65.1","node":"k8s-node-1","endpoint":"HTTP","headers":{"Accept":["*/*"],"User-Agent":["curl/8.6.0"]}}
 ```
 
 If `TLS` is enabled, you can test the HTTPS endpoint:
@@ -144,12 +144,12 @@ kubectl run netshoot --rm -it --image=nicolaka/netshoot -- curl http://echo-app-
 
 You should see a similar client output like this:
 ```json
-{"timestamp":"2024-05-28T19:50:35.022Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1"}
+{"timestamp":"2024-05-28T19:50:35.022Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1","endpoint":"HTTP"}
 ```
 
 If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include the request headers:
 ```json
-{"timestamp":"2024-05-28T20:21:23.363Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1","headers":{"Accept":["*/*"],"User-Agent":["curl/8.6.0"]}}
+{"timestamp":"2024-05-28T20:21:23.363Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1","endpoint":"HTTP","headers":{"Accept":["*/*"],"User-Agent":["curl/8.6.0"]}}
 ```
 
 ### Ingress Example
