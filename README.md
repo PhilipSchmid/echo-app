@@ -2,7 +2,7 @@
 
 ![Build and Push Docker Image](https://github.com/philipschmid/echo-app/actions/workflows/build.yaml/badge.svg) ![Go Syntax and Format Check](https://github.com/philipschmid/echo-app/actions/workflows/test.yaml/badge.svg)
 
-This is a simple Go application that responds with a JSON payload containing a timestamp, a message, the source IP, the hostname, the endpoint name, and optionally the node name and HTTP request headers. The application also supports optional TLS functionality, generating an in-memory self-signed TLS certificate when enabled. This allows secure communication over a dedicated HTTPS port in addition to the already existing HTTP port.
+This is a simple Go application that responds with a JSON payload containing a timestamp, a message, the source IP, the hostname, the endpoint name, and optionally the node name and HTTP request headers. The application also supports optional TLS functionality, generating an in-memory self-signed TLS certificate when enabled. This allows secure communication over a dedicated HTTPS port in addition to the already existing HTTP port. Additionally, the application supports a TCP endpoint for serving the same JSON message.
 
 ## Configuration Options
 - `MESSAGE`: A customizable message to be returned in the JSON response. If not set, no message will be displayed.
@@ -11,6 +11,8 @@ This is a simple Go application that responds with a JSON payload containing a t
 - `PRINT_HTTP_REQUEST_HEADERS`: Set to `true` to include HTTP request headers in the JSON response. By default, headers are not included.
 - `TLS`: Set to `true` to enable TLS (HTTPS) support. By default, TLS is disabled.
 - `TLS_PORT`: The port number on which the TLS server listens. Default is `8443`.
+- `TCP`: Set to `true` to enable the TCP endpoint. By default, TCP is disabled.
+- `TCP_PORT`: The port number on which the TCP server listens. Default is `9090`.
 
 ## Standalone Container
 Shell 1 (server):
@@ -24,6 +26,8 @@ docker run -it -p 8080:8080 -e NODE="k8s-node-1" ghcr.io/philipschmid/echo-app:m
 docker run -it -p 8080:8080 -e PRINT_HTTP_REQUEST_HEADERS="true" ghcr.io/philipschmid/echo-app:main
 # Optionally enable TLS:
 docker run -it -p 8080:8080 -p 8443:8443 -e TLS="true" ghcr.io/philipschmid/echo-app:main
+# Optionally enable TCP:
+docker run -it -p 8080:8080 -p 9090:9090 -e TCP="true" ghcr.io/philipschmid/echo-app:main
 ```
 
 Shell 2 (client):
@@ -45,6 +49,17 @@ If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include
 If `TLS` is enabled, you can test the HTTPS endpoint:
 ```bash
 curl -k https://localhost:8443/
+```
+
+To test the TCP endpoint using netcat:
+```bash
+nc localhost 9090
+```
+
+You should see a similar output like this:
+```json
+{"timestamp":"2024-05-28T19:50:10.289Z","hostname":"83ff0b127ed6","source_ip":"127.0.0.1","endpoint":"TCP"}
+{"timestamp":"2024-05-28T19:50:35.022Z","message":"Hello World!","hostname":"4495529ebd32","source_ip":"127.0.0.1","node":"k8s-node-1","endpoint":"TCP"}
 ```
 
 ## Kubernetes

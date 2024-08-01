@@ -29,11 +29,12 @@ type Response struct {
 }
 
 func main() {
-	// Get MESSAGE, NODE, PRINT_HTTP_REQUEST_HEADERS, and TLS environment variables
+	// Get MESSAGE, NODE, PRINT_HTTP_REQUEST_HEADERS, TLS, and TCP environment variables
 	messagePtr := getMessagePtr()
 	nodePtr := getNodePtr()
 	printHeaders := getPrintHeadersSetting()
 	tlsEnabled := getTLSSetting()
+	tcpEnabled := getTCPSetting()
 
 	// Prepare the message log
 	messageLog := "No MESSAGE environment variable set"
@@ -60,6 +61,11 @@ func main() {
 		log.Println("  TLS is enabled")
 	} else {
 		log.Println("  TLS is disabled")
+	}
+	if tcpEnabled {
+		log.Println("  TCP is enabled")
+	} else {
+		log.Println("  TCP is disabled")
 	}
 
 	// Register hello function to handle all requests
@@ -105,6 +111,33 @@ func main() {
 
 			log.Printf("TLS server listening on port %s\n", tlsPort)
 			log.Fatal(server.ListenAndServeTLS("", ""))
+		}()
+	}
+
+	if tcpEnabled {
+		// Use TCP_PORT environment variable, or default to 9090
+		tcpPort := os.Getenv("TCP_PORT")
+		if tcpPort == "" {
+			tcpPort = "9090"
+		}
+
+		// Start the TCP server on the specified TCP port
+		go func() {
+			listener, err := net.Listen("tcp", ":"+tcpPort)
+			if err != nil {
+				log.Fatalf("Failed to start TCP server: %v", err)
+			}
+			defer listener.Close()
+
+			log.Printf("TCP server listening on port %s\n", tcpPort)
+			for {
+				conn, err := listener.Accept()
+				if err != nil {
+					log.Printf("Failed to accept TCP connection: %v", err)
+					continue
+				}
+				go handleTCPConnection(conn, messagePtr, nodePtr, "TCP")
+			}
 		}()
 	}
 
@@ -160,6 +193,41 @@ func hello(messagePtr *string, nodePtr *string, printHeaders bool, endpoint stri
 	}
 }
 
+// handleTCPConnection handles a TCP connection and sends the JSON response.
+func handleTCPConnection(conn net.Conn, messagePtr *string, nodePtr *string, endpoint string) {
+	defer conn.Close()
+
+	// Get the IP address without the port number
+	ip, _, err := net.SplitHostPort(conn.RemoteAddr().String())
+	if err != nil {
+		log.Printf("Error getting remote address: %v", err)
+		return
+	}
+
+	// Log the serving request with detailed information
+	log.Printf("Serving TCP request from %s via %s endpoint", ip, endpoint)
+	host, _ := os.Hostname()
+
+	// Get the current time in human-readable format with milliseconds
+	timestamp := time.Now().Format("2006-01-02T15:04:05.999Z07:00")
+
+	// Create the response struct with the timestamp as the first field
+	response := Response{
+		Timestamp: timestamp,
+		Message:   messagePtr,
+		Hostname:  host,
+		Endpoint:  endpoint,
+		Node:      nodePtr,
+		SourceIP:  ip,
+	}
+
+	// Encode the response struct to JSON and send it as the response
+	err = json.NewEncoder(conn).Encode(response)
+	if err != nil {
+		log.Printf("Error encoding JSON response: %v", err)
+	}
+}
+
 // getMessagePtr gets the MESSAGE environment variable and returns a pointer to it, or nil if it's not set.
 func getMessagePtr() *string {
 	message := os.Getenv("MESSAGE")
@@ -186,6 +254,11 @@ func getPrintHeadersSetting() bool {
 // getTLSSetting checks the TLS environment variable.
 func getTLSSetting() bool {
 	return strings.ToLower(os.Getenv("TLS")) == "true"
+}
+
+// getTCPSetting checks the TCP environment variable.
+func getTCPSetting() bool {
+	return strings.ToLower(os.Getenv("TCP")) == "true"
 }
 
 // generateSelfSignedCert generates a self-signed TLS certificate.
