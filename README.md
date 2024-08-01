@@ -496,10 +496,10 @@ $ while true; do nc <ip-of-tcp-echo-gw-lb-service>.sslip.io 9090; sleep 2; done
 
 Testing `GRPCRoute`:
 ```bash
-$ while true; do grpcurl -plaintext -d '{"message": "Hello"}' <ip-of-grpc-echo-gw-lb-service>.sslip.io:50051 echo.EchoService/Echo; sleep 2; done
+$ while true; do grpcurl -plaintext <ip-of-grpc-echo-gw-lb-service>.sslip.io:50051 echo.EchoService/Echo; sleep 2; done
 {
   "timestamp": "2024-07-31T09:10:43.293Z",
-  "message": "Hello",
+  "message": "demo-env",
   "source_ip": "10.0.2.214",
   "hostname": "echo-app-deployment-85f85574bb-rspj9",
   "node": "aks-nodepool1-15164467-vmss000002"
