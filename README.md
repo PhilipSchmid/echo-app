@@ -13,10 +13,10 @@ This is a simple Go application that responds with a JSON payload containing var
 The application supports multiple endpoints and functionalities:
 
 - **HTTP Endpoint**: Responds with the JSON payload over HTTP.
-- **HTTPS Endpoint**:
-  - Optional TLS functionality can be enabled.
+- **TLS (HTTPS) Endpoint**:
   - Generates an in-memory self-signed TLS certificate.
   - Allows secure communication over a dedicated HTTPS port.
+  - Returns the same JSON message over a TLS-encrypted HTTP connection.
 - **TCP Endpoint**: Serves the same JSON message over a TCP connection (minus the request headers).
 - **gRPC Endpoint**: Provides the same information using gRPC (minus the request headers).
 
