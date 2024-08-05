@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,6 +23,14 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	pb "echo-app/proto"
+)
+
+// Default port numbers
+const (
+	DefaultHTTPPort = "8080"
+	DefaultTLSPort  = "8443"
+	DefaultTCPPort  = "9090"
+	DefaultGRPCPort = "50051"
 )
 
 // Response is the struct for the JSON response
@@ -113,15 +122,12 @@ func main() {
 	log.Debugf("  TCP is set to: %t", tcpEnabled)
 	log.Debugf("  GRPC is set to: %t", grpcEnabled)
 
-	// Register hello function to handle all requests
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", hello(messagePtr, nodePtr, printHeaders, "HTTP")) // Pass message, node pointers, printHeaders, and endpoint name to the hello function
+	// Use PORT environment variable, or default to DefaultHTTPPort
+	port := getValidPort("PORT", DefaultHTTPPort)
 
-	// Use PORT environment variable, or default to 8080
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	// Register handleHTTPConnection function to handle all requests
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", handleHTTPConnection(messagePtr, nodePtr, printHeaders, "HTTP")) // Pass message, node pointers, printHeaders, and endpoint name to the handleHTTPConnection function
 
 	// Start the web server on port and accept requests
 	go func() {
@@ -130,11 +136,8 @@ func main() {
 	}()
 
 	if tlsEnabled {
-		// Use TLS_PORT environment variable, or default to 8443
-		tlsPort := os.Getenv("TLS_PORT")
-		if tlsPort == "" {
-			tlsPort = "8443"
-		}
+		// Use TLS_PORT environment variable, or default to DefaultTLSPort
+		tlsPort := getValidPort("TLS_PORT", DefaultTLSPort)
 
 		// Generate in-memory TLS certificate pair
 		cert, err := generateSelfSignedCert()
@@ -147,7 +150,7 @@ func main() {
 			server := &http.Server{
 				Addr: ":" + tlsPort,
 				Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					hello(messagePtr, nodePtr, printHeaders, "TLS")(w, r)
+					handleHTTPConnection(messagePtr, nodePtr, printHeaders, "TLS")(w, r)
 				}),
 				TLSConfig: &tls.Config{
 					Certificates: []tls.Certificate{cert},
@@ -160,11 +163,8 @@ func main() {
 	}
 
 	if tcpEnabled {
-		// Use TCP_PORT environment variable, or default to 9090
-		tcpPort := os.Getenv("TCP_PORT")
-		if tcpPort == "" {
-			tcpPort = "9090"
-		}
+		// Use TCP_PORT environment variable, or default to DefaultTCPPort
+		tcpPort := getValidPort("TCP_PORT", DefaultTCPPort)
 
 		// Start the TCP server on the specified TCP port
 		go func() {
@@ -187,11 +187,8 @@ func main() {
 	}
 
 	if grpcEnabled {
-		// Use GRPC_PORT environment variable, or default to 50051
-		grpcPort := os.Getenv("GRPC_PORT")
-		if grpcPort == "" {
-			grpcPort = "50051"
-		}
+		// Use GRPC_PORT environment variable, or default to DefaultGRPCPort
+		grpcPort := getValidPort("GRPC_PORT", DefaultGRPCPort)
 
 		// Start the gRPC server on the specified gRPC port
 		go func() {
@@ -216,8 +213,8 @@ func main() {
 	select {}
 }
 
-// hello returns a http.HandlerFunc that uses the provided message pointer, node pointer, printHeaders flag, and endpoint name.
-func hello(messagePtr *string, nodePtr *string, printHeaders bool, endpoint string) http.HandlerFunc {
+// handleHTTPConnection returns a http.HandlerFunc that uses the provided message pointer, node pointer, printHeaders flag, and endpoint name.
+func handleHTTPConnection(messagePtr *string, nodePtr *string, printHeaders bool, endpoint string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the IP address without the port number
 		ip, _, err := net.SplitHostPort(r.RemoteAddr)
@@ -350,6 +347,29 @@ func setLogLevel() {
 		level = log.InfoLevel
 	}
 	log.SetLevel(level)
+}
+
+// getValidPort retrieves and validates the port from the environment variable, falling back to the default if invalid.
+func getValidPort(envVar string, defaultPort string) string {
+	port := os.Getenv(envVar)
+	if port == "" {
+		log.Infof("Port for %s not set. Falling back to default port: %s", envVar, defaultPort)
+		return defaultPort
+	}
+	if !isValidPort(port) {
+		log.Errorf("Invalid port for %s: %s. Falling back to default port: %s", envVar, port, defaultPort)
+		return defaultPort
+	}
+	return port
+}
+
+// isValidPort checks if the given port is a valid port number.
+func isValidPort(port string) bool {
+	portNum, err := strconv.Atoi(port)
+	if err != nil {
+		return false
+	}
+	return portNum > 0 && portNum <= 65535
 }
 
 // generateSelfSignedCert generates a self-signed TLS certificate.
