@@ -9,7 +9,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
-	"log"
 	"math/big"
 	"net"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
@@ -57,7 +57,7 @@ func (s *EchoServer) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoRes
 	}
 
 	// Log the serving request with detailed information
-	log.Printf("Serving gRPC request from %s via gRPC endpoint", clientIP)
+	log.Infof("Serving gRPC request from %s via gRPC endpoint", clientIP)
 
 	// Create the response struct
 	response := &pb.EchoResponse{
@@ -81,7 +81,10 @@ func (s *EchoServer) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoRes
 }
 
 func main() {
-	// Get MESSAGE, NODE, PRINT_HTTP_REQUEST_HEADERS, TLS, TCP, and GRPC environment variables
+	// Set up logging
+	setLogLevel()
+
+	// Get environment variables
 	messagePtr := getMessagePtr()
 	nodePtr := getNodePtr()
 	printHeaders := getPrintHeadersSetting()
@@ -92,7 +95,7 @@ func main() {
 	// Prepare the message log
 	messageLog := "No MESSAGE environment variable set"
 	if messagePtr != nil {
-		messageLog = "MESSAGE environment variable set to: " + *messagePtr
+		messageLog = "MESSAGE is set to: " + *messagePtr
 	}
 
 	// Prepare the node log
@@ -102,29 +105,13 @@ func main() {
 	}
 
 	// Print optional configs on multiple lines
-	log.Println("Server configuration:")
-	log.Printf("  %s\n", messageLog)
-	log.Printf("  %s\n", nodeLog)
-	if printHeaders {
-		log.Println("  PRINT_HTTP_REQUEST_HEADERS is enabled")
-	} else {
-		log.Println("  PRINT_HTTP_REQUEST_HEADERS is disabled")
-	}
-	if tlsEnabled {
-		log.Println("  TLS is enabled")
-	} else {
-		log.Println("  TLS is disabled")
-	}
-	if tcpEnabled {
-		log.Println("  TCP is enabled")
-	} else {
-		log.Println("  TCP is disabled")
-	}
-	if grpcEnabled {
-		log.Println("  gRPC is enabled")
-	} else {
-		log.Println("  gRPC is disabled")
-	}
+	log.Debug("Server configuration:")
+	log.Debugf("  %s", messageLog)
+	log.Debugf("  %s", nodeLog)
+	log.Debugf("  PRINT_HTTP_REQUEST_HEADERS is set to: %t", printHeaders)
+	log.Debugf("  TLS is set to: %t", tlsEnabled)
+	log.Debugf("  TCP is set to: %t", tcpEnabled)
+	log.Debugf("  GRPC is set to: %t", grpcEnabled)
 
 	// Register hello function to handle all requests
 	mux := http.NewServeMux()
@@ -138,7 +125,7 @@ func main() {
 
 	// Start the web server on port and accept requests
 	go func() {
-		log.Printf("Server listening on port %s\n", port)
+		log.Infof("HTTP server listening on port %s", port)
 		log.Fatal(http.ListenAndServe(":"+port, mux))
 	}()
 
@@ -160,14 +147,14 @@ func main() {
 			server := &http.Server{
 				Addr: ":" + tlsPort,
 				Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					hello(messagePtr, nodePtr, printHeaders, "HTTPS")(w, r)
+					hello(messagePtr, nodePtr, printHeaders, "TLS")(w, r)
 				}),
 				TLSConfig: &tls.Config{
 					Certificates: []tls.Certificate{cert},
 				},
 			}
 
-			log.Printf("TLS server listening on port %s\n", tlsPort)
+			log.Infof("TLS server listening on port %s", tlsPort)
 			log.Fatal(server.ListenAndServeTLS("", ""))
 		}()
 	}
@@ -187,14 +174,14 @@ func main() {
 			}
 			defer listener.Close()
 
-			log.Printf("TCP server listening on port %s\n", tcpPort)
+			log.Infof("TCP server listening on port %s", tcpPort)
 			for {
 				conn, err := listener.Accept()
 				if err != nil {
-					log.Printf("Failed to accept TCP connection: %v", err)
+					log.Errorf("Failed to accept TCP connection: %v", err)
 					continue
 				}
-				go handleTCPConnection(conn, messagePtr, nodePtr, "TCP")
+				go handleTCPConnection(conn, messagePtr, nodePtr)
 			}
 		}()
 	}
@@ -218,7 +205,7 @@ func main() {
 			pb.RegisterEchoServiceServer(grpcServer, &EchoServer{messagePtr: messagePtr, nodePtr: nodePtr})
 			reflection.Register(grpcServer)
 
-			log.Printf("gRPC server listening on port %s\n", grpcPort)
+			log.Infof("gRPC server listening on port %s", grpcPort)
 			if err := grpcServer.Serve(listener); err != nil {
 				log.Fatalf("Failed to serve gRPC server: %v", err)
 			}
@@ -235,13 +222,13 @@ func hello(messagePtr *string, nodePtr *string, printHeaders bool, endpoint stri
 		// Get the IP address without the port number
 		ip, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
-			log.Printf("Error getting remote address: %v", err)
+			log.Errorf("Error getting remote address: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
 
-		// Log the serving request with detailed information
-		log.Printf("Serving request: %s %s from %s (User-Agent: %s) via %s endpoint", r.Method, r.URL.Path, ip, r.UserAgent(), endpoint)
+		// Log the serving request with detailed information in info log level, as serving those is the core functionality of the application.
+		log.Infof("Serving request: %s %s from %s (User-Agent: %s) via %s endpoint", r.Method, r.URL.Path, ip, r.UserAgent(), endpoint)
 		host, _ := os.Hostname()
 
 		// Get the current time in human-readable format with milliseconds
@@ -271,25 +258,25 @@ func hello(messagePtr *string, nodePtr *string, printHeaders bool, endpoint stri
 		// Encode the response struct to JSON and send it as the response
 		err = json.NewEncoder(w).Encode(response)
 		if err != nil {
-			log.Printf("Error encoding JSON response: %v", err)
+			log.Errorf("Error encoding JSON response: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	}
 }
 
 // handleTCPConnection handles a TCP connection and sends the JSON response.
-func handleTCPConnection(conn net.Conn, messagePtr *string, nodePtr *string, endpoint string) {
+func handleTCPConnection(conn net.Conn, messagePtr *string, nodePtr *string) {
 	defer conn.Close()
 
 	// Get the IP address without the port number
 	ip, _, err := net.SplitHostPort(conn.RemoteAddr().String())
 	if err != nil {
-		log.Printf("Error getting remote address: %v", err)
+		log.Errorf("Error getting remote address: %v", err)
 		return
 	}
 
 	// Log the serving request with detailed information
-	log.Printf("Serving TCP request from %s via %s endpoint", ip, endpoint)
+	log.Infof("Serving TCP request from %s via TCP endpoint", ip)
 	host, _ := os.Hostname()
 
 	// Get the current time in human-readable format with milliseconds
@@ -300,7 +287,7 @@ func handleTCPConnection(conn net.Conn, messagePtr *string, nodePtr *string, end
 		Timestamp: timestamp,
 		Message:   messagePtr,
 		Hostname:  host,
-		Endpoint:  endpoint,
+		Endpoint:  "TCP",
 		Node:      nodePtr,
 		SourceIP:  ip,
 	}
@@ -308,7 +295,7 @@ func handleTCPConnection(conn net.Conn, messagePtr *string, nodePtr *string, end
 	// Encode the response struct to JSON and send it as the response
 	err = json.NewEncoder(conn).Encode(response)
 	if err != nil {
-		log.Printf("Error encoding JSON response: %v", err)
+		log.Errorf("Error encoding JSON response: %v", err)
 	}
 }
 
@@ -348,6 +335,21 @@ func getTCPSetting() bool {
 // getGRPCSetting checks the GRPC environment variable.
 func getGRPCSetting() bool {
 	return strings.ToLower(os.Getenv("GRPC")) == "true"
+}
+
+// setLogLevel sets the log level based on the LOG_LEVEL environment variable.
+func setLogLevel() {
+	logLevel := os.Getenv("LOG_LEVEL")
+	if logLevel == "" {
+		// Default log level should be "info"
+		logLevel = "info"
+	}
+	level, err := log.ParseLevel(logLevel)
+	if err != nil {
+		log.Warnf("Invalid log level: %v. Falling back to 'info'.", err)
+		level = log.InfoLevel
+	}
+	log.SetLevel(level)
 }
 
 // generateSelfSignedCert generates a self-signed TLS certificate.
