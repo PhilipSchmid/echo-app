@@ -296,3 +296,160 @@ func TestSetLogLevel(t *testing.T) {
 		})
 	}
 }
+
+func TestGetMessagePtr(t *testing.T) {
+	tests := []struct {
+		envValue string
+		expected *string
+	}{
+		{"Hello, World!", stringPtr("Hello, World!")},
+		{"", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.envValue, func(t *testing.T) {
+			os.Setenv("MESSAGE", tt.envValue)
+			defer os.Unsetenv("MESSAGE")
+
+			result := getMessagePtr()
+			if (result == nil && tt.expected != nil) || (result != nil && tt.expected == nil) {
+				t.Errorf("getMessagePtr() = %v; want %v", result, tt.expected)
+			} else if result != nil && *result != *tt.expected {
+				t.Errorf("getMessagePtr() = %v; want %v", *result, *tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetNodePtr(t *testing.T) {
+	tests := []struct {
+		envValue string
+		expected *string
+	}{
+		{"test-node", stringPtr("test-node")},
+		{"", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.envValue, func(t *testing.T) {
+			os.Setenv("NODE", tt.envValue)
+			defer os.Unsetenv("NODE")
+
+			result := getNodePtr()
+			if (result == nil && tt.expected != nil) || (result != nil && tt.expected == nil) {
+				t.Errorf("getNodePtr() = %v; want %v", result, tt.expected)
+			} else if result != nil && *result != *tt.expected {
+				t.Errorf("getNodePtr() = %v; want %v", *result, *tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetPrintHeadersSetting(t *testing.T) {
+	tests := []struct {
+		envValue string
+		expected bool
+	}{
+		{"true", true},
+		{"false", false},
+		{"TRUE", true},
+		{"FALSE", false},
+		{"invalid", DefaultPrintHeaders},
+		{"", DefaultPrintHeaders},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.envValue, func(t *testing.T) {
+			os.Setenv("PRINT_HTTP_REQUEST_HEADERS", tt.envValue)
+			defer os.Unsetenv("PRINT_HTTP_REQUEST_HEADERS")
+
+			result := getPrintHeadersSetting()
+			if result != tt.expected {
+				t.Errorf("getPrintHeadersSetting() = %v; want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetTLSSetting(t *testing.T) {
+	tests := []struct {
+		envValue string
+		expected bool
+	}{
+		{"true", true},
+		{"false", false},
+		{"TRUE", true},
+		{"FALSE", false},
+		{"invalid", DefaultTLS},
+		{"", DefaultTLS},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.envValue, func(t *testing.T) {
+			os.Setenv("TLS", tt.envValue)
+			defer os.Unsetenv("TLS")
+
+			result := getTLSSetting()
+			if result != tt.expected {
+				t.Errorf("getTLSSetting() = %v; want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetTCPSetting(t *testing.T) {
+	tests := []struct {
+		envValue string
+		expected bool
+	}{
+		{"true", true},
+		{"false", false},
+		{"TRUE", true},
+		{"FALSE", false},
+		{"invalid", DefaultTCP},
+		{"", DefaultTCP},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.envValue, func(t *testing.T) {
+			os.Setenv("TCP", tt.envValue)
+			defer os.Unsetenv("TCP")
+
+			result := getTCPSetting()
+			if result != tt.expected {
+				t.Errorf("getTCPSetting() = %v; want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetGRPCSetting(t *testing.T) {
+	tests := []struct {
+		envValue string
+		expected bool
+	}{
+		{"true", true},
+		{"false", false},
+		{"TRUE", true},
+		{"FALSE", false},
+		{"invalid", DefaultGRPC},
+		{"", DefaultGRPC},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.envValue, func(t *testing.T) {
+			os.Setenv("GRPC", tt.envValue)
+			defer os.Unsetenv("GRPC")
+
+			result := getGRPCSetting()
+			if result != tt.expected {
+				t.Errorf("getGRPCSetting() = %v; want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+// Helper function to create a string pointer
+func stringPtr(s string) *string {
+	return &s
+}

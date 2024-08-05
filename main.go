@@ -27,6 +27,14 @@ import (
 
 // Default port numbers
 const (
+    DefaultMessage       = ""
+    DefaultNode          = ""
+
+    DefaultPrintHeaders  = false
+    DefaultTLS           = false
+    DefaultTCP           = false
+    DefaultGRPC          = false
+
 	DefaultHTTPPort = "8080"
 	DefaultTLSPort  = "8443"
 	DefaultTCPPort  = "9090"
@@ -296,42 +304,77 @@ func handleTCPConnection(conn net.Conn, messagePtr *string, nodePtr *string) {
 	}
 }
 
-// getMessagePtr gets the MESSAGE environment variable and returns a pointer to it, or nil if it's not set.
+// getMessagePtr gets the MESSAGE environment variable and returns a pointer to it, or nil if it's not set or invalid.
 func getMessagePtr() *string {
-	message := os.Getenv("MESSAGE")
-	if message == "" {
-		return nil
-	}
-	return &message
+    message := os.Getenv("MESSAGE")
+    if message == "" {
+        log.Warnf("Invalid MESSAGE environment variable. Falling back to default value: %s", DefaultMessage)
+        return nil
+    }
+    return &message
 }
 
-// getNodePtr gets the NODE environment variable and returns a pointer to it, or nil if it's not set.
+// getNodePtr gets the NODE environment variable and returns a pointer to it, or nil if it's not set or invalid.
 func getNodePtr() *string {
-	node := os.Getenv("NODE")
-	if node == "" {
-		return nil
-	}
-	return &node
+    node := os.Getenv("NODE")
+    if node == "" {
+        log.Warnf("Invalid NODE environment variable. Falling back to default value: %s", DefaultNode)
+        return nil
+    }
+    return &node
 }
 
 // getPrintHeadersSetting checks the PRINT_HTTP_REQUEST_HEADERS environment variable.
 func getPrintHeadersSetting() bool {
-	return strings.ToLower(os.Getenv("PRINT_HTTP_REQUEST_HEADERS")) == "true"
+    value := os.Getenv("PRINT_HTTP_REQUEST_HEADERS")
+    if value == "" {
+        log.Warnf("Invalid PRINT_HTTP_REQUEST_HEADERS environment variable. Falling back to default value: %t", DefaultPrintHeaders)
+        return DefaultPrintHeaders
+    }
+    return parseBool(value, DefaultPrintHeaders, "PRINT_HTTP_REQUEST_HEADERS")
 }
 
 // getTLSSetting checks the TLS environment variable.
 func getTLSSetting() bool {
-	return strings.ToLower(os.Getenv("TLS")) == "true"
+    value := os.Getenv("TLS")
+    if value == "" {
+        log.Warnf("Invalid TLS environment variable. Falling back to default value: %t", DefaultTLS)
+        return DefaultTLS
+    }
+    return parseBool(value, DefaultTLS, "TLS")
 }
 
 // getTCPSetting checks the TCP environment variable.
 func getTCPSetting() bool {
-	return strings.ToLower(os.Getenv("TCP")) == "true"
+    value := os.Getenv("TCP")
+    if value == "" {
+        log.Warnf("Invalid TCP environment variable. Falling back to default value: %t", DefaultTCP)
+        return DefaultTCP
+    }
+    return parseBool(value, DefaultTCP, "TCP")
 }
 
 // getGRPCSetting checks the GRPC environment variable.
 func getGRPCSetting() bool {
-	return strings.ToLower(os.Getenv("GRPC")) == "true"
+    value := os.Getenv("GRPC")
+    if value == "" {
+        log.Warnf("Invalid GRPC environment variable. Falling back to default value: %t", DefaultGRPC)
+        return DefaultGRPC
+    }
+    return parseBool(value, DefaultGRPC, "GRPC")
+}
+
+// parseBool parses a string to a boolean value, falling back to the default value if invalid.
+func parseBool(value string, defaultValue bool, envVarName string) bool {
+    switch strings.ToLower(value) {
+    case "true":
+        return true
+    case "false":
+        return false
+    default:
+        log.Warnf("Invalid value for %s: %s. Falling back to default value: %t", envVarName, value, defaultValue)
+        return defaultValue
+    }
 }
 
 // setLogLevel sets the log level based on the LOG_LEVEL environment variable.
