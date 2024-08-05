@@ -34,6 +34,35 @@ These features make the application versatile for different types of network com
 - `TCP_PORT`: The port number on which the TCP server listens. Default is `9090`.
 - `GRPC`: Set to `true` to enable the gRPC endpoint. By default, gRPC is disabled.
 - `GRPC_PORT`: The port number on which the gRPC server listens. Default is `50051`.
+- `LOG_LEVEL`: Set the logging level (`debug`, `info`, `warn`, `error`). Default is `info`.
+
+## Makefile Targets
+- `make`: Show the help message.
+- `make build`: Build the Go application.
+- `make vet`: Run `go vet` to examine Go source code and report suspicious constructs.
+- `make lint`: Run `golangci-lint` to perform static code analysis.
+- `make test`: Run the tests using `go test`.
+- `make docker`: Build the Docker image using `docker buildx build`.
+- `make run`: Build and run the Go application.
+
+## Running the Application
+To run the application, you can use the `make run` command:
+
+```sh
+make run
+```
+
+This will build the Go application (if not already built) and then execute it.
+
+## Building the Docker Image
+To build the Docker image, you can use the `make docker` command:
+
+```sh
+make docker
+```
+
+This will build a multi-arch Docker image for both `amd64` and `arm64` platforms.
+```
 
 ## Standalone Container
 Shell 1 (server):
