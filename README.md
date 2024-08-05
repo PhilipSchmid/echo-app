@@ -5,11 +5,10 @@
 This is a simple Go application that responds with a JSON payload containing various details. The JSON response includes:
 
 - Timestamp
-- Customizable message
 - Source IP
 - Hostname
 - Endpoint name
-- Optionally, the (Kubernetes) node name and HTTP request headers
+- Optionally, a customizable message, the (Kubernetes) node name and/or the HTTP request headers
 
 The application supports multiple endpoints and functionalities:
 
@@ -18,8 +17,8 @@ The application supports multiple endpoints and functionalities:
   - Optional TLS functionality can be enabled.
   - Generates an in-memory self-signed TLS certificate.
   - Allows secure communication over a dedicated HTTPS port.
-- **TCP Endpoint**: Serves the same JSON message over a TCP connection (minus the request headers)
-- **gRPC Endpoint**: Provides the same information using gRPC.
+- **TCP Endpoint**: Serves the same JSON message over a TCP connection (minus the request headers).
+- **gRPC Endpoint**: Provides the same information using gRPC (minus the request headers).
 
 These features make the application versatile for different types of network communication.
 
@@ -48,7 +47,7 @@ These features make the application versatile for different types of network com
 ## Running the Application
 To run the application, you can use the `make run` command:
 
-```sh
+```bash
 make run
 ```
 
@@ -57,12 +56,11 @@ This will build the Go application (if not already built) and then execute it.
 ## Building the Docker Image
 To build the Docker image, you can use the `make docker` command:
 
-```sh
+```bash
 make docker
 ```
 
 This will build a multi-arch Docker image for both `amd64` and `arm64` platforms.
-```
 
 ## Standalone Container
 Shell 1 (server):
