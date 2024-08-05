@@ -20,9 +20,6 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
 
-    - name: Build the app
-      run: go build ./...
-
     - name: Check go formatting
       run: |
         if [ -n "$(gofmt -l .)" ]; then
@@ -38,3 +35,9 @@ jobs:
       uses: golangci/golangci-lint-action@v6
       with:
         version: v1.58
+
+    - name: Run go tests
+      run: go test -v ./...
+
+    - name: Build the app
+      run: go build ./...
