@@ -60,7 +60,7 @@ build: lint vet test ## Build the Go application
 	@echo "Build completed."
 
 # Run target
-run: build ## Run the Go application
+run: ## Run the Go application
 	@echo "Running the Go application..."
 	./$(APP_NAME)
 

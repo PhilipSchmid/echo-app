@@ -27,13 +27,15 @@ import (
 
 // Default port numbers
 const (
-    DefaultMessage       = ""
-    DefaultNode          = ""
+	DefaultMessage = ""
+	DefaultNode    = ""
 
-    DefaultPrintHeaders  = false
-    DefaultTLS           = false
-    DefaultTCP           = false
-    DefaultGRPC          = false
+	DefaultPrintHeaders = false
+	DefaultTLS          = false
+	DefaultTCP          = false
+	DefaultGRPC         = false
+
+	DefaultLogLevel = log.InfoLevel
 
 	DefaultHTTPPort = "8080"
 	DefaultTLSPort  = "8443"
@@ -144,81 +146,93 @@ func main() {
 	}()
 
 	if tlsEnabled {
-		// Use TLS_PORT environment variable, or default to DefaultTLSPort
-		tlsPort := getValidPort("TLS_PORT", DefaultTLSPort)
-
-		// Generate in-memory TLS certificate pair
-		cert, err := generateSelfSignedCert()
-		if err != nil {
-			log.Fatalf("Failed to generate self-signed certificate: %v", err)
-		}
-
-		// Start the HTTPS server on the specified TLS port
-		go func() {
-			server := &http.Server{
-				Addr: ":" + tlsPort,
-				Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					handleHTTPConnection(messagePtr, nodePtr, printHeaders, "TLS")(w, r)
-				}),
-				TLSConfig: &tls.Config{
-					Certificates: []tls.Certificate{cert},
-				},
-			}
-
-			log.Infof("TLS server listening on port %s", tlsPort)
-			log.Fatal(server.ListenAndServeTLS("", ""))
-		}()
+		startTLSServer(messagePtr, nodePtr, printHeaders)
 	}
 
 	if tcpEnabled {
-		// Use TCP_PORT environment variable, or default to DefaultTCPPort
-		tcpPort := getValidPort("TCP_PORT", DefaultTCPPort)
-
-		// Start the TCP server on the specified TCP port
-		go func() {
-			listener, err := net.Listen("tcp", ":"+tcpPort)
-			if err != nil {
-				log.Fatalf("Failed to start TCP server: %v", err)
-			}
-			defer listener.Close()
-
-			log.Infof("TCP server listening on port %s", tcpPort)
-			for {
-				conn, err := listener.Accept()
-				if err != nil {
-					log.Errorf("Failed to accept TCP connection: %v", err)
-					continue
-				}
-				go handleTCPConnection(conn, messagePtr, nodePtr)
-			}
-		}()
+		startTCPServer(messagePtr, nodePtr)
 	}
 
 	if grpcEnabled {
-		// Use GRPC_PORT environment variable, or default to DefaultGRPCPort
-		grpcPort := getValidPort("GRPC_PORT", DefaultGRPCPort)
-
-		// Start the gRPC server on the specified gRPC port
-		go func() {
-			listener, err := net.Listen("tcp", ":"+grpcPort)
-			if err != nil {
-				log.Fatalf("Failed to start gRPC server: %v", err)
-			}
-			defer listener.Close()
-
-			grpcServer := grpc.NewServer()
-			pb.RegisterEchoServiceServer(grpcServer, &EchoServer{messagePtr: messagePtr, nodePtr: nodePtr})
-			reflection.Register(grpcServer)
-
-			log.Infof("gRPC server listening on port %s", grpcPort)
-			if err := grpcServer.Serve(listener); err != nil {
-				log.Fatalf("Failed to serve gRPC server: %v", err)
-			}
-		}()
+		startGRPCServer(messagePtr, nodePtr)
 	}
 
 	// Block forever
 	select {}
+}
+
+func startTLSServer(messagePtr, nodePtr *string, printHeaders bool) {
+	// Use TLS_PORT environment variable, or default to DefaultTLSPort
+	tlsPort := getValidPort("TLS_PORT", DefaultTLSPort)
+
+	// Generate in-memory TLS certificate pair
+	cert, err := generateSelfSignedCert()
+	if err != nil {
+		log.Fatalf("Failed to generate self-signed certificate: %v", err)
+	}
+
+	// Start the HTTPS server on the specified TLS port
+	go func() {
+		server := &http.Server{
+			Addr: ":" + tlsPort,
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				handleHTTPConnection(messagePtr, nodePtr, printHeaders, "TLS")(w, r)
+			}),
+			TLSConfig: &tls.Config{
+				Certificates: []tls.Certificate{cert},
+			},
+		}
+
+		log.Infof("TLS server listening on port %s", tlsPort)
+		log.Fatal(server.ListenAndServeTLS("", ""))
+	}()
+}
+
+func startTCPServer(messagePtr, nodePtr *string) {
+	// Use TCP_PORT environment variable, or default to DefaultTCPPort
+	tcpPort := getValidPort("TCP_PORT", DefaultTCPPort)
+
+	// Start the TCP server on the specified TCP port
+	go func() {
+		listener, err := net.Listen("tcp", ":"+tcpPort)
+		if err != nil {
+			log.Fatalf("Failed to start TCP server: %v", err)
+		}
+		defer listener.Close()
+
+		log.Infof("TCP server listening on port %s", tcpPort)
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				log.Errorf("Failed to accept TCP connection: %v", err)
+				continue
+			}
+			go handleTCPConnection(conn, messagePtr, nodePtr)
+		}
+	}()
+}
+
+func startGRPCServer(messagePtr, nodePtr *string) {
+	// Use GRPC_PORT environment variable, or default to DefaultGRPCPort
+	grpcPort := getValidPort("GRPC_PORT", DefaultGRPCPort)
+
+	// Start the gRPC server on the specified gRPC port
+	go func() {
+		listener, err := net.Listen("tcp", ":"+grpcPort)
+		if err != nil {
+			log.Fatalf("Failed to start gRPC server: %v", err)
+		}
+		defer listener.Close()
+
+		grpcServer := grpc.NewServer()
+		pb.RegisterEchoServiceServer(grpcServer, &EchoServer{messagePtr: messagePtr, nodePtr: nodePtr})
+		reflection.Register(grpcServer)
+
+		log.Infof("gRPC server listening on port %s", grpcPort)
+		if err := grpcServer.Serve(listener); err != nil {
+			log.Fatalf("Failed to serve gRPC server: %v", err)
+		}
+	}()
 }
 
 // handleHTTPConnection returns a http.HandlerFunc that uses the provided message pointer, node pointer, printHeaders flag, and endpoint name.
@@ -306,75 +320,75 @@ func handleTCPConnection(conn net.Conn, messagePtr *string, nodePtr *string) {
 
 // getMessagePtr gets the MESSAGE environment variable and returns a pointer to it, or nil if it's not set or invalid.
 func getMessagePtr() *string {
-    message := os.Getenv("MESSAGE")
-    if message == "" {
-        log.Warnf("Invalid MESSAGE environment variable. Falling back to default value: %s", DefaultMessage)
-        return nil
-    }
-    return &message
+	message := os.Getenv("MESSAGE")
+	if message == "" {
+		log.Debugf("No MESSAGE environment variable set. Falling back to default value: '%s'", DefaultMessage)
+		return nil
+	}
+	return &message
 }
 
 // getNodePtr gets the NODE environment variable and returns a pointer to it, or nil if it's not set or invalid.
 func getNodePtr() *string {
-    node := os.Getenv("NODE")
-    if node == "" {
-        log.Warnf("Invalid NODE environment variable. Falling back to default value: %s", DefaultNode)
-        return nil
-    }
-    return &node
+	node := os.Getenv("NODE")
+	if node == "" {
+		log.Debugf("No NODE environment variable set. Falling back to default value: '%s'", DefaultNode)
+		return nil
+	}
+	return &node
 }
 
 // getPrintHeadersSetting checks the PRINT_HTTP_REQUEST_HEADERS environment variable.
 func getPrintHeadersSetting() bool {
-    value := os.Getenv("PRINT_HTTP_REQUEST_HEADERS")
-    if value == "" {
-        log.Warnf("Invalid PRINT_HTTP_REQUEST_HEADERS environment variable. Falling back to default value: %t", DefaultPrintHeaders)
-        return DefaultPrintHeaders
-    }
-    return parseBool(value, DefaultPrintHeaders, "PRINT_HTTP_REQUEST_HEADERS")
+	value := os.Getenv("PRINT_HTTP_REQUEST_HEADERS")
+	if value == "" {
+		log.Debugf("No PRINT_HTTP_REQUEST_HEADERS environment variable set. Falling back to default value: '%t'", DefaultPrintHeaders)
+		return DefaultPrintHeaders
+	}
+	return parseBool(value, DefaultPrintHeaders, "PRINT_HTTP_REQUEST_HEADERS")
 }
 
 // getTLSSetting checks the TLS environment variable.
 func getTLSSetting() bool {
-    value := os.Getenv("TLS")
-    if value == "" {
-        log.Warnf("Invalid TLS environment variable. Falling back to default value: %t", DefaultTLS)
-        return DefaultTLS
-    }
-    return parseBool(value, DefaultTLS, "TLS")
+	value := os.Getenv("TLS")
+	if value == "" {
+		log.Debugf("No TLS environment variable set. Falling back to default value: '%t'", DefaultTLS)
+		return DefaultTLS
+	}
+	return parseBool(value, DefaultTLS, "TLS")
 }
 
 // getTCPSetting checks the TCP environment variable.
 func getTCPSetting() bool {
-    value := os.Getenv("TCP")
-    if value == "" {
-        log.Warnf("Invalid TCP environment variable. Falling back to default value: %t", DefaultTCP)
-        return DefaultTCP
-    }
-    return parseBool(value, DefaultTCP, "TCP")
+	value := os.Getenv("TCP")
+	if value == "" {
+		log.Debugf("No TCP environment variable set. Falling back to default value: '%t'", DefaultTCP)
+		return DefaultTCP
+	}
+	return parseBool(value, DefaultTCP, "TCP")
 }
 
 // getGRPCSetting checks the GRPC environment variable.
 func getGRPCSetting() bool {
-    value := os.Getenv("GRPC")
-    if value == "" {
-        log.Warnf("Invalid GRPC environment variable. Falling back to default value: %t", DefaultGRPC)
-        return DefaultGRPC
-    }
-    return parseBool(value, DefaultGRPC, "GRPC")
+	value := os.Getenv("GRPC")
+	if value == "" {
+		log.Debugf("No GRPC environment variable set. Falling back to default value: '%t'", DefaultGRPC)
+		return DefaultGRPC
+	}
+	return parseBool(value, DefaultGRPC, "GRPC")
 }
 
 // parseBool parses a string to a boolean value, falling back to the default value if invalid.
 func parseBool(value string, defaultValue bool, envVarName string) bool {
-    switch strings.ToLower(value) {
-    case "true":
-        return true
-    case "false":
-        return false
-    default:
-        log.Warnf("Invalid value for %s: %s. Falling back to default value: %t", envVarName, value, defaultValue)
-        return defaultValue
-    }
+	switch strings.ToLower(value) {
+	case "true":
+		return true
+	case "false":
+		return false
+	default:
+		log.Warnf("Invalid value for %s: %s. It needs to be a boolean. Falling back to default value: '%t'", envVarName, value, defaultValue)
+		return defaultValue
+	}
 }
 
 // setLogLevel sets the log level based on the LOG_LEVEL environment variable.
@@ -382,12 +396,12 @@ func setLogLevel() {
 	logLevel := os.Getenv("LOG_LEVEL")
 	if logLevel == "" {
 		// Default log level should be "info"
-		logLevel = "info"
+		logLevel = DefaultLogLevel.String()
 	}
 	level, err := log.ParseLevel(logLevel)
 	if err != nil {
-		log.Warnf("Invalid log level: %v. Falling back to 'info'.", err)
-		level = log.InfoLevel
+		log.Warnf("Invalid log level: %v. Falling back to '%s'.", err, DefaultLogLevel)
+		level = DefaultLogLevel
 	}
 	log.SetLevel(level)
 }
@@ -396,11 +410,11 @@ func setLogLevel() {
 func getValidPort(envVar string, defaultPort string) string {
 	port := os.Getenv(envVar)
 	if port == "" {
-		log.Infof("Port for %s not set. Falling back to default port: %s", envVar, defaultPort)
+		log.Debugf("No port for %s set. Falling back to default port: '%s'", envVar, defaultPort)
 		return defaultPort
 	}
 	if !isValidPort(port) {
-		log.Errorf("Invalid port for %s: %s. Falling back to default port: %s", envVar, port, defaultPort)
+		log.Warnf("Invalid port for %s: %s. Falling back to default port: '%s'", envVar, port, defaultPort)
 		return defaultPort
 	}
 	return port
