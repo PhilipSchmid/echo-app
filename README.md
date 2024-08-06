@@ -25,8 +25,6 @@ The application supports multiple listeners and functionalities:
 - **TCP Listener**: Serves the same JSON message over a TCP connection (minus the request headers).
 - **gRPC Listener**: Provides the same information using gRPC (minus the request headers).
 
-These features make the application versatile for different types of network communication.
-
 ## Configuration Options
 
 ### Environment Variables
