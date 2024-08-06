@@ -1,6 +1,6 @@
 # echo-app
 
-![Build and Push Docker Image](https://github.com/philipschmid/echo-app/actions/workflows/build.yaml/badge.svg) ![Go Syntax and Format Check](https://github.com/philipschmid/echo-app/actions/workflows/test.yaml/badge.svg)
+![Build and push Docker image](https://github.com/philipschmid/echo-app/actions/workflows/build.yaml/badge.svg) ![Go syntax and format check](https://github.com/philipschmid/echo-app/actions/workflows/lint.yaml/badge.svg) ![Go tests and app build](https://github.com/philipschmid/echo-app/actions/workflows/test.yaml/badge.svg)
 
 This is a simple Go application that responds with a JSON payload containing various details. The JSON response includes:
 

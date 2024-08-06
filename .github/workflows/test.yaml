@@ -1,4 +1,4 @@
-name: Go Syntax and Format Check
+name: Go tests and app build
 
 on:
   push:
@@ -7,34 +7,10 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
-    name: Check Go Syntax and Format
+  test-and-build:
+    name: Run tests and build the app
     runs-on: ubuntu-latest
     steps:
-
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.22'
-
-    - name: Check out code
-      uses: actions/checkout@v4
-
-    - name: Check go formatting
-      run: |
-        if [ -n "$(gofmt -l .)" ]; then
-          echo "Go code is not formatted:"
-          gofmt -d .
-          exit 1
-        fi
-
-    - name: Run go vet
-      run: go vet ./...
-
-    - name: golangci-lint
-      uses: golangci/golangci-lint-action@v6
-      with:
-        version: v1.58
 
     - name: Run go tests
       run: go test -v ./...
