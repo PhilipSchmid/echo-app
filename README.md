@@ -8,7 +8,9 @@ This is a simple Go application that responds with a JSON payload containing var
 - Source IP
 - Hostname
 - Listener name
-- Optionally, a customizable message, the (Kubernetes) node name and/or the HTTP request headers
+- HTTP version, HTTP method, and HTTP endpoint (HTTP and TLS listener only)
+- gRPC method (gRPC listener only)
+- Optionally, a customizable message, the (Kubernetes) node name, the HTTP request headers.
 
 The application supports multiple listeners and functionalities:
 
@@ -170,7 +172,8 @@ You should see a similar output like this:
   "sourceIp": "192.168.65.1",
   "hostname": "a96e5c48f68c",
   "listener": "gRPC",
-  "node": "k8s-node-1"
+  "node": "k8s-node-1",
+  "grpc_method": "/echo.EchoService/Echo"
 }
 ```
 
@@ -517,7 +520,8 @@ $ while true; do nc <ip-of-tcp-echo-gw-lb-service>.sslip.io 9090; sleep 2; done
   "message": "demo-env",
   "source_ip": "10.0.2.214",
   "hostname": "echo-app-deployment-85f85574bb-rspj9",
-  "node": "aks-nodepool1-15164467-vmss000002"
+  "node": "aks-nodepool1-15164467-vmss000002",
+  "listener": "TCP"
 }
 ```
 
@@ -529,7 +533,9 @@ $ while true; do grpcurl -plaintext <ip-of-grpc-echo-gw-lb-service>.sslip.io:500
   "message": "demo-env",
   "source_ip": "10.0.2.214",
   "hostname": "echo-app-deployment-85f85574bb-rspj9",
-  "node": "aks-nodepool1-15164467-vmss000002"
+  "node": "aks-nodepool1-15164467-vmss000002",
+  "listener": "gRPC",
+  "grpc_method": "/echo.EchoService/Echo"
 }
 ```
 

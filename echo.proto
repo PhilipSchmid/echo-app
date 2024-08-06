@@ -17,4 +17,8 @@ message EchoResponse {
   string hostname = 4;
   string listener = 5;
   string node = 6;
+  string grpc_method = 7;
+  string http_version = 8;
+  string http_method = 9;
+  string http_endpoint = 10;
 }

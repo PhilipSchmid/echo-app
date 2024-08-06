@@ -47,13 +47,17 @@ const (
 
 // Response is the struct for the JSON response
 type Response struct {
-	Timestamp string              `json:"timestamp"`
-	Message   *string             `json:"message,omitempty"`
-	SourceIP  string              `json:"source_ip"`
-	Hostname  string              `json:"hostname"`
-	Listener  string              `json:"listener"`          // Field to include the listener name
-	Node      *string             `json:"node,omitempty"`    // Optional field to include node name
-	Headers   map[string][]string `json:"headers,omitempty"` // Optional field to include headers
+	Timestamp    string              `json:"timestamp"`
+	Message      *string             `json:"message,omitempty"`
+	SourceIP     string              `json:"source_ip"`
+	Hostname     string              `json:"hostname"`
+	Listener     string              `json:"listener"`          // Field to include the listener name
+	Node         *string             `json:"node,omitempty"`    // Optional field to include node name
+	Headers      map[string][]string `json:"headers,omitempty"` // Optional field to include headers
+	HTTPVersion  string              `json:"http_version,omitempty"`
+	HTTPMethod   string              `json:"http_method,omitempty"`
+	HTTPEndpoint string              `json:"http_endpoint,omitempty"`
+	GRPCMethod   string              `json:"grpc_method,omitempty"`
 }
 
 // EchoServer is the gRPC server that implements the EchoService
@@ -77,15 +81,19 @@ func (s *EchoServer) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoRes
 		}
 	}
 
+	// Extract the gRPC method name from the context
+	method, _ := grpc.Method(ctx)
+
 	// Log the serving request with detailed information
-	log.Infof("Serving gRPC request from %s via gRPC listener", clientIP)
+	log.Infof("Serving gRPC request from %s via gRPC listener, method: %s", clientIP, method)
 
 	// Create the response struct
 	response := &pb.EchoResponse{
-		Timestamp: timestamp,
-		Hostname:  host,
-		Listener:  "gRPC",
-		SourceIp:  clientIP,
+		Timestamp:  timestamp,
+		Hostname:   host,
+		Listener:   "gRPC",
+		SourceIp:   clientIP,
+		GrpcMethod: method,
 	}
 
 	// Optionally set the message if it's not nil
@@ -252,7 +260,7 @@ func handleHTTPConnection(messagePtr *string, nodePtr *string, printHeaders bool
 		}
 
 		// Log the serving request with detailed information in info log level, as serving those is the core functionality of the application.
-		log.Infof("Serving request: %s %s from %s (User-Agent: %s) via %s listener", r.Method, r.URL.Path, ip, r.UserAgent(), listener)
+		log.Infof("Serving request: %s %s from %s (User-Agent: %s) via %s listener, HTTP version: %s", r.Method, r.URL.Path, ip, r.UserAgent(), listener, r.Proto)
 		host, _ := os.Hostname()
 
 		// Get the current time in human-readable format with milliseconds
@@ -260,12 +268,15 @@ func handleHTTPConnection(messagePtr *string, nodePtr *string, printHeaders bool
 
 		// Create the response struct with the timestamp as the first field
 		response := Response{
-			Timestamp: timestamp,
-			Message:   messagePtr,
-			Hostname:  host,
-			Listener:  listener,
-			Node:      nodePtr,
-			SourceIP:  ip,
+			Timestamp:    timestamp,
+			Message:      messagePtr,
+			Hostname:     host,
+			Listener:     listener,
+			Node:         nodePtr,
+			SourceIP:     ip,
+			HTTPVersion:  r.Proto,
+			HTTPMethod:   r.Method,
+			HTTPEndpoint: r.URL.Path,
 		}
 
 		// Conditionally add headers if printHeaders is true
