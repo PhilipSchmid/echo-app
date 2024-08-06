@@ -15,6 +15,6 @@ message EchoResponse {
   string message = 2;
   string source_ip = 3;
   string hostname = 4;
-  string endpoint = 5;
+  string listener = 5;
   string node = 6;
 }

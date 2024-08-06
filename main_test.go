@@ -119,8 +119,8 @@ func TestHTTPHandler(t *testing.T) {
 		t.Errorf("HTTP handler returned wrong node: got %v want %v", response.Node, node)
 	}
 
-	if response.Endpoint != "HTTP" {
-		t.Errorf("HTTP handler returned wrong endpoint: got %v want %v", response.Endpoint, "HTTP")
+	if response.Listener != "HTTP" {
+		t.Errorf("HTTP handler returned wrong listener: got %v want %v", response.Listener, "HTTP")
 	}
 }
 
@@ -130,7 +130,7 @@ func TestTCPHandler(t *testing.T) {
 
 	message := "Hello, World!"
 	node := "test-node"
-	endpoint := "TCP"
+	listenerName := "TCP"
 
 	// Start a TCP server
 	listener, err := net.Listen("tcp", "localhost:0")
@@ -173,8 +173,8 @@ func TestTCPHandler(t *testing.T) {
 		t.Errorf("TCP handler returned wrong node: got %v want %v", response.Node, node)
 	}
 
-	if response.Endpoint != endpoint {
-		t.Errorf("TCP handler returned wrong endpoint: got %v want %v", response.Endpoint, endpoint)
+	if response.Listener != listenerName {
+		t.Errorf("TCP handler returned wrong listener: got %v want %v", response.Listener, listenerName)
 	}
 
 	if err := <-errChan; err != nil {

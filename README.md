@@ -7,18 +7,18 @@ This is a simple Go application that responds with a JSON payload containing var
 - Timestamp
 - Source IP
 - Hostname
-- Endpoint name
+- Listener name
 - Optionally, a customizable message, the (Kubernetes) node name and/or the HTTP request headers
 
-The application supports multiple endpoints and functionalities:
+The application supports multiple listeners and functionalities:
 
-- **HTTP Endpoint**: Responds with the JSON payload over HTTP.
-- **TLS (HTTPS) Endpoint**:
+- **HTTP Listener**: Responds with the JSON payload over HTTP.
+- **TLS (HTTPS) Listener**:
   - Generates an in-memory self-signed TLS certificate.
   - Allows secure communication over a dedicated HTTPS port.
   - Returns the same JSON message over a TLS-encrypted HTTP connection.
-- **TCP Endpoint**: Serves the same JSON message over a TCP connection (minus the request headers).
-- **gRPC Endpoint**: Provides the same information using gRPC (minus the request headers).
+- **TCP Listener**: Serves the same JSON message over a TCP connection (minus the request headers).
+- **gRPC Listener**: Provides the same information using gRPC (minus the request headers).
 
 These features make the application versatile for different types of network communication.
 
@@ -29,9 +29,9 @@ These features make the application versatile for different types of network com
 - `PRINT_HTTP_REQUEST_HEADERS`: Set to `true` to include HTTP request headers in the JSON response. By default, headers are not included.
 - `TLS`: Set to `true` to enable TLS (HTTPS) support. By default, TLS is disabled.
 - `TLS_PORT`: The port number on which the TLS server listens. Default is `8443`.
-- `TCP`: Set to `true` to enable the TCP endpoint. By default, TCP is disabled.
+- `TCP`: Set to `true` to enable the TCP listener. By default, TCP is disabled.
 - `TCP_PORT`: The port number on which the TCP server listens. Default is `9090`.
-- `GRPC`: Set to `true` to enable the gRPC endpoint. By default, gRPC is disabled.
+- `GRPC`: Set to `true` to enable the gRPC listener. By default, gRPC is disabled.
 - `GRPC_PORT`: The port number on which the gRPC server listens. Default is `50051`.
 - `LOG_LEVEL`: Set the logging level (`debug`, `info`, `warn`, `error`). Default is `info`.
 
@@ -91,7 +91,7 @@ You should see a similar client output like this:
     "timestamp": "2024-05-28T19:50:10.289Z",
     "hostname": "83ff0b127ed6",
     "source_ip": "192.168.65.1",
-    "endpoint": "HTTP"
+    "listener": "HTTP"
 }
 {
     "timestamp": "2024-05-28T19:50:35.022Z",
@@ -99,7 +99,7 @@ You should see a similar client output like this:
     "hostname": "4495529ebd32",
     "source_ip": "192.168.65.1",
     "node": "k8s-node-1",
-    "endpoint": "HTTP"
+    "listener": "HTTP"
 }
 ```
 
@@ -110,7 +110,7 @@ If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include
     "hostname": "3f96391b04f2",
     "source_ip": "192.168.65.1",
     "node": "k8s-node-1",
-    "endpoint": "HTTP",
+    "listener": "HTTP",
     "headers": {
         "Accept": [
             "*/*"
@@ -122,12 +122,12 @@ If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include
 }
 ```
 
-If `TLS` is enabled, you can test the HTTPS endpoint:
+If `TLS` is enabled, you can test the HTTPS listener:
 ```bash
 curl -k https://localhost:8443/
 ```
 
-To test the TCP endpoint using netcat:
+To test the TCP listener using netcat:
 ```bash
 nc localhost 9090
 ```
@@ -138,7 +138,7 @@ You should see a similar output like this:
     "timestamp": "2024-05-28T19:50:10.289Z",
     "hostname": "83ff0b127ed6",
     "source_ip": "127.0.0.1",
-    "endpoint": "TCP"
+    "listener": "TCP"
 }
 {
     "timestamp": "2024-05-28T19:50:35.022Z",
@@ -146,11 +146,11 @@ You should see a similar output like this:
     "hostname": "4495529ebd32",
     "source_ip": "127.0.0.1",
     "node": "k8s-node-1",
-    "endpoint": "TCP"
+    "listener": "TCP"
 }
 ```
 
-To test the gRPC endpoint, you can use a gRPC client like `grpcurl`:
+To test the gRPC listener, you can use a gRPC client like `grpcurl`:
 
 ```bash
 grpcurl -plaintext localhost:50051 echo.EchoService/Echo
@@ -162,14 +162,14 @@ You should see a similar output like this:
   "timestamp": "2024-08-01T13:55:45.228Z",
   "sourceIp": "192.168.65.1",
   "hostname": "efa892e16a74",
-  "endpoint": "gRPC"
+  "listener": "gRPC"
 }
 {
   "timestamp": "2024-08-01T13:55:45.228Z",
   "message": "Hello World!",
   "sourceIp": "192.168.65.1",
   "hostname": "a96e5c48f68c",
-  "endpoint": "gRPC",
+  "listener": "gRPC",
   "node": "k8s-node-1"
 }
 ```
@@ -281,12 +281,12 @@ kubectl run netshoot --rm -it --image=nicolaka/netshoot -- curl http://echo-app-
 
 You should see a similar client output like this:
 ```json
-{"timestamp":"2024-05-28T19:50:35.022Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1","endpoint":"HTTP"}
+{"timestamp":"2024-05-28T19:50:35.022Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1","listener":"HTTP"}
 ```
 
 If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include the request headers:
 ```json
-{"timestamp":"2024-05-28T20:21:23.363Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1","endpoint":"HTTP","headers":{"Accept":["*/*"],"User-Agent":["curl/8.6.0"]}}
+{"timestamp":"2024-05-28T20:21:23.363Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1","listener":"HTTP","headers":{"Accept":["*/*"],"User-Agent":["curl/8.6.0"]}}
 ```
 
 ### Ingress Example

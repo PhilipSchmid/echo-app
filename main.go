@@ -51,7 +51,7 @@ type Response struct {
 	Message   *string             `json:"message,omitempty"`
 	SourceIP  string              `json:"source_ip"`
 	Hostname  string              `json:"hostname"`
-	Endpoint  string              `json:"endpoint"`          // Field to include the endpoint name
+	Listener  string              `json:"listener"`          // Field to include the listener name
 	Node      *string             `json:"node,omitempty"`    // Optional field to include node name
 	Headers   map[string][]string `json:"headers,omitempty"` // Optional field to include headers
 }
@@ -78,13 +78,13 @@ func (s *EchoServer) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoRes
 	}
 
 	// Log the serving request with detailed information
-	log.Infof("Serving gRPC request from %s via gRPC endpoint", clientIP)
+	log.Infof("Serving gRPC request from %s via gRPC listener", clientIP)
 
 	// Create the response struct
 	response := &pb.EchoResponse{
 		Timestamp: timestamp,
 		Hostname:  host,
-		Endpoint:  "gRPC",
+		Listener:  "gRPC",
 		SourceIp:  clientIP,
 	}
 
@@ -139,7 +139,7 @@ func main() {
 
 	// Register handleHTTPConnection function to handle all requests
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleHTTPConnection(messagePtr, nodePtr, printHeaders, "HTTP")) // Pass message, node pointers, printHeaders, and endpoint name to the handleHTTPConnection function
+	mux.HandleFunc("/", handleHTTPConnection(messagePtr, nodePtr, printHeaders, "HTTP")) // Pass message, node pointers, printHeaders, and listener name to the handleHTTPConnection function
 
 	// Start the web server on port and accept requests
 	go func() {
@@ -240,8 +240,8 @@ func startGRPCServer(messagePtr, nodePtr *string) {
 	}()
 }
 
-// handleHTTPConnection returns a http.HandlerFunc that uses the provided message pointer, node pointer, printHeaders flag, and endpoint name.
-func handleHTTPConnection(messagePtr *string, nodePtr *string, printHeaders bool, endpoint string) http.HandlerFunc {
+// handleHTTPConnection returns a http.HandlerFunc that uses the provided message pointer, node pointer, printHeaders flag, and listener name.
+func handleHTTPConnection(messagePtr *string, nodePtr *string, printHeaders bool, listener string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the IP address without the port number
 		ip, _, err := net.SplitHostPort(r.RemoteAddr)
@@ -252,7 +252,7 @@ func handleHTTPConnection(messagePtr *string, nodePtr *string, printHeaders bool
 		}
 
 		// Log the serving request with detailed information in info log level, as serving those is the core functionality of the application.
-		log.Infof("Serving request: %s %s from %s (User-Agent: %s) via %s endpoint", r.Method, r.URL.Path, ip, r.UserAgent(), endpoint)
+		log.Infof("Serving request: %s %s from %s (User-Agent: %s) via %s listener", r.Method, r.URL.Path, ip, r.UserAgent(), listener)
 		host, _ := os.Hostname()
 
 		// Get the current time in human-readable format with milliseconds
@@ -263,7 +263,7 @@ func handleHTTPConnection(messagePtr *string, nodePtr *string, printHeaders bool
 			Timestamp: timestamp,
 			Message:   messagePtr,
 			Hostname:  host,
-			Endpoint:  endpoint,
+			Listener:  listener,
 			Node:      nodePtr,
 			SourceIP:  ip,
 		}
@@ -300,7 +300,7 @@ func handleTCPConnection(conn net.Conn, messagePtr *string, nodePtr *string) {
 	}
 
 	// Log the serving request with detailed information
-	log.Infof("Serving TCP request from %s via TCP endpoint", ip)
+	log.Infof("Serving TCP request from %s via TCP listener", ip)
 	host, _ := os.Hostname()
 
 	// Get the current time in human-readable format with milliseconds
@@ -311,7 +311,7 @@ func handleTCPConnection(conn net.Conn, messagePtr *string, nodePtr *string) {
 		Timestamp: timestamp,
 		Message:   messagePtr,
 		Hostname:  host,
-		Endpoint:  "TCP",
+		Listener:  "TCP",
 		Node:      nodePtr,
 		SourceIP:  ip,
 	}
