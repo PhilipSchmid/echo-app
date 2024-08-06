@@ -13,8 +13,10 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -156,6 +158,9 @@ func main() {
 	if grpcEnabled {
 		startGRPCServer(messagePtr, nodePtr)
 	}
+
+	// Handle OS signals
+	handleSignals()
 
 	// Block forever
 	select {}
@@ -458,4 +463,17 @@ func generateSelfSignedCert() (tls.Certificate, error) {
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
 
 	return tls.X509KeyPair(certPEM, keyPEM)
+}
+
+// handleSignals sets up signal handling for SIGINT and SIGTSTP.
+func handleSignals() {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTSTP)
+
+	go func() {
+		for sig := range sigChan {
+			log.Infof("Received signal: %s. Terminating...", sig)
+			os.Exit(0)
+		}
+	}()
 }
