@@ -8,9 +8,9 @@ This is a simple Go application that responds with a JSON payload containing var
 - Source IP
 - Hostname
 - Listener name
-- HTTP version, HTTP method, and HTTP endpoint (HTTP and TLS listener only)
+- HTTP version, HTTP method, HTTP endpoint, and HTTP request headers (HTTP, TLS, and QUIC listeners only)
 - gRPC method (gRPC listener only)
-- Optionally, a customizable message, the (Kubernetes) node name, the HTTP request headers.
+- Optionally, a customizable message and the (Kubernetes) node name.
 
 The application supports multiple listeners and functionalities:
 
@@ -19,6 +19,9 @@ The application supports multiple listeners and functionalities:
   - Generates an in-memory self-signed TLS certificate.
   - Allows secure communication over a dedicated HTTPS port.
   - Returns the same JSON message over a TLS-encrypted HTTP connection.
+- **QUIC Listener**:
+  - Generates an in-memory self-signed TLS certificate.
+  - Returns the same JSON message over a TLS-encrypted HTTP/3 over QUIC connection.
 - **TCP Listener**: Serves the same JSON message over a TCP connection (minus the request headers).
 - **gRPC Listener**: Provides the same information using gRPC (minus the request headers).
 
@@ -27,14 +30,16 @@ These features make the application versatile for different types of network com
 ## Configuration Options
 - `MESSAGE`: A customizable message to be returned in the JSON response. If not set, no message will be displayed.
 - `NODE`: The name of the node where the app is running. This is typically used in a Kubernetes environment.
-- `PORT`: The port number on which the server listens. Default is `8080`.
+- `PORT`: The port number on which the HTTP server listens. Default is `8080` (TCP).
 - `PRINT_HTTP_REQUEST_HEADERS`: Set to `true` to include HTTP request headers in the JSON response. By default, headers are not included.
 - `TLS`: Set to `true` to enable TLS (HTTPS) support. By default, TLS is disabled.
-- `TLS_PORT`: The port number on which the TLS server listens. Default is `8443`.
+- `TLS_PORT`: The port number on which the TLS server listens. Default is `8443` (TCP).
 - `TCP`: Set to `true` to enable the TCP listener. By default, TCP is disabled.
-- `TCP_PORT`: The port number on which the TCP server listens. Default is `9090`.
+- `TCP_PORT`: The port number on which the TCP server listens. Default is `9090` (TCP).
 - `GRPC`: Set to `true` to enable the gRPC listener. By default, gRPC is disabled.
-- `GRPC_PORT`: The port number on which the gRPC server listens. Default is `50051`.
+- `GRPC_PORT`: The port number on which the gRPC server listens. Default is `50051` (TCP).
+- `QUIC`: Set to `true` to enable the QUIC listener. By default, QUIC is disabled.
+- `QUIC_PORT`: The port number on which the QUIC server listens. Default is `4433` (UDP).
 - `LOG_LEVEL`: Set the logging level (`debug`, `info`, `warn`, `error`). Default is `info`.
 
 ## Makefile Targets
@@ -80,53 +85,107 @@ docker run -it -p 8080:8080 -p 8443:8443 -e TLS="true" ghcr.io/philipschmid/echo
 docker run -it -p 8080:8080 -p 9090:9090 -e TCP="true" ghcr.io/philipschmid/echo-app:main
 # Optionally enable gRPC:
 docker run -it -p 8080:8080 -p 50051:50051 -e GRPC="true" ghcr.io/philipschmid/echo-app:main
+# Optionally enable QUIC:
+docker run -it -p 8080:8080 -p 4433:4433/udp -e QUIC="true" ghcr.io/philipschmid/echo-app:main
 ```
 
 Shell 2 (client):
 ```bash
-curl http://localhost:8080/
+curl -sS http://localhost:8080/
 ```
 
-You should see a similar client output like this:
+You should see a similar output like this:
 ```json
 {
-    "timestamp": "2024-05-28T19:50:10.289Z",
-    "hostname": "83ff0b127ed6",
-    "source_ip": "192.168.65.1",
-    "listener": "HTTP"
-}
-{
-    "timestamp": "2024-05-28T19:50:35.022Z",
-    "message": "Hello World!",
-    "hostname": "4495529ebd32",
-    "source_ip": "192.168.65.1",
-    "node": "k8s-node-1",
-    "listener": "HTTP"
+  "timestamp": "2024-08-06T12:09:46.174+02:00",
+  "source_ip": "192.168.65.1",
+  "hostname": "demo-host",
+  "listener": "HTTP",
+  "http_version": "HTTP/1.1",
+  "http_method": "GET",
+  "http_endpoint": "/"
 }
 ```
 
 If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include the request headers:
 ```json
 {
-    "timestamp": "2024-05-28T20:21:23.363Z",
-    "hostname": "3f96391b04f2",
-    "source_ip": "192.168.65.1",
-    "node": "k8s-node-1",
-    "listener": "HTTP",
-    "headers": {
-        "Accept": [
-            "*/*"
-        ],
-        "User-Agent": [
-            "curl/8.6.0"
-        ]
-    }
+  "timestamp": "2024-08-06T12:10:07.743+02:00",
+  "source_ip": "192.168.65.1",
+  "hostname": "demo-host",
+  "listener": "HTTP",
+  "headers": {
+    "Accept": [
+      "*/*"
+    ],
+    "User-Agent": [
+      "curl/8.10.0-DEV"
+    ]
+  },
+  "http_version": "HTTP/1.1",
+  "http_method": "GET",
+  "http_endpoint": "/"
 }
 ```
 
 If `TLS` is enabled, you can test the HTTPS listener:
 ```bash
-curl -k https://localhost:8443/
+curl -sSk https://localhost:8443/
+```
+
+You should see a similar output like this:
+```json
+{
+  "timestamp": "2024-08-06T12:10:29.468+02:00",
+  "source_ip": "192.168.65.1",
+  "hostname": "demo-host",
+  "listener": "TLS",
+  "headers": {
+    "Accept": [
+      "*/*"
+    ],
+    "User-Agent": [
+      "curl/8.10.0-DEV"
+    ]
+  },
+  "http_version": "HTTP/1.1",
+  "http_method": "GET",
+  "http_endpoint": "/"
+}
+```
+
+To test the QUIC (HTTP/3) listener, you need to use a `curl` version which supports it. For example, the one [from CloudClare](https://github.com/cloudflare/homebrew-cloudflare). Check out [this guide](https://dev.to/gjrdiesel/installing-curl-with-http3-on-macos-2di2) to learn how to install it on macOS.
+
+Ensure your `curl` has built-in `HTTP3` support:
+```bash
+$ curl --version | grep HTTP3
+Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM SPNEGO SSL threadsafe UnixSockets zstd
+```
+
+Testing the QUIC listener:
+```bash
+curl -sSk --http3 https://localhost:4433/
+```
+
+You should see a similar output like this:
+```json
+{
+  "timestamp": "2024-08-06T12:11:13.158+02:00",
+  "source_ip": "192.168.65.1",
+  "hostname": "demo-host",
+  "listener": "QUIC",
+  "headers": {
+    "Accept": [
+      "*/*"
+    ],
+    "User-Agent": [
+      "curl/8.10.0-DEV"
+    ]
+  },
+  "http_version": "HTTP/3.0",
+  "http_method": "GET",
+  "http_endpoint": "/"
+}
 ```
 
 To test the TCP listener using netcat:
@@ -137,18 +196,10 @@ nc localhost 9090
 You should see a similar output like this:
 ```json
 {
-    "timestamp": "2024-05-28T19:50:10.289Z",
-    "hostname": "83ff0b127ed6",
-    "source_ip": "127.0.0.1",
-    "listener": "TCP"
-}
-{
-    "timestamp": "2024-05-28T19:50:35.022Z",
-    "message": "Hello World!",
-    "hostname": "4495529ebd32",
-    "source_ip": "127.0.0.1",
-    "node": "k8s-node-1",
-    "listener": "TCP"
+  "timestamp": "2024-08-06T12:11:29.603+02:00",
+  "source_ip": "192.168.65.1",
+  "hostname": "demo-host",
+  "listener": "TCP"
 }
 ```
 
@@ -161,19 +212,11 @@ grpcurl -plaintext localhost:50051 echo.EchoService/Echo
 You should see a similar output like this:
 ```json
 {
-  "timestamp": "2024-08-01T13:55:45.228Z",
+  "timestamp": "2024-08-06T12:11:39.15+02:00",
   "sourceIp": "192.168.65.1",
-  "hostname": "efa892e16a74",
-  "listener": "gRPC"
-}
-{
-  "timestamp": "2024-08-01T13:55:45.228Z",
-  "message": "Hello World!",
-  "sourceIp": "192.168.65.1",
-  "hostname": "a96e5c48f68c",
+  "hostname": "demo-host",
   "listener": "gRPC",
-  "node": "k8s-node-1",
-  "grpc_method": "/echo.EchoService/Echo"
+  "grpcMethod": "/echo.EchoService/Echo"
 }
 ```
 
@@ -222,10 +265,21 @@ spec:
       - name: echo-app
         image: ghcr.io/philipschmid/echo-app:main
         ports:
-        - containerPort: 8080
-        - containerPort: 8443
-        - containerPort: 9090
-        - containerPort: 50051
+        - name: http
+          protocol: TCP
+          port: 8080
+        - name: tls
+          protocol: TCP
+          port: 8443
+        - name: quic
+          protocol: UDP
+          port: 4433
+        - name: tcp
+          protocol: TCP
+          port: 9090
+        - name: grpc
+          protocol: TCP
+          port: 50051
         env:
         - name: MESSAGE
           valueFrom:
@@ -262,10 +316,14 @@ spec:
     protocol: TCP
     port: 8080
     targetPort: 8080
-  - name: https
+  - name: tls
     protocol: TCP
     port: 8443
     targetPort: 8443
+  - name: quic
+    protocol: UDP
+    port: 4433
+    targetPort: 4433
   - name: tcp
     protocol: TCP
     port: 9090

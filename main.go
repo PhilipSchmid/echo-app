@@ -19,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/quic-go/quic-go/http3"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
@@ -36,6 +37,7 @@ const (
 	DefaultTLS          = false
 	DefaultTCP          = false
 	DefaultGRPC         = false
+	DefaultQUIC         = false
 
 	DefaultLogLevel = log.InfoLevel
 
@@ -43,6 +45,7 @@ const (
 	DefaultTLSPort  = "8443"
 	DefaultTCPPort  = "9090"
 	DefaultGRPCPort = "50051"
+	DefaultQUICPort = "4433"
 )
 
 // Response is the struct for the JSON response
@@ -120,6 +123,7 @@ func main() {
 	tlsEnabled := getTLSSetting()
 	tcpEnabled := getTCPSetting()
 	grpcEnabled := getGRPCSetting()
+	quicEnabled := getQUICSetting()
 
 	// Prepare the message log
 	messageLog := "No MESSAGE environment variable set"
@@ -141,6 +145,7 @@ func main() {
 	log.Debugf("  TLS is set to: %t", tlsEnabled)
 	log.Debugf("  TCP is set to: %t", tcpEnabled)
 	log.Debugf("  GRPC is set to: %t", grpcEnabled)
+	log.Debugf("  QUIC is set to: %t", quicEnabled)
 
 	// Use PORT environment variable, or default to DefaultHTTPPort
 	port := getValidPort("PORT", DefaultHTTPPort)
@@ -151,8 +156,14 @@ func main() {
 
 	// Start the web server on port and accept requests
 	go func() {
-		log.Infof("HTTP server listening on port %s", port)
-		log.Fatal(http.ListenAndServe(":"+port, mux))
+		listener, err := net.Listen("tcp", ":"+port)
+		if err != nil {
+			log.Fatalf("Failed to start HTTP server: %v", err)
+		}
+		defer listener.Close()
+
+		log.Infof("HTTP server listening on port %s (%s)", port, getL4Protocol(listener))
+		log.Fatal(http.Serve(listener, mux))
 	}()
 
 	if tlsEnabled {
@@ -165,6 +176,10 @@ func main() {
 
 	if grpcEnabled {
 		startGRPCServer(messagePtr, nodePtr)
+	}
+
+	if quicEnabled {
+		startQUICServer(messagePtr, nodePtr, printHeaders)
 	}
 
 	// Handle OS signals
@@ -186,18 +201,21 @@ func startTLSServer(messagePtr, nodePtr *string, printHeaders bool) {
 
 	// Start the HTTPS server on the specified TLS port
 	go func() {
+		listener, err := tls.Listen("tcp", ":"+tlsPort, &tls.Config{
+			Certificates: []tls.Certificate{cert},
+		})
+		if err != nil {
+			log.Fatalf("Failed to start TLS server: %v", err)
+		}
+		defer listener.Close()
+
+		log.Infof("TLS server listening on port %s (%s)", tlsPort, getL4Protocol(listener))
 		server := &http.Server{
-			Addr: ":" + tlsPort,
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				handleHTTPConnection(messagePtr, nodePtr, printHeaders, "TLS")(w, r)
 			}),
-			TLSConfig: &tls.Config{
-				Certificates: []tls.Certificate{cert},
-			},
 		}
-
-		log.Infof("TLS server listening on port %s", tlsPort)
-		log.Fatal(server.ListenAndServeTLS("", ""))
+		log.Fatal(server.Serve(listener))
 	}()
 }
 
@@ -213,7 +231,7 @@ func startTCPServer(messagePtr, nodePtr *string) {
 		}
 		defer listener.Close()
 
-		log.Infof("TCP server listening on port %s", tcpPort)
+		log.Infof("TCP server listening on port %s (%s)", tcpPort, getL4Protocol(listener))
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
@@ -237,15 +255,55 @@ func startGRPCServer(messagePtr, nodePtr *string) {
 		}
 		defer listener.Close()
 
+		log.Infof("gRPC server listening on port %s (%s)", grpcPort, getL4Protocol(listener))
 		grpcServer := grpc.NewServer()
 		pb.RegisterEchoServiceServer(grpcServer, &EchoServer{messagePtr: messagePtr, nodePtr: nodePtr})
 		reflection.Register(grpcServer)
 
-		log.Infof("gRPC server listening on port %s", grpcPort)
 		if err := grpcServer.Serve(listener); err != nil {
 			log.Fatalf("Failed to serve gRPC server: %v", err)
 		}
 	}()
+}
+
+func startQUICServer(messagePtr, nodePtr *string, printHeaders bool) {
+	// Use QUIC_PORT environment variable, or default to DefaultQUICPort
+	quicPort := getValidPort("QUIC_PORT", DefaultQUICPort)
+
+	// Generate in-memory TLS certificate pair
+	cert, err := generateSelfSignedCert()
+	if err != nil {
+		log.Fatalf("Failed to generate self-signed certificate: %v", err)
+	}
+
+	// Start the HTTP/3 server on the specified QUIC port
+	go func() {
+		server := &http3.Server{
+			Addr: ":" + quicPort,
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				handleHTTPConnection(messagePtr, nodePtr, printHeaders, "QUIC")(w, r)
+			}),
+			TLSConfig: http3.ConfigureTLSConfig(&tls.Config{
+				Certificates: []tls.Certificate{cert},
+			}),
+		}
+		defer server.Close()
+
+		log.Infof("QUIC server listening on port %s (UDP)", quicPort)
+		log.Fatal(server.ListenAndServe())
+	}()
+}
+
+// getL4Protocol determines the L4 protocol (TCP or UDP) from the listener.
+func getL4Protocol(listener net.Listener) string {
+	switch listener.Addr().Network() {
+	case "tcp", "tcp4", "tcp6":
+		return "TCP"
+	case "udp", "udp4", "udp6":
+		return "UDP"
+	default:
+		return "Unknown"
+	}
 }
 
 // handleHTTPConnection returns a http.HandlerFunc that uses the provided message pointer, node pointer, printHeaders flag, and listener name.
@@ -392,6 +450,16 @@ func getGRPCSetting() bool {
 		return DefaultGRPC
 	}
 	return parseBool(value, DefaultGRPC, "GRPC")
+}
+
+// getQUICSetting checks the QUIC environment variable.
+func getQUICSetting() bool {
+	value := os.Getenv("QUIC")
+	if value == "" {
+		log.Debugf("No QUIC environment variable set. Falling back to default value: '%t'", DefaultQUIC)
+		return DefaultQUIC
+	}
+	return parseBool(value, DefaultQUIC, "QUIC")
 }
 
 // parseBool parses a string to a boolean value, falling back to the default value if invalid.

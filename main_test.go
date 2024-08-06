@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -10,10 +11,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"testing"
 
 	pb "echo-app/proto"
 
+	"github.com/quic-go/quic-go/http3"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/peer"
 )
@@ -218,6 +221,90 @@ func TestGRPCHandler(t *testing.T) {
 
 	if resp.SourceIp != clientIP {
 		t.Errorf("Echo() got = %v, want %v", resp.SourceIp, clientIP)
+	}
+}
+
+func TestQUICHandler(t *testing.T) {
+	// Suppress log output
+	logrus.SetOutput(io.Discard)
+
+	message := "Hello, World!"
+	node := "test-node"
+	printHeaders := true
+
+	// Generate in-memory TLS certificate pair
+	cert, err := generateSelfSignedCert()
+	if err != nil {
+		t.Fatalf("Failed to generate self-signed certificate: %v", err)
+	}
+
+	// Start a QUIC server
+	listener, err := net.ListenPacket("udp", "localhost:0")
+	if err != nil {
+		t.Fatalf("Failed to start QUIC server: %v", err)
+	}
+	defer listener.Close()
+
+	server := &http3.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handleHTTPConnection(&message, &node, printHeaders, "QUIC")(w, r)
+		}),
+		TLSConfig: http3.ConfigureTLSConfig(&tls.Config{
+			Certificates: []tls.Certificate{cert},
+		}),
+	}
+
+	errChan := make(chan error, 1)
+
+	go func() {
+		errChan <- server.Serve(listener)
+	}()
+
+	// Connect to the QUIC server
+	client := &http.Client{
+		Transport: &http3.RoundTripper{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+
+	url := "https://localhost:" + strconv.Itoa(listener.LocalAddr().(*net.UDPAddr).Port)
+	resp, err := client.Get(url)
+	if err != nil {
+		t.Fatalf("Failed to connect to QUIC server: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("QUIC handler returned wrong status code: got %v want %v", resp.StatusCode, http.StatusOK)
+	}
+
+	var response Response
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if response.Message == nil || *response.Message != message {
+		t.Errorf("QUIC handler returned wrong message: got %v want %v", response.Message, message)
+	}
+
+	if response.Node == nil || *response.Node != node {
+		t.Errorf("QUIC handler returned wrong node: got %v want %v", response.Node, node)
+	}
+
+	if response.Listener != "QUIC" {
+		t.Errorf("QUIC handler returned wrong listener: got %v want %v", response.Listener, "QUIC")
+	}
+
+	// Properly shut down the server
+	if err := server.Close(); err != nil {
+		t.Fatalf("Failed to close QUIC server: %v", err)
+	}
+
+	if err := <-errChan; err != nil && err != http.ErrServerClosed {
+		t.Fatalf("Error in QUIC handler goroutine: %v", err)
 	}
 }
 
@@ -444,6 +531,32 @@ func TestGetGRPCSetting(t *testing.T) {
 			result := getGRPCSetting()
 			if result != tt.expected {
 				t.Errorf("getGRPCSetting() = %v; want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetQUICSetting(t *testing.T) {
+	tests := []struct {
+		envValue string
+		expected bool
+	}{
+		{"true", true},
+		{"false", false},
+		{"TRUE", true},
+		{"FALSE", false},
+		{"invalid", DefaultQUIC},
+		{"", DefaultQUIC},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.envValue, func(t *testing.T) {
+			os.Setenv("QUIC", tt.envValue)
+			defer os.Unsetenv("QUIC")
+
+			result := getQUICSetting()
+			if result != tt.expected {
+				t.Errorf("getQUICSetting() = %v; want %v", result, tt.expected)
 			}
 		})
 	}

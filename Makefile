@@ -67,7 +67,7 @@ run: ## Run the Go application
 # Run all target
 run-all: ## Run the Go application with all listeners
 	@echo "Running the Go application..."
-	TLS="true" TCP="true" GRPC="true" $(MAKE) run
+	TLS="true" TCP="true" GRPC="true" QUIC="true" $(MAKE) run
 
 # Run all debug mode target
 run-all-debug: ## Run the Go application with all listeners in debug mode
