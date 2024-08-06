@@ -51,17 +51,17 @@ These features make the application versatile for different types of network com
 - `make docker`: Build the Docker image using `docker buildx build`.
 - `make run`: Build and run the Go application.
 
-## Running the Application
-To run the application, you can use the `make run` command:
+## Building the Application
+
+### Local Build
+Building the `echo-app` binary:
 
 ```bash
-make run
+make build
 ```
 
-This will build the Go application (if not already built) and then execute it.
-
-## Building the Docker Image
-To build the Docker image, you can use the `make docker` command:
+### Container Image
+Building the Docker image:
 
 ```bash
 make docker
@@ -69,8 +69,21 @@ make docker
 
 This will build a multi-arch Docker image for both `amd64` and `arm64` platforms.
 
-## Standalone Container
-Shell 1 (server):
+## Running the Application
+
+### Local
+Use one of the following commands to run the application locally after building it with `make build`:
+
+```bash
+# Start only the HTTP listener (default):
+make run
+# Alternatively, to enable all listeners:
+make run-all
+```
+
+### Standalone Container
+Examples how to run the applcation within a standalone contianer:
+
 ```bash
 docker run -it -p 8080:8080 ghcr.io/philipschmid/echo-app:main
 # Optionally with a customized message:
@@ -89,12 +102,16 @@ docker run -it -p 8080:8080 -p 50051:50051 -e GRPC="true" ghcr.io/philipschmid/e
 docker run -it -p 8080:8080 -p 4433:4433/udp -e QUIC="true" ghcr.io/philipschmid/echo-app:main
 ```
 
-Shell 2 (client):
+## Testing
+
+### HTTP Listener
+
 ```bash
 curl -sS http://localhost:8080/
 ```
 
 You should see a similar output like this:
+
 ```json
 {
   "timestamp": "2024-08-06T12:09:46.174+02:00",
@@ -108,6 +125,7 @@ You should see a similar output like this:
 ```
 
 If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include the request headers:
+
 ```json
 {
   "timestamp": "2024-08-06T12:10:07.743+02:00",
@@ -128,12 +146,16 @@ If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include
 }
 ```
 
+### TLS (HTTPS) Listener
+
 If `TLS` is enabled, you can test the HTTPS listener:
+
 ```bash
 curl -sSk https://localhost:8443/
 ```
 
 You should see a similar output like this:
+
 ```json
 {
   "timestamp": "2024-08-06T12:10:29.468+02:00",
@@ -154,20 +176,25 @@ You should see a similar output like this:
 }
 ```
 
-To test the QUIC (HTTP/3) listener, you need to use a `curl` version which supports it. For example, the one [from CloudClare](https://github.com/cloudflare/homebrew-cloudflare). Check out [this guide](https://dev.to/gjrdiesel/installing-curl-with-http3-on-macos-2di2) to learn how to install it on macOS.
+### QUIC Listener (HTTP/3 & TLS)
+
+To test the QUIC (HTTP/3) listener, you need to use a `curl` version which supports it. For example, the one [from CloudFlare](https://github.com/cloudflare/homebrew-cloudflare). Check out [this guide](https://dev.to/gjrdiesel/installing-curl-with-http3-on-macos-2di2) to learn how to install it on macOS.
 
 Ensure your `curl` has built-in `HTTP3` support:
+
 ```bash
 $ curl --version | grep HTTP3
 Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM SPNEGO SSL threadsafe UnixSockets zstd
 ```
 
 Testing the QUIC listener:
+
 ```bash
 curl -sSk --http3 https://localhost:4433/
 ```
 
 You should see a similar output like this:
+
 ```json
 {
   "timestamp": "2024-08-06T12:11:13.158+02:00",
@@ -188,12 +215,16 @@ You should see a similar output like this:
 }
 ```
 
+### TCP Listener
+
 To test the TCP listener using netcat:
+
 ```bash
 nc localhost 9090
 ```
 
 You should see a similar output like this:
+
 ```json
 {
   "timestamp": "2024-08-06T12:11:29.603+02:00",
@@ -203,6 +234,8 @@ You should see a similar output like this:
 }
 ```
 
+### GRPC Listener
+
 To test the gRPC listener, you can use a gRPC client like `grpcurl`:
 
 ```bash
@@ -210,6 +243,7 @@ grpcurl -plaintext localhost:50051 echo.EchoService/Echo
 ```
 
 You should see a similar output like this:
+
 ```json
 {
   "timestamp": "2024-08-06T12:11:39.15+02:00",
@@ -220,8 +254,10 @@ You should see a similar output like this:
 }
 ```
 
-## Kubernetes
+## Kubernetes Deployment
+
 Apply the following manifests to deploy the echo-app with the `NODE` environment variable set to the name of the Kubernetes node using the Downward API:
+
 ```yaml
 ---
 apiVersion: v1
@@ -336,22 +372,27 @@ spec:
 ```
 
 Shell 2 (client):
+
 ```bash
 kubectl run netshoot --rm -it --image=nicolaka/netshoot -- curl http://echo-app-service:8080
 ```
 
 You should see a similar client output like this:
+
 ```json
 {"timestamp":"2024-05-28T19:50:35.022Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1","listener":"HTTP"}
 ```
 
 If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include the request headers:
+
 ```json
 {"timestamp":"2024-05-28T20:21:23.363Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1","listener":"HTTP","headers":{"Accept":["*/*"],"User-Agent":["curl/8.6.0"]}}
 ```
 
 ### Ingress Example
+
 For example, if you're running a cluster with Cilium installed like this: https://gist.github.com/PhilipSchmid/bf4e4d2382678959f29f6e0d7b9b4725
+
 ```yaml
 ---
 apiVersion: networking.k8s.io/v1
@@ -380,7 +421,9 @@ spec:
 ```
 
 ### Gateway API Example
+
 For example, if you're running a cluster with Cilium installed like this: https://gist.github.com/PhilipSchmid/bf4e4d2382678959f29f6e0d7b9b4725
+
 ```yaml
 # Infrastructure
 ---
@@ -519,6 +562,7 @@ spec:
 ```
 
 Testing `HTTPRoute`:
+
 ```bash
 $ while true; do curl -sSL http://echo.<ip-of-echo-gw-lb-service>.sslip.io | jq; sleep 2; done
 {
@@ -551,6 +595,7 @@ $ while true; do curl -sSL http://echo.<ip-of-echo-gw-lb-service>.sslip.io | jq;
 ```
 
 Testing `TLSRoute`:
+
 ```bash
 $ while true; do curl -sSLk https://tls-echo.<ip-of-tls-echo-gw-lb-service>.sslip.io | jq; sleep 2; done
 {
@@ -571,6 +616,7 @@ $ while true; do curl -sSLk https://tls-echo.<ip-of-tls-echo-gw-lb-service>.ssli
 ```
 
 Testing `TCPRoute`:
+
 ```bash
 $ while true; do nc <ip-of-tcp-echo-gw-lb-service>.sslip.io 9090; sleep 2; done
 {
@@ -584,6 +630,7 @@ $ while true; do nc <ip-of-tcp-echo-gw-lb-service>.sslip.io 9090; sleep 2; done
 ```
 
 Testing `GRPCRoute`:
+
 ```bash
 $ while true; do grpcurl -plaintext <ip-of-grpc-echo-gw-lb-service>.sslip.io:50051 echo.EchoService/Echo; sleep 2; done
 {
@@ -596,6 +643,3 @@ $ while true; do grpcurl -plaintext <ip-of-grpc-echo-gw-lb-service>.sslip.io:500
   "grpc_method": "/echo.EchoService/Echo"
 }
 ```
-
-## Credit
-Basic idea (& source code) is taken from https://cloud.google.com/kubernetes-engine/docs/samples/container-hello-app.
