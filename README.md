@@ -130,7 +130,7 @@ docker run -it -p 8080:8080 -p 4433:4433/udp -e ECHO_APP_QUIC="true" ghcr.io/phi
 ### HTTP Listener
 
 ```bash
-curl -sS http://localhost:8080/
+curl -sS http://localhost:8080/ | jq
 ```
 
 You should see a similar output like this:
@@ -174,7 +174,7 @@ If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include
 If `TLS` is enabled, you can test the HTTPS listener:
 
 ```bash
-curl -sSk https://localhost:8443/
+curl -sSk https://localhost:8443/ | jq
 ```
 
 You should see a similar output like this:
@@ -213,7 +213,7 @@ Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy IDN IPv6
 Testing the QUIC listener:
 
 ```bash
-curl -sSk --http3 https://localhost:4433/
+curl -sSk --http3 https://localhost:4433/ | jq
 ```
 
 You should see a similar output like this:
@@ -243,7 +243,7 @@ You should see a similar output like this:
 To test the TCP listener using netcat:
 
 ```bash
-nc localhost 9090
+nc localhost 9090 | jq
 ```
 
 You should see a similar output like this:
@@ -279,6 +279,8 @@ You should see a similar output like this:
 
 ## Kubernetes Deployment
 
+For example, if you're running a cluster with Cilium installed like this: https://gist.github.com/PhilipSchmid/bf4e4d2382678959f29f6e0d7b9b4725
+
 Apply the following manifests to deploy the echo-app with the `NODE` environment variable set to the name of the Kubernetes node using the Downward API:
 
 ```yaml
@@ -288,11 +290,12 @@ kind: ConfigMap
 metadata:
   name: echo-app-config
 data:
-  MESSAGE: "demo-env"
-  # Add the PRINT_HTTP_REQUEST_HEADERS key with a value of "true" to include headers in the response
-  PRINT_HTTP_REQUEST_HEADERS: "true"
-  # Add the TLS key with a value of "true" to enable TLS
-  TLS: "true"
+  ECHO_APP_MESSAGE: "demo-env"
+  ECHO_APP_PRINT_HTTP_REQUEST_HEADERS: "true"
+  ECHO_APP_TLS: "true"
+  ECHO_APP_QUIC: "true"
+  ECHO_APP_GRPC: "true"
+  ECHO_APP_TCP: "true"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -301,7 +304,7 @@ metadata:
   labels:
     app: echo-app
 spec:
-  replicas: 2  # Adjust the number of replicas as needed
+  replicas: 3 # Adjust the number of replicas as needed
   selector:
     matchLabels:
       app: echo-app
@@ -312,52 +315,66 @@ spec:
     spec:
       affinity:
         podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:
-              - key: "app"
-                operator: In
-                values:
-                - echo-app
-            topologyKey: "kubernetes.io/hostname"
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: "app"
+                  operator: In
+                  values:
+                  - echo-app
+              topologyKey: "kubernetes.io/hostname"
       containers:
       - name: echo-app
         image: ghcr.io/philipschmid/echo-app:main
         ports:
         - name: http
           protocol: TCP
-          port: 8080
+          containerPort: 8080
         - name: tls
           protocol: TCP
-          port: 8443
+          containerPort: 8443
         - name: quic
           protocol: UDP
-          port: 4433
+          containerPort: 4433
         - name: tcp
           protocol: TCP
-          port: 9090
+          containerPort: 9090
         - name: grpc
           protocol: TCP
-          port: 50051
+          containerPort: 50051
         env:
-        - name: MESSAGE
+        - name: ECHO_APP_MESSAGE
           valueFrom:
             configMapKeyRef:
               name: echo-app-config
-              key: MESSAGE
-        #  Add the PRINT_HTTP_REQUEST_HEADERS environment variable
-        - name: PRINT_HTTP_REQUEST_HEADERS
+              key: ECHO_APP_MESSAGE
+        - name: ECHO_APP_PRINT_HTTP_REQUEST_HEADERS
           valueFrom:
             configMapKeyRef:
               name: echo-app-config
-              key: PRINT_HTTP_REQUEST_HEADERS
-        # Add the TLS environment variable
-        - name: TLS
+              key: ECHO_APP_PRINT_HTTP_REQUEST_HEADERS
+        - name: ECHO_APP_TLS
           valueFrom:
             configMapKeyRef:
               name: echo-app-config
-              key: TLS
-        # Add the NODE environment variable using the downward API
+              key: ECHO_APP_TLS
+        - name: ECHO_APP_QUIC
+          valueFrom:
+            configMapKeyRef:
+              name: echo-app-config
+              key: ECHO_APP_QUIC
+        - name: ECHO_APP_GRPC
+          valueFrom:
+            configMapKeyRef:
+              name: echo-app-config
+              key: ECHO_APP_GRPC
+        - name: ECHO_APP_TCP
+          valueFrom:
+            configMapKeyRef:
+              name: echo-app-config
+              key: ECHO_APP_TCP
         - name: NODE
           valueFrom:
             fieldRef:
@@ -397,24 +414,48 @@ spec:
 Shell 2 (client):
 
 ```bash
-kubectl run netshoot --rm -it --image=nicolaka/netshoot -- curl http://echo-app-service:8080
+kubectl run netshoot -it --rm --image=nicolaka/netshoot --restart=Never -q -- curl -sS http://echo-app-service:8080 | jq
 ```
 
 You should see a similar client output like this:
 
 ```json
-{"timestamp":"2024-05-28T19:50:35.022Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1","listener":"HTTP"}
+{
+  "timestamp": "2024-08-06T14:52:21.129Z",
+  "message": "demo-env",
+  "source_ip": "10.0.0.163",
+  "hostname": "echo-app-deployment-699d7bf76f-mn8qs",
+  "listener": "HTTP",
+  "http_version": "HTTP/1.1",
+  "http_method": "GET",
+  "http_endpoint": "/"
+}
 ```
 
 If `PRINT_HTTP_REQUEST_HEADERS` is set to `true`, the response will also include the request headers:
 
 ```json
-{"timestamp":"2024-05-28T20:21:23.363Z","message":"demo-env","hostname":"echo-app-deployment-5d8f8b8b8b-9t4kq","source_ip":"10.1.0.1","node":"k8s-node-1","listener":"HTTP","headers":{"Accept":["*/*"],"User-Agent":["curl/8.6.0"]}}
+{
+  "timestamp": "2024-08-06T14:52:35.215Z",
+  "message": "demo-env",
+  "source_ip": "10.0.0.63",
+  "hostname": "echo-app-deployment-699d7bf76f-mn8qs",
+  "listener": "HTTP",
+  "headers": {
+    "Accept": [
+      "*/*"
+    ],
+    "User-Agent": [
+      "curl/8.7.1"
+    ]
+  },
+  "http_version": "HTTP/1.1",
+  "http_method": "GET",
+  "http_endpoint": "/"
+}
 ```
 
 ### Ingress Example
-
-For example, if you're running a cluster with Cilium installed like this: https://gist.github.com/PhilipSchmid/bf4e4d2382678959f29f6e0d7b9b4725
 
 ```yaml
 ---
@@ -422,8 +463,6 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: echo
-  annotations:
-    cert-manager.io/cluster-issuer: "lets-encrypt-prod"
 spec:
   ingressClassName: cilium
   rules:
@@ -437,15 +476,49 @@ spec:
             name: echo-app-service
             port:
               number: 8080
-  tls:
-  - hosts:
-    - echo.<ip-of-ingress-lb-service>.sslip.io
-    secretName: echo-app-tls
 ```
 
-### Gateway API Example
+```bash
+curl -sS http://echo.52.167.255.246.sslip.io | jq
+```
 
-For example, if you're running a cluster with Cilium installed like this: https://gist.github.com/PhilipSchmid/bf4e4d2382678959f29f6e0d7b9b4725
+You should see a similar client output like this:
+```json
+{
+  "timestamp": "2024-08-06T14:54:27.813Z",
+  "message": "demo-env",
+  "source_ip": "10.0.1.230",
+  "hostname": "echo-app-deployment-699d7bf76f-k7k4h",
+  "listener": "HTTP",
+  "headers": {
+    "Accept": [
+      "*/*"
+    ],
+    "User-Agent": [
+      "curl/8.10.0-DEV"
+    ],
+    "X-Envoy-External-Address": [
+      "85.X.Y.Z"
+    ],
+    "X-Forwarded-For": [
+      "85.X.Y.Z"
+    ],
+    "X-Forwarded-Proto": [
+      "http"
+    ],
+    "X-Request-Id": [
+      "c32cb1aa-44d6-4484-8554-14a9984cff60"
+    ]
+  },
+  "http_version": "HTTP/1.1",
+  "http_method": "GET",
+  "http_endpoint": "/"
+}
+```
+
+Side note: Some headers are automatically added by Cilium Ingress.
+
+### Gateway API Example
 
 ```yaml
 # Infrastructure
@@ -494,36 +567,17 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: tcp-echo-gw
-  namespace: infra
-spec:
-  gatewayClassName: cilium
-  listeners:
-  - name: tcp
-    protocol: TCP
-    port: 9090
-    allowedRoutes:
-      namespaces:
-        from: All
-      kinds:
-      - kind: TCPRoute
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
   name: grpc-echo-gw
   namespace: infra
 spec:
   gatewayClassName: cilium
   listeners:
   - name: grpc
-    protocol: GRPC
+    protocol: HTTP
     port: 50051
     allowedRoutes:
       namespaces:
         from: All
-      kinds:
-      - kind: GRPCRoute
 # Routes
 ---
 apiVersion: gateway.networking.k8s.io/v1
@@ -557,20 +611,6 @@ spec:
       port: 8443
 ---
 apiVersion: gateway.networking.k8s.io/v1alpha2
-kind: TCPRoute
-metadata:
-  name: tcp-echo
-spec:
-  parentRefs:
-  - name: tcp-echo-gw
-    namespace: infra
-    sectionName: tcp
-  rules:
-  - backendRefs:
-    - name: echo-app-service
-      port: 9090
----
-apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: GRPCRoute
 metadata:
   name: grpc-echo
@@ -578,28 +618,32 @@ spec:
   parentRefs:
   - name: grpc-echo-gw
     namespace: infra
+  hostnames:
+  - grpc-echo.<ip-of-tls-echo-gw-lb-service>.sslip.io
   rules:
   - backendRefs:
     - name: echo-app-service
       port: 50051
 ```
 
+Side note: Cilium does not yet support `TCPRoute` or `UDPRoutes`. See https://github.com/cilium/cilium/issues/21929 for more details.
+
 Testing `HTTPRoute`:
 
 ```bash
-$ while true; do curl -sSL http://echo.<ip-of-echo-gw-lb-service>.sslip.io | jq; sleep 2; done
+$ while true; do curl -sS http://echo.<ip-of-echo-gw-lb-service>.sslip.io | jq; sleep 2; done
 {
-  "timestamp": "2024-07-31T09:04:14.801Z",
+  "timestamp": "2024-08-06T15:14:21.299Z",
   "message": "demo-env",
-  "source_ip": "10.0.0.169",
-  "hostname": "echo-app-deployment-85f85574bb-cbv9p",
-  "node": "aks-nodepool1-15164467-vmss000000",
+  "source_ip": "10.0.1.230",
+  "hostname": "echo-app-deployment-699d7bf76f-mtmt7",
+  "listener": "HTTP",
   "headers": {
     "Accept": [
       "*/*"
     ],
     "User-Agent": [
-      "curl/8.6.0"
+      "curl/8.10.0-DEV"
     ],
     "X-Envoy-External-Address": [
       "85.X.Y.Z"
@@ -611,44 +655,36 @@ $ while true; do curl -sSL http://echo.<ip-of-echo-gw-lb-service>.sslip.io | jq;
       "http"
     ],
     "X-Request-Id": [
-      "6821c0bc-361c-4f15-837a-be3dc025ff78"
+      "107e4dc4-548b-4d02-8170-77feffe8552e"
     ]
-  }
+  },
+  "http_version": "HTTP/1.1",
+  "http_method": "GET",
+  "http_endpoint": "/"
 }
 ```
 
 Testing `TLSRoute`:
 
 ```bash
-$ while true; do curl -sSLk https://tls-echo.<ip-of-tls-echo-gw-lb-service>.sslip.io | jq; sleep 2; done
+$ while true; do curl -sSk https://tls-echo.<ip-of-tls-echo-gw-lb-service>.sslip.io | jq; sleep 2; done
 {
-  "timestamp": "2024-07-31T09:06:43.293Z",
+  "timestamp": "2024-08-06T15:15:40.74Z",
   "message": "demo-env",
-  "source_ip": "10.0.2.214",
-  "hostname": "echo-app-deployment-85f85574bb-rspj9",
-  "node": "aks-nodepool1-15164467-vmss000002",
+  "source_ip": "10.0.0.213",
+  "hostname": "echo-app-deployment-699d7bf76f-k7k4h",
+  "listener": "TLS",
   "headers": {
     "Accept": [
       "*/*"
     ],
     "User-Agent": [
-      "curl/8.6.0"
+      "curl/8.10.0-DEV"
     ]
-  }
-}
-```
-
-Testing `TCPRoute`:
-
-```bash
-$ while true; do nc <ip-of-tcp-echo-gw-lb-service>.sslip.io 9090; sleep 2; done
-{
-  "timestamp": "2024-07-31T09:08:43.293Z",
-  "message": "demo-env",
-  "source_ip": "10.0.2.214",
-  "hostname": "echo-app-deployment-85f85574bb-rspj9",
-  "node": "aks-nodepool1-15164467-vmss000002",
-  "listener": "TCP"
+  },
+  "http_version": "HTTP/1.1",
+  "http_method": "GET",
+  "http_endpoint": "/"
 }
 ```
 
@@ -657,12 +693,11 @@ Testing `GRPCRoute`:
 ```bash
 $ while true; do grpcurl -plaintext <ip-of-grpc-echo-gw-lb-service>.sslip.io:50051 echo.EchoService/Echo; sleep 2; done
 {
-  "timestamp": "2024-07-31T09:10:43.293Z",
+  "timestamp": "2024-08-06T15:26:30.638Z",
   "message": "demo-env",
-  "source_ip": "10.0.2.214",
-  "hostname": "echo-app-deployment-85f85574bb-rspj9",
-  "node": "aks-nodepool1-15164467-vmss000002",
+  "sourceIp": "10.0.2.56",
+  "hostname": "echo-app-deployment-699d7bf76f-mtmt7",
   "listener": "gRPC",
-  "grpc_method": "/echo.EchoService/Echo"
+  "grpcMethod": "/echo.EchoService/Echo"
 }
 ```
