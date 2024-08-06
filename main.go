@@ -9,6 +9,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"net"
 	"net/http"
@@ -21,6 +22,8 @@ import (
 
 	"github.com/quic-go/quic-go/http3"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
@@ -113,10 +116,45 @@ func (s *EchoServer) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoRes
 }
 
 func main() {
+	// Set up Viper
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix("ECHO_APP")
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+
+	// Define command line flags using pflag
+	pflag.String("message", DefaultMessage, "Custom message to include in the response")
+	pflag.String("node", DefaultNode, "Node name to include in the response")
+	pflag.Bool("print-http-request-headers", DefaultPrintHeaders, "Include HTTP request headers in the response")
+	pflag.Bool("tls", DefaultTLS, "Enable TLS (HTTPS) support")
+	pflag.Bool("tcp", DefaultTCP, "Enable TCP listener")
+	pflag.Bool("grpc", DefaultGRPC, "Enable gRPC listener")
+	pflag.Bool("quic", DefaultQUIC, "Enable QUIC listener")
+	pflag.String("port", DefaultHTTPPort, "Port for the HTTP server")
+	pflag.String("tls-port", DefaultTLSPort, "Port for the TLS server")
+	pflag.String("tcp-port", DefaultTCPPort, "Port for the TCP server")
+	pflag.String("grpc-port", DefaultGRPCPort, "Port for the gRPC server")
+	pflag.String("quic-port", DefaultQUICPort, "Port for the QUIC server")
+	pflag.String("log-level", DefaultLogLevel.String(), "Logging level (debug, info, warn, error)")
+
+	// Set custom usage function
+	pflag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "echo-app: A simple Go application that responds with a JSON payload containing various details.\n\n")
+		fmt.Fprintf(os.Stderr, "Usage:\n")
+		pflag.PrintDefaults()
+	}
+
+	// Parse command line flags
+	pflag.Parse()
+
+	// Bind command line flags to Viper
+	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
+		log.Fatalf("Failed to bind command line flags: %v", err)
+	}
+
 	// Set up logging
 	setLogLevel()
 
-	// Get environment variables
+	// Get configuration values
 	messagePtr := getMessagePtr()
 	nodePtr := getNodePtr()
 	printHeaders := getPrintHeadersSetting()
@@ -148,7 +186,7 @@ func main() {
 	log.Debugf("  QUIC is set to: %t", quicEnabled)
 
 	// Use PORT environment variable, or default to DefaultHTTPPort
-	port := getValidPort("PORT", DefaultHTTPPort)
+	port := getValidPort("port", DefaultHTTPPort)
 
 	// Register handleHTTPConnection function to handle all requests
 	mux := http.NewServeMux()
@@ -191,7 +229,7 @@ func main() {
 
 func startTLSServer(messagePtr, nodePtr *string, printHeaders bool) {
 	// Use TLS_PORT environment variable, or default to DefaultTLSPort
-	tlsPort := getValidPort("TLS_PORT", DefaultTLSPort)
+	tlsPort := getValidPort("tls-port", DefaultTLSPort)
 
 	// Generate in-memory TLS certificate pair
 	cert, err := generateSelfSignedCert()
@@ -221,7 +259,7 @@ func startTLSServer(messagePtr, nodePtr *string, printHeaders bool) {
 
 func startTCPServer(messagePtr, nodePtr *string) {
 	// Use TCP_PORT environment variable, or default to DefaultTCPPort
-	tcpPort := getValidPort("TCP_PORT", DefaultTCPPort)
+	tcpPort := getValidPort("tcp-port", DefaultTCPPort)
 
 	// Start the TCP server on the specified TCP port
 	go func() {
@@ -245,7 +283,7 @@ func startTCPServer(messagePtr, nodePtr *string) {
 
 func startGRPCServer(messagePtr, nodePtr *string) {
 	// Use GRPC_PORT environment variable, or default to DefaultGRPCPort
-	grpcPort := getValidPort("GRPC_PORT", DefaultGRPCPort)
+	grpcPort := getValidPort("grpc-port", DefaultGRPCPort)
 
 	// Start the gRPC server on the specified gRPC port
 	go func() {
@@ -268,7 +306,7 @@ func startGRPCServer(messagePtr, nodePtr *string) {
 
 func startQUICServer(messagePtr, nodePtr *string, printHeaders bool) {
 	// Use QUIC_PORT environment variable, or default to DefaultQUICPort
-	quicPort := getValidPort("QUIC_PORT", DefaultQUICPort)
+	quicPort := getValidPort("quic-port", DefaultQUICPort)
 
 	// Generate in-memory TLS certificate pair
 	cert, err := generateSelfSignedCert()
@@ -394,7 +432,7 @@ func handleTCPConnection(conn net.Conn, messagePtr *string, nodePtr *string) {
 
 // getMessagePtr gets the MESSAGE environment variable and returns a pointer to it, or nil if it's not set or invalid.
 func getMessagePtr() *string {
-	message := os.Getenv("MESSAGE")
+	message := viper.GetString("message")
 	if message == "" {
 		log.Debugf("No MESSAGE environment variable set. Falling back to default value: '%s'", DefaultMessage)
 		return nil
@@ -404,7 +442,7 @@ func getMessagePtr() *string {
 
 // getNodePtr gets the NODE environment variable and returns a pointer to it, or nil if it's not set or invalid.
 func getNodePtr() *string {
-	node := os.Getenv("NODE")
+	node := viper.GetString("node")
 	if node == "" {
 		log.Debugf("No NODE environment variable set. Falling back to default value: '%s'", DefaultNode)
 		return nil
@@ -414,70 +452,32 @@ func getNodePtr() *string {
 
 // getPrintHeadersSetting checks the PRINT_HTTP_REQUEST_HEADERS environment variable.
 func getPrintHeadersSetting() bool {
-	value := os.Getenv("PRINT_HTTP_REQUEST_HEADERS")
-	if value == "" {
-		log.Debugf("No PRINT_HTTP_REQUEST_HEADERS environment variable set. Falling back to default value: '%t'", DefaultPrintHeaders)
-		return DefaultPrintHeaders
-	}
-	return parseBool(value, DefaultPrintHeaders, "PRINT_HTTP_REQUEST_HEADERS")
+	return viper.GetBool("print-http-request-headers")
 }
 
 // getTLSSetting checks the TLS environment variable.
 func getTLSSetting() bool {
-	value := os.Getenv("TLS")
-	if value == "" {
-		log.Debugf("No TLS environment variable set. Falling back to default value: '%t'", DefaultTLS)
-		return DefaultTLS
-	}
-	return parseBool(value, DefaultTLS, "TLS")
+	return viper.GetBool("tls")
 }
 
 // getTCPSetting checks the TCP environment variable.
 func getTCPSetting() bool {
-	value := os.Getenv("TCP")
-	if value == "" {
-		log.Debugf("No TCP environment variable set. Falling back to default value: '%t'", DefaultTCP)
-		return DefaultTCP
-	}
-	return parseBool(value, DefaultTCP, "TCP")
+	return viper.GetBool("tcp")
 }
 
 // getGRPCSetting checks the GRPC environment variable.
 func getGRPCSetting() bool {
-	value := os.Getenv("GRPC")
-	if value == "" {
-		log.Debugf("No GRPC environment variable set. Falling back to default value: '%t'", DefaultGRPC)
-		return DefaultGRPC
-	}
-	return parseBool(value, DefaultGRPC, "GRPC")
+	return viper.GetBool("grpc")
 }
 
 // getQUICSetting checks the QUIC environment variable.
 func getQUICSetting() bool {
-	value := os.Getenv("QUIC")
-	if value == "" {
-		log.Debugf("No QUIC environment variable set. Falling back to default value: '%t'", DefaultQUIC)
-		return DefaultQUIC
-	}
-	return parseBool(value, DefaultQUIC, "QUIC")
-}
-
-// parseBool parses a string to a boolean value, falling back to the default value if invalid.
-func parseBool(value string, defaultValue bool, envVarName string) bool {
-	switch strings.ToLower(value) {
-	case "true":
-		return true
-	case "false":
-		return false
-	default:
-		log.Warnf("Invalid value for %s: %s. It needs to be a boolean. Falling back to default value: '%t'", envVarName, value, defaultValue)
-		return defaultValue
-	}
+	return viper.GetBool("quic")
 }
 
 // setLogLevel sets the log level based on the LOG_LEVEL environment variable.
 func setLogLevel() {
-	logLevel := os.Getenv("LOG_LEVEL")
+	logLevel := viper.GetString("log-level")
 	if logLevel == "" {
 		// Default log level should be "info"
 		logLevel = DefaultLogLevel.String()
@@ -492,7 +492,7 @@ func setLogLevel() {
 
 // getValidPort retrieves and validates the port from the environment variable, falling back to the default if invalid.
 func getValidPort(envVar string, defaultPort string) string {
-	port := os.Getenv(envVar)
+	port := viper.GetString(envVar)
 	if port == "" {
 		log.Debugf("No port for %s set. Falling back to default port: '%s'", envVar, defaultPort)
 		return defaultPort

@@ -28,19 +28,42 @@ The application supports multiple listeners and functionalities:
 These features make the application versatile for different types of network communication.
 
 ## Configuration Options
-- `MESSAGE`: A customizable message to be returned in the JSON response. If not set, no message will be displayed.
-- `NODE`: The name of the node where the app is running. This is typically used in a Kubernetes environment.
-- `PORT`: The port number on which the HTTP server listens. Default is `8080` (TCP).
-- `PRINT_HTTP_REQUEST_HEADERS`: Set to `true` to include HTTP request headers in the JSON response. By default, headers are not included.
-- `TLS`: Set to `true` to enable TLS (HTTPS) support. By default, TLS is disabled.
-- `TLS_PORT`: The port number on which the TLS server listens. Default is `8443` (TCP).
-- `TCP`: Set to `true` to enable the TCP listener. By default, TCP is disabled.
-- `TCP_PORT`: The port number on which the TCP server listens. Default is `9090` (TCP).
-- `GRPC`: Set to `true` to enable the gRPC listener. By default, gRPC is disabled.
-- `GRPC_PORT`: The port number on which the gRPC server listens. Default is `50051` (TCP).
-- `QUIC`: Set to `true` to enable the QUIC listener. By default, QUIC is disabled.
-- `QUIC_PORT`: The port number on which the QUIC server listens. Default is `4433` (UDP).
-- `LOG_LEVEL`: Set the logging level (`debug`, `info`, `warn`, `error`). Default is `info`.
+
+### Environment Variables
+- `ECHO_APP_MESSAGE`: A customizable message to be returned in the JSON response. If not set, no message will be displayed.
+- `ECHO_APP_NODE`: The name of the node where the app is running. This is typically used in a Kubernetes environment.
+- `ECHO_APP_PORT`: The port number on which the HTTP server listens. Default is `8080` (TCP).
+- `ECHO_APP_PRINT_HTTP_REQUEST_HEADERS`: Set to `true` to include HTTP request headers in the JSON response. By default, headers are not included.
+- `ECHO_APP_TLS`: Set to `true` to enable TLS (HTTPS) support. By default, TLS is disabled.
+- `ECHO_APP_TLS_PORT`: The port number on which the TLS server listens. Default is `8443` (TCP).
+- `ECHO_APP_TCP`: Set to `true` to enable the TCP listener. By default, TCP is disabled.
+- `ECHO_APP_TCP_PORT`: The port number on which the TCP server listens. Default is `9090` (TCP).
+- `ECHO_APP_GRPC`: Set to `true` to enable the gRPC listener. By default, gRPC is disabled.
+- `ECHO_APP_GRPC_PORT`: The port number on which the gRPC server listens. Default is `50051` (TCP).
+- `ECHO_APP_QUIC`: Set to `true` to enable the QUIC listener. By default, QUIC is disabled.
+- `ECHO_APP_QUIC_PORT`: The port number on which the QUIC server listens. Default is `4433` (UDP).
+- `ECHO_APP_LOG_LEVEL`: Set the logging level (`debug`, `info`, `warn`, `error`). Default is `info`.
+
+### Commandline Flags
+```bash
+./echo-app --help
+echo-app: A simple Go application that responds with a JSON payload containing various details.
+
+Usage:
+      --grpc                         Enable gRPC listener
+      --grpc-port string             Port for the gRPC server (default "50051")
+      --log-level string             Logging level (debug, info, warn, error) (default "info")
+      --message string               Custom message to include in the response
+      --node string                  Node name to include in the response
+      --port string                  Port for the HTTP server (default "8080")
+      --print-http-request-headers   Include HTTP request headers in the response
+      --quic                         Enable QUIC listener
+      --quic-port string             Port for the QUIC server (default "4433")
+      --tcp                          Enable TCP listener
+      --tcp-port string              Port for the TCP server (default "9090")
+      --tls                          Enable TLS (HTTPS) support
+      --tls-port string              Port for the TLS server (default "8443")
+```
 
 ## Makefile Targets
 - `make`: Show the help message.
@@ -82,24 +105,24 @@ make run-all
 ```
 
 ### Standalone Container
-Examples how to run the applcation within a standalone contianer:
+Examples how to run the application within a standalone container:
 
 ```bash
 docker run -it -p 8080:8080 ghcr.io/philipschmid/echo-app:main
 # Optionally with a customized message:
-docker run -it -p 8080:8080 -e MESSAGE="demo-env" ghcr.io/philipschmid/echo-app:main
+docker run -it -p 8080:8080 -e ECHO_APP_MESSAGE="demo-env" ghcr.io/philipschmid/echo-app:main
 # Optionally with a node name:
-docker run -it -p 8080:8080 -e NODE="k8s-node-1" ghcr.io/philipschmid/echo-app:main
+docker run -it -p 8080:8080 -e ECHO_APP_NODE="k8s-node-1" ghcr.io/philipschmid/echo-app:main
 # Optionally include HTTP request headers in the response:
-docker run -it -p 8080:8080 -e PRINT_HTTP_REQUEST_HEADERS="true" ghcr.io/philipschmid/echo-app:main
+docker run -it -p 8080:8080 -e ECHO_APP_PRINT_HTTP_REQUEST_HEADERS="true" ghcr.io/philipschmid/echo-app:main
 # Optionally enable TLS:
-docker run -it -p 8080:8080 -p 8443:8443 -e TLS="true" ghcr.io/philipschmid/echo-app:main
+docker run -it -p 8080:8080 -p 8443:8443 -e ECHO_APP_TLS="true" ghcr.io/philipschmid/echo-app:main
 # Optionally enable TCP:
-docker run -it -p 8080:8080 -p 9090:9090 -e TCP="true" ghcr.io/philipschmid/echo-app:main
+docker run -it -p 8080:8080 -p 9090:9090 -e ECHO_APP_TCP="true" ghcr.io/philipschmid/echo-app:main
 # Optionally enable gRPC:
-docker run -it -p 8080:8080 -p 50051:50051 -e GRPC="true" ghcr.io/philipschmid/echo-app:main
+docker run -it -p 8080:8080 -p 50051:50051 -e ECHO_APP_GRPC="true" ghcr.io/philipschmid/echo-app:main
 # Optionally enable QUIC:
-docker run -it -p 8080:8080 -p 4433:4433/udp -e QUIC="true" ghcr.io/philipschmid/echo-app:main
+docker run -it -p 8080:8080 -p 4433:4433/udp -e ECHO_APP_QUIC="true" ghcr.io/philipschmid/echo-app:main
 ```
 
 ## Testing

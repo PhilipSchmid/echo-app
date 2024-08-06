@@ -67,12 +67,12 @@ run: ## Run the Go application
 # Run all target
 run-all: ## Run the Go application with all listeners
 	@echo "Running the Go application..."
-	TLS="true" TCP="true" GRPC="true" QUIC="true" $(MAKE) run
+	./$(APP_NAME) --tls --tcp --grpc --quic
 
 # Run all debug mode target
 run-all-debug: ## Run the Go application with all listeners in debug mode
 	@echo "Running the Go application in debug mode..."
-	LOG_LEVEL="debug" $(MAKE) run-all
+	./$(APP_NAME) --tls --tcp --grpc --quic --log-level debug
 
 # Clean up build artifcats target
 cleanup: ## Clean up build artifacts

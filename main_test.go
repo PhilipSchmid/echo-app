@@ -12,14 +12,22 @@ import (
 	"net/http/httptest"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 
 	pb "echo-app/proto"
 
 	"github.com/quic-go/quic-go/http3"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"google.golang.org/grpc/peer"
 )
+
+func initViperForTests() {
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix("ECHO_APP")
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+}
 
 func TestEcho(t *testing.T) {
 	// Suppress log output
@@ -312,16 +320,18 @@ func TestGetValidPort(t *testing.T) {
 	// Suppress log output
 	logrus.SetOutput(io.Discard)
 
+	initViperForTests()
+
 	tests := []struct {
 		envVar      string
 		envValue    string
 		defaultPort string
 		expected    string
 	}{
-		{"TEST_PORT", "1234", "8080", "1234"},
-		{"TEST_PORT", "", "8080", "8080"},
-		{"TEST_PORT", "invalid", "8080", "8080"},
-		{"TEST_PORT", "70000", "8080", "8080"},
+		{"ECHO_APP_TEST_PORT", "1234", "8080", "1234"},
+		{"ECHO_APP_TEST_PORT", "", "8080", "8080"},
+		{"ECHO_APP_TEST_PORT", "invalid", "8080", "8080"},
+		{"ECHO_APP_TEST_PORT", "70000", "8080", "8080"},
 	}
 
 	for _, tt := range tests {
@@ -329,7 +339,7 @@ func TestGetValidPort(t *testing.T) {
 			os.Setenv(tt.envVar, tt.envValue)
 			defer os.Unsetenv(tt.envVar)
 
-			port := getValidPort(tt.envVar, tt.defaultPort)
+			port := getValidPort(strings.ToLower(strings.Replace(tt.envVar, "ECHO_APP_", "", 1)), tt.defaultPort)
 			if port != tt.expected {
 				t.Errorf("getValidPort(%s, %s) = %s; want %s", tt.envVar, tt.defaultPort, port, tt.expected)
 			}
@@ -359,6 +369,8 @@ func TestIsValidPort(t *testing.T) {
 }
 
 func TestSetLogLevel(t *testing.T) {
+	initViperForTests()
+
 	tests := []struct {
 		envValue string
 		expected logrus.Level
@@ -373,8 +385,8 @@ func TestSetLogLevel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.envValue, func(t *testing.T) {
-			os.Setenv("LOG_LEVEL", tt.envValue)
-			defer os.Unsetenv("LOG_LEVEL")
+			os.Setenv("ECHO_APP_LOG_LEVEL", tt.envValue)
+			defer os.Unsetenv("ECHO_APP_LOG_LEVEL")
 
 			setLogLevel()
 			if logrus.GetLevel() != tt.expected {
@@ -385,6 +397,8 @@ func TestSetLogLevel(t *testing.T) {
 }
 
 func TestGetMessagePtr(t *testing.T) {
+	initViperForTests()
+
 	tests := []struct {
 		envValue string
 		expected *string
@@ -395,8 +409,8 @@ func TestGetMessagePtr(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.envValue, func(t *testing.T) {
-			os.Setenv("MESSAGE", tt.envValue)
-			defer os.Unsetenv("MESSAGE")
+			os.Setenv("ECHO_APP_MESSAGE", tt.envValue)
+			defer os.Unsetenv("ECHO_APP_MESSAGE")
 
 			result := getMessagePtr()
 			if (result == nil && tt.expected != nil) || (result != nil && tt.expected == nil) {
@@ -409,6 +423,8 @@ func TestGetMessagePtr(t *testing.T) {
 }
 
 func TestGetNodePtr(t *testing.T) {
+	initViperForTests()
+
 	tests := []struct {
 		envValue string
 		expected *string
@@ -419,8 +435,8 @@ func TestGetNodePtr(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.envValue, func(t *testing.T) {
-			os.Setenv("NODE", tt.envValue)
-			defer os.Unsetenv("NODE")
+			os.Setenv("ECHO_APP_NODE", tt.envValue)
+			defer os.Unsetenv("ECHO_APP_NODE")
 
 			result := getNodePtr()
 			if (result == nil && tt.expected != nil) || (result != nil && tt.expected == nil) {
@@ -433,6 +449,8 @@ func TestGetNodePtr(t *testing.T) {
 }
 
 func TestGetPrintHeadersSetting(t *testing.T) {
+	initViperForTests()
+
 	tests := []struct {
 		envValue string
 		expected bool
@@ -447,8 +465,8 @@ func TestGetPrintHeadersSetting(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.envValue, func(t *testing.T) {
-			os.Setenv("PRINT_HTTP_REQUEST_HEADERS", tt.envValue)
-			defer os.Unsetenv("PRINT_HTTP_REQUEST_HEADERS")
+			os.Setenv("ECHO_APP_PRINT_HTTP_REQUEST_HEADERS", tt.envValue)
+			defer os.Unsetenv("ECHO_APP_PRINT_HTTP_REQUEST_HEADERS")
 
 			result := getPrintHeadersSetting()
 			if result != tt.expected {
@@ -459,6 +477,8 @@ func TestGetPrintHeadersSetting(t *testing.T) {
 }
 
 func TestGetTLSSetting(t *testing.T) {
+	initViperForTests()
+
 	tests := []struct {
 		envValue string
 		expected bool
@@ -473,8 +493,8 @@ func TestGetTLSSetting(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.envValue, func(t *testing.T) {
-			os.Setenv("TLS", tt.envValue)
-			defer os.Unsetenv("TLS")
+			os.Setenv("ECHO_APP_TLS", tt.envValue)
+			defer os.Unsetenv("ECHO_APP_TLS")
 
 			result := getTLSSetting()
 			if result != tt.expected {
@@ -485,6 +505,8 @@ func TestGetTLSSetting(t *testing.T) {
 }
 
 func TestGetTCPSetting(t *testing.T) {
+	initViperForTests()
+
 	tests := []struct {
 		envValue string
 		expected bool
@@ -499,8 +521,8 @@ func TestGetTCPSetting(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.envValue, func(t *testing.T) {
-			os.Setenv("TCP", tt.envValue)
-			defer os.Unsetenv("TCP")
+			os.Setenv("ECHO_APP_TCP", tt.envValue)
+			defer os.Unsetenv("ECHO_APP_TCP")
 
 			result := getTCPSetting()
 			if result != tt.expected {
@@ -511,6 +533,8 @@ func TestGetTCPSetting(t *testing.T) {
 }
 
 func TestGetGRPCSetting(t *testing.T) {
+	initViperForTests()
+
 	tests := []struct {
 		envValue string
 		expected bool
@@ -525,8 +549,8 @@ func TestGetGRPCSetting(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.envValue, func(t *testing.T) {
-			os.Setenv("GRPC", tt.envValue)
-			defer os.Unsetenv("GRPC")
+			os.Setenv("ECHO_APP_GRPC", tt.envValue)
+			defer os.Unsetenv("ECHO_APP_GRPC")
 
 			result := getGRPCSetting()
 			if result != tt.expected {
@@ -537,6 +561,8 @@ func TestGetGRPCSetting(t *testing.T) {
 }
 
 func TestGetQUICSetting(t *testing.T) {
+	initViperForTests()
+
 	tests := []struct {
 		envValue string
 		expected bool
@@ -551,8 +577,8 @@ func TestGetQUICSetting(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.envValue, func(t *testing.T) {
-			os.Setenv("QUIC", tt.envValue)
-			defer os.Unsetenv("QUIC")
+			os.Setenv("ECHO_APP_QUIC", tt.envValue)
+			defer os.Unsetenv("ECHO_APP_QUIC")
 
 			result := getQUICSetting()
 			if result != tt.expected {
