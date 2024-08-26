@@ -56,7 +56,7 @@ vet: ## Run go vet
 # Build target
 build: lint vet test ## Build the Go application
 	@echo "Building the Go application..."
-	go build -o $(APP_NAME) .
+	go build -ldflags="-s -w" -a -o $(APP_NAME) .
 	@echo "Build completed."
 
 # Run target
