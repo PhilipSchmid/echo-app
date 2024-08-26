@@ -19,7 +19,7 @@ RUN go mod download
 COPY . .
 
 # Compile the application to a binary with all dependencies included
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -installsuffix cgo -o /main .
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -a -o /main .
 
 # Final stage
 FROM scratch
