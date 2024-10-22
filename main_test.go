@@ -270,7 +270,7 @@ func TestQUICHandler(t *testing.T) {
 
 	// Connect to the QUIC server
 	client := &http.Client{
-		Transport: &http3.RoundTripper{
+		Transport: &http3.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
 			},
