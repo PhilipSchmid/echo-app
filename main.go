@@ -20,6 +20,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/quic-go/quic-go/http3"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
@@ -49,7 +51,49 @@ const (
 	DefaultTCPPort  = "9090"
 	DefaultGRPCPort = "50051"
 	DefaultQUICPort = "4433"
+
+	DefaultMetrics     = true
+	DefaultMetricsPort = "3000"
 )
+
+var (
+	metricsEnabled bool
+
+	httpRequestsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_requests_total",
+			Help: "Total number of HTTP requests",
+		},
+		[]string{"listener", "method", "endpoint"},
+	)
+	tcpRequestsTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "tcp_requests_total",
+			Help: "Total number of TCP requests",
+		},
+	)
+	grpcRequestsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "grpc_requests_total",
+			Help: "Total number of gRPC requests",
+		},
+		[]string{"method"},
+	)
+	quicRequestsTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "quic_requests_total",
+			Help: "Total number of QUIC requests",
+		},
+	)
+)
+
+func initMetrics() {
+	log.Debug("Initializing metrics")
+	prometheus.MustRegister(httpRequestsTotal)
+	prometheus.MustRegister(tcpRequestsTotal)
+	prometheus.MustRegister(grpcRequestsTotal)
+	prometheus.MustRegister(quicRequestsTotal)
+}
 
 // Response is the struct for the JSON response
 type Response struct {
@@ -75,6 +119,16 @@ type EchoServer struct {
 
 // Echo handles the Echo gRPC request
 func (s *EchoServer) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoResponse, error) {
+
+	// Extract the gRPC method name from the context
+	method, _ := grpc.Method(ctx)
+
+	if metricsEnabled {
+		log.Debug("Incrementing gRPC requests counter")
+		// Increment the gRPC requests counter
+		grpcRequestsTotal.WithLabelValues(method).Inc()
+	}
+
 	// Get the current time in human-readable format with milliseconds
 	timestamp := time.Now().Format("2006-01-02T15:04:05.999Z07:00")
 	host, _ := os.Hostname()
@@ -86,9 +140,6 @@ func (s *EchoServer) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoRes
 			clientIP = addr.IP.String()
 		}
 	}
-
-	// Extract the gRPC method name from the context
-	method, _ := grpc.Method(ctx)
 
 	// Log the serving request with detailed information
 	log.Infof("Serving gRPC request from %s via gRPC listener, method: %s", clientIP, method)
@@ -129,11 +180,13 @@ func main() {
 	pflag.Bool("tcp", DefaultTCP, "Enable TCP listener")
 	pflag.Bool("grpc", DefaultGRPC, "Enable gRPC listener")
 	pflag.Bool("quic", DefaultQUIC, "Enable QUIC listener")
+	pflag.Bool("metrics", DefaultMetrics, "Enable Prometheus metrics endpoint")
 	pflag.String("port", DefaultHTTPPort, "Port for the HTTP server")
 	pflag.String("tls-port", DefaultTLSPort, "Port for the TLS server")
 	pflag.String("tcp-port", DefaultTCPPort, "Port for the TCP server")
 	pflag.String("grpc-port", DefaultGRPCPort, "Port for the gRPC server")
 	pflag.String("quic-port", DefaultQUICPort, "Port for the QUIC server")
+	pflag.String("metrics-port", DefaultMetricsPort, "Port for the Prometheus metrics server")
 	pflag.String("log-level", DefaultLogLevel.String(), "Logging level (debug, info, warn, error)")
 
 	// Set custom usage function
@@ -162,6 +215,7 @@ func main() {
 	tcpEnabled := getTCPSetting()
 	grpcEnabled := getGRPCSetting()
 	quicEnabled := getQUICSetting()
+	metricsEnabled = getMetricsSetting()
 
 	// Prepare the message log
 	messageLog := "No MESSAGE environment variable set"
@@ -184,6 +238,7 @@ func main() {
 	log.Debugf("  TCP is set to: %t", tcpEnabled)
 	log.Debugf("  GRPC is set to: %t", grpcEnabled)
 	log.Debugf("  QUIC is set to: %t", quicEnabled)
+	log.Debugf("  METRICS is set to: %t", metricsEnabled)
 
 	// Use PORT environment variable, or default to DefaultHTTPPort
 	port := getValidPort("port", DefaultHTTPPort)
@@ -218,6 +273,11 @@ func main() {
 
 	if quicEnabled {
 		startQUICServer(messagePtr, nodePtr, printHeaders)
+	}
+
+	if metricsEnabled {
+		initMetrics()
+		startMetricsServer()
 	}
 
 	// Handle OS signals
@@ -319,6 +379,12 @@ func startQUICServer(messagePtr, nodePtr *string, printHeaders bool) {
 		server := &http3.Server{
 			Addr: ":" + quicPort,
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if metricsEnabled {
+					log.Debug("Incrementing QUIC requests counter")
+					// Increment the QUIC requests counter
+					quicRequestsTotal.Inc()
+				}
+
 				handleHTTPConnection(messagePtr, nodePtr, printHeaders, "QUIC")(w, r)
 			}),
 			TLSConfig: http3.ConfigureTLSConfig(&tls.Config{
@@ -329,6 +395,24 @@ func startQUICServer(messagePtr, nodePtr *string, printHeaders bool) {
 
 		log.Infof("QUIC server listening on port %s (UDP)", quicPort)
 		log.Fatal(server.ListenAndServe())
+	}()
+}
+
+func startMetricsServer() {
+	log.Debug("Starting Prometheus metrics server")
+	// Start the Prometheus metrics server
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	go func() {
+		metricsPort := getValidPort("metrics-port", DefaultMetricsPort)
+		listener, err := net.Listen("tcp", ":"+metricsPort)
+		if err != nil {
+			log.Fatalf("Failed to start metrics HTTP server: %v", err)
+		}
+		defer listener.Close()
+
+		log.Infof("Prometheus HTTP metrics server listening on port %s (%s)", metricsPort, getL4Protocol(listener))
+		log.Fatal(http.Serve(listener, mux))
 	}()
 }
 
@@ -347,6 +431,12 @@ func getL4Protocol(listener net.Listener) string {
 // handleHTTPConnection returns a http.HandlerFunc that uses the provided message pointer, node pointer, printHeaders flag, and listener name.
 func handleHTTPConnection(messagePtr *string, nodePtr *string, printHeaders bool, listener string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if metricsEnabled {
+			log.Debug("Incrementing HTTP requests counter")
+			// Increment the HTTP requests counter
+			httpRequestsTotal.WithLabelValues(listener, r.Method, r.URL.Path).Inc()
+		}
+
 		// Get the IP address without the port number
 		ip, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
@@ -398,6 +488,12 @@ func handleHTTPConnection(messagePtr *string, nodePtr *string, printHeaders bool
 // handleTCPConnection handles a TCP connection and sends the JSON response.
 func handleTCPConnection(conn net.Conn, messagePtr *string, nodePtr *string) {
 	defer conn.Close()
+
+	if metricsEnabled {
+		log.Debug("Incrementing TCP requests counter")
+		// Increment the TCP requests counter
+		tcpRequestsTotal.Inc()
+	}
 
 	// Get the IP address without the port number
 	ip, _, err := net.SplitHostPort(conn.RemoteAddr().String())
@@ -473,6 +569,11 @@ func getGRPCSetting() bool {
 // getQUICSetting checks the QUIC environment variable.
 func getQUICSetting() bool {
 	return viper.GetBool("quic")
+}
+
+// getMetricsSetting checks the METRICS environment variable.
+func getMetricsSetting() bool {
+	return viper.GetBool("metrics")
 }
 
 // setLogLevel sets the log level based on the LOG_LEVEL environment variable.

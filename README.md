@@ -24,6 +24,7 @@ The application supports multiple listeners and functionalities:
   - Returns the same JSON message over a TLS-encrypted HTTP/3 over QUIC connection.
 - **TCP Listener**: Serves the same JSON message over a TCP connection (minus the request headers).
 - **gRPC Listener**: Provides the same information using gRPC (minus the request headers).
+- **Prometheus Metrics**: Exposes metrics about the listeners/endpoints.
 
 ## Configuration Options
 
@@ -40,6 +41,8 @@ The application supports multiple listeners and functionalities:
 - `ECHO_APP_GRPC_PORT`: The port number on which the gRPC server listens. Default is `50051` (TCP).
 - `ECHO_APP_QUIC`: Set to `true` to enable the QUIC listener. By default, QUIC is disabled.
 - `ECHO_APP_QUIC_PORT`: The port number on which the QUIC server listens. Default is `4433` (UDP).
+- `ECHO_APP_METRICS`: Set to `true` to enable Prometheus metrics endpoint. By default, metrics are enabled.
+- `ECHO_APP_METRICS_PORT`: The port number on which the Prometheus metrics server listens. Default is `3000` (TCP).
 - `ECHO_APP_LOG_LEVEL`: Set the logging level (`debug`, `info`, `warn`, `error`). Default is `info`.
 
 ### Commandline Flags
@@ -52,6 +55,8 @@ Usage:
       --grpc-port string             Port for the gRPC server (default "50051")
       --log-level string             Logging level (debug, info, warn, error) (default "info")
       --message string               Custom message to include in the response
+      --metrics                      Enable Prometheus metrics endpoint
+      --metrics-port string          Port for the Prometheus metrics server (default "3000")
       --node string                  Node name to include in the response
       --port string                  Port for the HTTP server (default "8080")
       --print-http-request-headers   Include HTTP request headers in the response
@@ -107,6 +112,8 @@ Examples how to run the application within a standalone container:
 
 ```bash
 docker run -it -p 8080:8080 ghcr.io/philipschmid/echo-app:main
+# Optionally with exposed metrics endpoint
+docker run -it -p 8080:8080 -p 3000:3000 ghcr.io/philipschmid/echo-app:main
 # Optionally with a customized message:
 docker run -it -p 8080:8080 -e ECHO_APP_MESSAGE="demo-env" ghcr.io/philipschmid/echo-app:main
 # Optionally with a node name:
@@ -121,6 +128,8 @@ docker run -it -p 8080:8080 -p 9090:9090 -e ECHO_APP_TCP="true" ghcr.io/philipsc
 docker run -it -p 8080:8080 -p 50051:50051 -e ECHO_APP_GRPC="true" ghcr.io/philipschmid/echo-app:main
 # Optionally enable QUIC:
 docker run -it -p 8080:8080 -p 4433:4433/udp -e ECHO_APP_QUIC="true" ghcr.io/philipschmid/echo-app:main
+# Optionally disable Prometheus metrics:
+docker run -it -p 8080:8080 -e ECHO_APP_METRICS="false" ghcr.io/philipschmid/echo-app:main
 ```
 
 ## Testing
@@ -275,6 +284,31 @@ You should see a similar output like this:
 }
 ```
 
+### Prometheus Metrics
+
+If `METRICS` is enabled (default), you can access the Prometheus metrics endpoint:
+
+```bash
+curl -sS http://localhost:3000/metrics
+```
+
+You should see a similar output like this:
+
+```
+# HELP http_requests_total Total number of HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{listener="HTTP",method="GET",endpoint="/"} 1
+# HELP tcp_requests_total Total number of TCP requests
+# TYPE tcp_requests_total counter
+tcp_requests_total 1
+# HELP grpc_requests_total Total number of gRPC requests
+# TYPE grpc_requests_total counter
+grpc_requests_total{method="/echo.EchoService/Echo"} 1
+# HELP quic_requests_total Total number of QUIC requests
+# TYPE quic_requests_total counter
+quic_requests_total 1
+```
+
 ## Kubernetes Deployment
 
 For example, if you're running a cluster with Cilium installed like this: https://gist.github.com/PhilipSchmid/bf4e4d2382678959f29f6e0d7b9b4725
@@ -294,6 +328,7 @@ data:
   ECHO_APP_QUIC: "true"
   ECHO_APP_GRPC: "true"
   ECHO_APP_TCP: "true"
+  ECHO_APP_METRICS: "true"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -342,6 +377,9 @@ spec:
         - name: grpc
           protocol: TCP
           containerPort: 50051
+        - name: metrics
+          protocol: TCP
+          containerPort: 3000
         env:
         - name: ECHO_APP_MESSAGE
           valueFrom:
@@ -373,6 +411,11 @@ spec:
             configMapKeyRef:
               name: echo-app-config
               key: ECHO_APP_TCP
+        - name: ECHO_APP_METRICS
+          valueFrom:
+            configMapKeyRef:
+              name: echo-app-config
+              key: ECHO_APP_METRICS
         - name: NODE
           valueFrom:
             fieldRef:
@@ -406,6 +449,10 @@ spec:
     protocol: TCP
     port: 50051
     targetPort: 50051
+  - name: metrics
+    protocol: TCP
+    port: 3000
+    targetPort: 3000
   type: ClusterIP
 ```
 
