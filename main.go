@@ -255,7 +255,7 @@ func main() {
 		}
 		defer listener.Close()
 
-		log.Infof("HTTP server listening on port %s (%s)", port, getL4Protocol(listener))
+		log.Infof("HTTP server listening on port %s/%s", port, getL4Protocol(listener))
 		log.Fatal(http.Serve(listener, mux))
 	}()
 
@@ -307,7 +307,7 @@ func startTLSServer(messagePtr, nodePtr *string, printHeaders bool) {
 		}
 		defer listener.Close()
 
-		log.Infof("TLS server listening on port %s (%s)", tlsPort, getL4Protocol(listener))
+		log.Infof("TLS server listening on port %s/%s", tlsPort, getL4Protocol(listener))
 		server := &http.Server{
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				handleHTTPConnection(messagePtr, nodePtr, printHeaders, "TLS")(w, r)
@@ -329,7 +329,7 @@ func startTCPServer(messagePtr, nodePtr *string) {
 		}
 		defer listener.Close()
 
-		log.Infof("TCP server listening on port %s (%s)", tcpPort, getL4Protocol(listener))
+		log.Infof("TCP server listening on port %s/%s", tcpPort, getL4Protocol(listener))
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
@@ -353,7 +353,7 @@ func startGRPCServer(messagePtr, nodePtr *string) {
 		}
 		defer listener.Close()
 
-		log.Infof("gRPC server listening on port %s (%s)", grpcPort, getL4Protocol(listener))
+		log.Infof("gRPC server listening on port %s/%s", grpcPort, getL4Protocol(listener))
 		grpcServer := grpc.NewServer()
 		pb.RegisterEchoServiceServer(grpcServer, &EchoServer{messagePtr: messagePtr, nodePtr: nodePtr})
 		reflection.Register(grpcServer)
@@ -393,7 +393,7 @@ func startQUICServer(messagePtr, nodePtr *string, printHeaders bool) {
 		}
 		defer server.Close()
 
-		log.Infof("QUIC server listening on port %s (UDP)", quicPort)
+		log.Infof("QUIC server listening on port %s/udp", quicPort)
 		log.Fatal(server.ListenAndServe())
 	}()
 }
@@ -411,7 +411,7 @@ func startMetricsServer() {
 		}
 		defer listener.Close()
 
-		log.Infof("Prometheus HTTP metrics server listening on port %s (%s)", metricsPort, getL4Protocol(listener))
+		log.Infof("Prometheus HTTP metrics server listening on port %s/%s", metricsPort, getL4Protocol(listener))
 		log.Fatal(http.Serve(listener, mux))
 	}()
 }
@@ -420,9 +420,9 @@ func startMetricsServer() {
 func getL4Protocol(listener net.Listener) string {
 	switch listener.Addr().Network() {
 	case "tcp", "tcp4", "tcp6":
-		return "TCP"
+		return "tcp"
 	case "udp", "udp4", "udp6":
-		return "UDP"
+		return "udp"
 	default:
 		return "Unknown"
 	}
