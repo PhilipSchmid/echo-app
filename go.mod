@@ -47,7 +47,7 @@ require (
 
 require (
 	github.com/prometheus/client_golang v1.20.5
-	github.com/quic-go/quic-go v0.48.1
+	github.com/quic-go/quic-go v0.48.2
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/net v0.29.0 // indirect
 	golang.org/x/sys v0.25.0 // indirect
