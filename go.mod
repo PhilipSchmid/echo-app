@@ -2,7 +2,7 @@ module echo-app
 
 go 1.22.7
 
-toolchain go1.23.4
+toolchain go1.23.5
 
 require (
 	github.com/spf13/pflag v1.0.5
