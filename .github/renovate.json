@@ -13,36 +13,62 @@
   ],
   "dockerfile": {
     "enabled": true,
-    "fileMatch": ["^Dockerfile$"],
+    "fileMatch": [
+      "^Dockerfile$"
+    ],
     "pinDigests": true
   },
   "packageRules": [
     {
-      "managers": ["dockerfile"],
-      "datasources": ["docker"],
-      "updateTypes": ["minor", "patch"],
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
       "automerge": true,
       "automergeType": "branch",
       "commitMessageTopic": "{{prettyDepType}} version",
       "commitMessageExtra": "to {{#if isMajor}}{{newMajor}}{{else}}{{newVersion}}{{/if}}",
       "commitMessageSuffix": "[skip ci]",
-      "schedule": ["before 9am on monday"]
+      "schedule": [
+        "before 9am on monday"
+      ]
     },
     {
-      "managers": ["dockerfile"],
-      "datasources": ["docker"],
-      "updateTypes": ["digest"],
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
       "automerge": true
     },
     {
-      "managers": ["github-actions"],
-      "updateTypes": ["minor", "patch", "pin", "digest"],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
       "automerge": true,
       "automergeType": "branch",
       "commitMessageTopic": "{{prettyDepType}} update",
       "commitMessageExtra": "to {{newVersion}}",
       "commitMessageSuffix": "[skip ci]",
-      "schedule": ["before 9am on monday"]
+      "schedule": [
+        "before 9am on monday"
+      ]
     }
   ]
 }
