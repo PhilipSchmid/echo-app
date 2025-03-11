@@ -1,2 +1,4 @@
-echo-app
+/echo-app
 .vscode
+app.log
+build.log

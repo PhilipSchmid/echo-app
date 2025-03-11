@@ -1,11 +1,13 @@
 # Build stage
 FROM --platform=$BUILDPLATFORM golang:1.24-alpine@sha256:43c094ad24b6ac0546c62193baeb3e6e49ce14d3250845d166c77c25f64b0386 AS builder
 
-# Define ARGs to specify the target platform
+# Define ARGs to specify the target platform and build metadata
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
+ARG BUILD_DATE
+ARG VCS_REF
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -19,7 +21,7 @@ RUN go mod download
 COPY . .
 
 # Compile the application to a binary with all dependencies included
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -a -o /main .
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -a -o /main cmd/echo-app/main.go
 
 # Final stage
 FROM scratch
