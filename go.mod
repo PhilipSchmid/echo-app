@@ -1,6 +1,6 @@
 module echo-app
 
-go 1.22.7
+go 1.23
 
 toolchain go1.24.1
 
@@ -48,7 +48,7 @@ require (
 
 require (
 	github.com/prometheus/client_golang v1.21.1
-	github.com/quic-go/quic-go v0.49.0
+	github.com/quic-go/quic-go v0.50.0
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect
