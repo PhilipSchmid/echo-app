@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package echo;
+
+option go_package = "github.com/PhilipSchmid/echo-app/proto";
+
+service EchoService {
+  rpc Echo (EchoRequest) returns (EchoResponse) {}
+}
+
+message EchoRequest {}
+
+message EchoResponse {
+  string timestamp = 1;
+  string message = 2;
+  string hostname = 3;
+  string listener = 4;
+  string node = 5;
+  string source_ip = 6;
+  string grpc_method = 7;
+}
