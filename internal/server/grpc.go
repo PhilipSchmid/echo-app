@@ -16,7 +16,11 @@ func StartGRPCServer(cfg *config.Config) {
 	if err != nil {
 		logrus.Fatalf("Failed to start gRPC server: %v", err)
 	}
-	defer listener.Close()
+	defer func() {
+		if err := listener.Close(); err != nil {
+			logrus.Errorf("Failed to close gRPC listener: %v", err)
+		}
+	}()
 
 	// Create the gRPC server
 	grpcServer := grpc.NewServer()

@@ -14,7 +14,11 @@ func StartTCPServer(cfg *config.Config) {
 	if err != nil {
 		logrus.Fatalf("Failed to start TCP server: %v", err)
 	}
-	defer listener.Close()
+	defer func() {
+		if err := listener.Close(); err != nil {
+			logrus.Errorf("Failed to close TCP listener: %v", err)
+		}
+	}()
 
 	logrus.Infof("TCP server listening on port %s", cfg.TCPPort)
 	for {
