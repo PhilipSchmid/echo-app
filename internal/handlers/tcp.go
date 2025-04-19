@@ -47,7 +47,11 @@ type TCPResponse struct {
 
 func TCPHandler(conn net.Conn, cfg *config.Config) {
 	start := time.Now()
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			logrus.Errorf("Failed to close TCP connection: %v", err)
+		}
+	}()
 	response := buildTCPResponse(conn, cfg)
 	data, err := json.Marshal(response)
 	if err != nil {
