@@ -55,7 +55,7 @@ jobs:
           
           ## Full Changelog
           
-          ${PREV_TAG}...${CURRENT_TAG}
+          https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${CURRENT_TAG}
           EOF
           
           echo "version=${CURRENT_TAG}" >> $GITHUB_OUTPUT
