@@ -26,6 +26,10 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w
 # Final stage
 FROM scratch
 
+# Re-declare ARGs in the final stage to use them
+ARG BUILD_DATE
+ARG VCS_REF
+
 # Add metadata to the image using opencontainers labels
 LABEL org.opencontainers.image.title="echo-app" \
       org.opencontainers.image.description="Tiny golang app which returns a timestamp, a customizable message, the hostname, the request source IP, and optionally the HTTP request headers." \
@@ -33,8 +37,8 @@ LABEL org.opencontainers.image.title="echo-app" \
       org.opencontainers.image.source="https://github.com/philipschmid/echo-app" \
       org.opencontainers.image.vendor="philipschmid" \
       org.opencontainers.image.licenses="Apache-2.0 license" \
-      org.opencontainers.image.revision="${VCS_REF}" \
-      org.opencontainers.image.created="${BUILD_DATE}"
+      org.opencontainers.image.revision="$VCS_REF" \
+      org.opencontainers.image.created="$BUILD_DATE"
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /main /main

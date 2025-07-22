@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/PhilipSchmid/echo-app/internal/config"
-	"github.com/PhilipSchmid/echo-app/internal/metrics"
 	"github.com/PhilipSchmid/echo-app/internal/server"
+	"github.com/PhilipSchmid/echo-app/internal/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -45,28 +48,84 @@ func main() {
 		logrus.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	// Start servers based on configuration
-	go server.StartHTTPServer(cfg)
+	// Validate configuration
+	if err := validateConfig(cfg); err != nil {
+		logrus.Fatalf("Invalid configuration: %v", err)
+	}
+
+	// Create server manager
+	manager := server.NewManager(cfg)
+
+	// Register servers based on configuration
+	// Always start HTTP server
+	manager.RegisterServer(server.NewHTTPServer(cfg, false))
+
 	if cfg.TLS {
-		go server.StartTLSServer(cfg)
+		manager.RegisterServer(server.NewHTTPServer(cfg, true))
 	}
 	if cfg.TCP {
-		go server.StartTCPServer(cfg)
+		manager.RegisterServer(server.NewTCPServer(cfg))
 	}
 	if cfg.GRPC {
-		go server.StartGRPCServer(cfg)
+		manager.RegisterServer(server.NewGRPCServer(cfg))
 	}
 	if cfg.QUIC {
-		go server.StartQUICServer(cfg)
+		manager.RegisterServer(server.NewQUICServer(cfg))
 	}
 	if cfg.Metrics {
-		go metrics.StartMetricsServer(cfg)
+		manager.RegisterServer(server.NewMetricsServer(cfg))
+	}
+
+	// Create context for server lifecycle
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start all servers
+	if err := manager.Start(ctx); err != nil {
+		logrus.Errorf("Failed to start servers: %v", err)
 	}
 
 	// Wait for shutdown signal
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
-	logrus.Info("Shutting down servers...")
-	// Add graceful shutdown logic here if needed
+
+	// Cancel context to signal shutdown
+	cancel()
+
+	// Graceful shutdown with timeout
+	shutdownTimeout := 30 * time.Second
+	logrus.Infof("Shutting down servers (timeout: %v)...", shutdownTimeout)
+
+	if err := manager.Shutdown(shutdownTimeout); err != nil {
+		logrus.Errorf("Shutdown error: %v", err)
+		os.Exit(1)
+	}
+
+	logrus.Info("Shutdown complete")
+}
+
+// validateConfig validates the configuration
+func validateConfig(cfg *config.Config) error {
+	// Validate ports
+	if !utils.IsValidPort(cfg.HTTPPort) {
+		return fmt.Errorf("invalid HTTP port: %s", cfg.HTTPPort)
+	}
+	if cfg.TLS && !utils.IsValidPort(cfg.TLSPort) {
+		return fmt.Errorf("invalid TLS port: %s", cfg.TLSPort)
+	}
+	if cfg.TCP && !utils.IsValidPort(cfg.TCPPort) {
+		return fmt.Errorf("invalid TCP port: %s", cfg.TCPPort)
+	}
+	if cfg.GRPC && !utils.IsValidPort(cfg.GRPCPort) {
+		return fmt.Errorf("invalid gRPC port: %s", cfg.GRPCPort)
+	}
+	if cfg.QUIC && !utils.IsValidPort(cfg.QUICPort) {
+		return fmt.Errorf("invalid QUIC port: %s", cfg.QUICPort)
+	}
+	if cfg.Metrics && !utils.IsValidPort(cfg.MetricsPort) {
+		return fmt.Errorf("invalid metrics port: %s", cfg.MetricsPort)
+	}
+
+	return nil
 }
