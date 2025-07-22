@@ -2,43 +2,17 @@ package handlers
 
 import (
 	"context"
-	"os"
 	"time"
 
 	"github.com/PhilipSchmid/echo-app/internal/config"
+	"github.com/PhilipSchmid/echo-app/internal/metrics"
 	"github.com/PhilipSchmid/echo-app/proto"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
-)
-
-// Define Prometheus metrics for gRPC
-var (
-	grpcRequestsTotal = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "grpc_requests_total",
-			Help: "Total number of gRPC requests",
-		},
-		[]string{"method"},
-	)
-	grpcRequestDuration = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "grpc_request_duration_seconds",
-			Help:    "Duration of gRPC requests in seconds",
-			Buckets: prometheus.DefBuckets,
-		},
-		[]string{"method"},
-	)
-	grpcErrorsTotal = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "grpc_errors_total",
-			Help: "Total number of gRPC errors",
-		},
-		[]string{"method"},
-	)
 )
 
 // EchoServer implements the gRPC EchoService
@@ -55,34 +29,54 @@ func NewEchoServer(cfg *config.Config) *EchoServer {
 // Echo handles the Echo request
 func (s *EchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (*proto.EchoResponse, error) {
 	start := time.Now()
-	method, _ := grpc.Method(ctx)
+	method, ok := grpc.Method(ctx)
+	if !ok {
+		method = "unknown"
+	}
+
+	// Get peer info for debug logging
+	var remoteAddr string
+	if p, ok := peer.FromContext(ctx); ok {
+		remoteAddr = p.Addr.String()
+	}
+
+	// Debug logging
+	logrus.Debugf("[gRPC] Incoming request: %s from %s", method, remoteAddr)
+	if md, ok := metadata.FromIncomingContext(ctx); ok && logrus.GetLevel() >= logrus.DebugLevel {
+		logrus.Debugf("[gRPC] Request metadata: %+v", md)
+	}
+
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordRequest("gRPC", method, "", duration)
+		logrus.Debugf("[gRPC] Response sent to %s in %.3fms", remoteAddr, duration*1000)
+	}()
+
 	if req == nil {
-		grpcErrorsTotal.WithLabelValues(method).Inc()
+		metrics.RecordError("gRPC", "nil_request")
+		logrus.Debugf("[gRPC] Nil request from %s", remoteAddr)
 		return nil, status.Error(codes.InvalidArgument, "request is nil")
 	}
 	response := buildGRPCResponse(ctx, s.cfg, method)
-	duration := time.Since(start).Seconds()
-	grpcRequestsTotal.WithLabelValues(method).Inc()
-	grpcRequestDuration.WithLabelValues(method).Observe(duration)
 	return response, nil
 }
 
 // buildGRPCResponse constructs the response struct for gRPC
 func buildGRPCResponse(ctx context.Context, cfg *config.Config, method string) *proto.EchoResponse {
-	timestamp := time.Now().Format(time.RFC3339)
-	host, _ := os.Hostname()
-	clientIP := ""
+	remoteAddr := ""
 	if p, ok := peer.FromContext(ctx); ok {
-		clientIP = p.Addr.String()
+		remoteAddr = p.Addr.String()
 	}
 
+	base := NewBaseResponse(cfg, "gRPC", remoteAddr)
+
 	return &proto.EchoResponse{
-		Timestamp:  timestamp,
-		Message:    cfg.Message,
-		Hostname:   host,
-		Listener:   "gRPC",
-		Node:       cfg.Node,
-		SourceIp:   clientIP,
+		Timestamp:  base.Timestamp,
+		Message:    base.Message,
+		Hostname:   base.Hostname,
+		Listener:   base.Listener,
+		Node:       base.Node,
+		SourceIp:   base.SourceIP,
 		GrpcMethod: method,
 	}
 }

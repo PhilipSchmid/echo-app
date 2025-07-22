@@ -1,4 +1,62 @@
+# Binary
 /echo-app
-.vscode
-app.log
-build.log
+echo-app
+
+# Build artifacts
+/build/
+build/
+*.log
+*.out
+coverage.*
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Go specific
+vendor/
+*.test
+*.prof
+*.pprof
+
+# Test artifacts
+coverage.html
+coverage.txt
+*.test.out
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS specific
+Thumbs.db
+.DS_Store
+
+# Debug files
+debug
+__debug_bin
+
+# Architecture specific binaries
+*-linux-*
+*-darwin-*
+*-windows-*
+*.exe
+
+# Docker
+.dockerignore.local
+
+# Certificates (if generated locally)
+*.pem
+*.key
+*.crt
+*.csr

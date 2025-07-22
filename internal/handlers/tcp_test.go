@@ -11,45 +11,45 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockConn is a mock implementation of net.Conn
-type MockConn struct {
+// MockTCPConn is a mock implementation of net.Conn
+type MockTCPConn struct {
 	mock.Mock
 }
 
 // Write mocks the Write method of net.Conn
-func (m *MockConn) Write(b []byte) (int, error) {
+func (m *MockTCPConn) Write(b []byte) (int, error) {
 	args := m.Called(b)
 	return args.Int(0), args.Error(1)
 }
 
 // Close mocks the Close method of net.Conn
-func (m *MockConn) Close() error {
+func (m *MockTCPConn) Close() error {
 	args := m.Called()
 	return args.Error(0)
 }
 
 // Minimal implementations for other net.Conn methods (required for the interface)
-func (m *MockConn) Read(b []byte) (int, error) {
+func (m *MockTCPConn) Read(b []byte) (int, error) {
 	return 0, nil // Not used in this test
 }
 
-func (m *MockConn) LocalAddr() net.Addr {
+func (m *MockTCPConn) LocalAddr() net.Addr {
 	return &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 12345}
 }
 
-func (m *MockConn) RemoteAddr() net.Addr {
+func (m *MockTCPConn) RemoteAddr() net.Addr {
 	return &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 54321}
 }
 
-func (m *MockConn) SetDeadline(t time.Time) error {
+func (m *MockTCPConn) SetDeadline(t time.Time) error {
 	return nil // Not used in this test
 }
 
-func (m *MockConn) SetReadDeadline(t time.Time) error {
+func (m *MockTCPConn) SetReadDeadline(t time.Time) error {
 	return nil // Not used in this test
 }
 
-func (m *MockConn) SetWriteDeadline(t time.Time) error {
+func (m *MockTCPConn) SetWriteDeadline(t time.Time) error {
 	return nil // Not used in this test
 }
 
@@ -61,7 +61,7 @@ func TestTCPHandler(t *testing.T) {
 	}
 
 	// Create a mock connection
-	mockConn := new(MockConn)
+	mockConn := new(MockTCPConn)
 
 	// Set expectations for the mock
 	mockConn.On("Write", mock.Anything).Return(len("some data"), nil).Once()

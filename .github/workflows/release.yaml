@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          CURRENT_TAG=${GITHUB_REF#refs/tags/}
+          
+          if [ -z "$PREV_TAG" ]; then
+            echo "First release"
+            CHANGELOG="Initial release of echo-app"
+          else
+            # Generate changelog from commits
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" $PREV_TAG..$CURRENT_TAG)
+          fi
+          
+          # Save to file for release notes
+          cat > CHANGELOG.md << EOF
+          ## What's Changed
+          
+          $CHANGELOG
+          
+          ## Docker Images
+          
+          \`\`\`bash
+          docker pull ghcr.io/${{ github.repository }}:${CURRENT_TAG}
+          docker pull ghcr.io/${{ github.repository }}:latest
+          \`\`\`
+          
+          ## Full Changelog
+          
+          ${PREV_TAG}...${CURRENT_TAG}
+          EOF
+          
+          echo "version=${CURRENT_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Build binaries
+        run: |
+          # Build for multiple platforms
+          make build-all
+          
+          # Create archives
+          cd build
+          for file in echo-app-*; do
+            if [[ "$file" == *.exe ]]; then
+              zip "${file%.exe}.zip" "$file"
+            else
+              tar -czf "${file}.tar.gz" "$file"
+            fi
+          done
+          cd ..
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: CHANGELOG.md
+          files: |
+            build/*.tar.gz
+            build/*.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
+
+  docker-release:
+    name: Docker Release
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            VCS_REF=${{ github.sha }}

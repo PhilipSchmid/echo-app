@@ -1,0 +1,86 @@
+name: Benchmark
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code (PR)
+        uses: actions/checkout@v4
+
+      - name: Checkout code (base)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          path: base
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Run benchmarks (base)
+        run: |
+          cd base
+          go test -bench=. -benchmem -count=10 ./... > ../base-benchmarks.txt
+
+      - name: Run benchmarks (PR)
+        run: |
+          go test -bench=. -benchmem -count=10 ./... > pr-benchmarks.txt
+
+      - name: Compare benchmarks
+        uses: rhysd/github-action-benchmark@v1
+        with:
+          tool: 'go'
+          output-file-path: pr-benchmarks.txt
+          external-data-json-path: ./cache/benchmark-data.json
+          fail-on-alert: true
+          comment-on-alert: true
+          alert-threshold: '150%'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: false
+
+      - name: Comment benchmark results
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const fs = require('fs');
+            const baseResults = fs.readFileSync('base-benchmarks.txt', 'utf8');
+            const prResults = fs.readFileSync('pr-benchmarks.txt', 'utf8');
+            
+            const comment = `## Benchmark Results
+            
+            <details>
+            <summary>Base Branch Results</summary>
+            
+            \`\`\`
+            ${baseResults}
+            \`\`\`
+            </details>
+            
+            <details>
+            <summary>PR Results</summary>
+            
+            \`\`\`
+            ${prResults}
+            \`\`\`
+            </details>
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
