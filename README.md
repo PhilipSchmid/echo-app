@@ -1,6 +1,6 @@
 # echo-app
 
-![Build and push Docker image](https://github.com/philipschmid/echo-app/actions/workflows/build.yaml/badge.svg) ![Go syntax and format check](https://github.com/philipschmid/echo-app/actions/workflows/lint.yaml/badge.svg) ![Go tests and app build](https://github.com/philipschmid/echo-app/actions/workflows/test.yaml/badge.svg)
+![CI](https://github.com/philipschmid/echo-app/actions/workflows/ci.yaml/badge.svg) ![Docker Build](https://github.com/philipschmid/echo-app/actions/workflows/docker.yaml/badge.svg) ![Release](https://github.com/philipschmid/echo-app/actions/workflows/release.yaml/badge.svg)
 
 The `echo-app` is a versatile Go application designed to echo back a JSON payload containing detailed information about incoming requests. It's an invaluable tool for testing, debugging, and understanding network interactions across multiple protocols. The JSON response includes:
 
