@@ -95,7 +95,6 @@ jobs:
           output-file: sbom.spdx.json
 
       - name: Scan image with Trivy
-        if: github.event_name != 'pull_request'
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ steps.first-tag.outputs.tag }}
@@ -104,7 +103,7 @@ jobs:
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v3
-        if: github.event_name != 'pull_request'
+        if: always()
         with:
           sarif_file: 'trivy-results.sarif'
 
