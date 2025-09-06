@@ -2,7 +2,7 @@ module github.com/PhilipSchmid/echo-app
 
 go 1.25
 
-toolchain go1.25.0
+toolchain go1.25.1
 
 require (
 	github.com/spf13/pflag v1.0.7
