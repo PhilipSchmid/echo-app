@@ -5,7 +5,7 @@ go 1.25
 toolchain go1.25.1
 
 require (
-	github.com/spf13/pflag v1.0.7
+	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.20.1
 	google.golang.org/grpc v1.75.0
 )
