@@ -18,8 +18,12 @@ type TCPResponse struct {
 func TCPHandler(conn net.Conn, cfg *config.Config) {
 	start := time.Now()
 	remoteAddr := conn.RemoteAddr().String()
+	sourceIP := extractIP(remoteAddr)
 
-	// Debug logging
+	// Enhanced request logging at INFO level for troubleshooting
+	logrus.Infof("[TCP] Connection from %s", sourceIP)
+
+	// Debug logging (keep existing for detailed debugging)
 	logrus.Debugf("[TCP] New connection from %s", remoteAddr)
 
 	defer func() {
