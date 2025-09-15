@@ -7,15 +7,17 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "06:00"
-    open-pull-requests-limit: 10
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
     reviewers:
       - "philipschmid"
     labels:
       - "dependencies"
       - "go"
     commit-message:
-      prefix: "deps"
+      prefix: "deps(go)"
       include: "scope"
+    rebase-strategy: "disabled"
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
@@ -24,15 +26,17 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "06:00"
-    open-pull-requests-limit: 10
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 3
     reviewers:
       - "philipschmid"
     labels:
       - "dependencies"
       - "github-actions"
     commit-message:
-      prefix: "ci"
+      prefix: "deps(actions)"
       include: "scope"
+    rebase-strategy: "disabled"
 
   # Enable version updates for Docker
   - package-ecosystem: "docker"
@@ -41,12 +45,14 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "06:00"
-    open-pull-requests-limit: 10
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 2
     reviewers:
       - "philipschmid"
     labels:
       - "dependencies"
       - "docker"
     commit-message:
-      prefix: "docker"
+      prefix: "deps(docker)"
       include: "scope"
+    rebase-strategy: "disabled"
