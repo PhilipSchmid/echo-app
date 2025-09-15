@@ -24,7 +24,26 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
-		// Debug logging
+		// Enhanced request logging at INFO level for troubleshooting
+		sourceIP := extractIP(r.RemoteAddr)
+		userAgent := r.Header.Get("User-Agent")
+		if userAgent == "" {
+			userAgent = "unknown"
+		}
+
+		logrus.Infof("[%s] Request: %s %s from %s (User-Agent: %s)",
+			listener, r.Method, r.URL.Path, sourceIP, userAgent)
+
+		// Additional header information if configured
+		if cfg.PrintHeaders {
+			logrus.Infof("[%s] Headers: Host=%s, Content-Type=%s, Accept=%s",
+				listener,
+				r.Header.Get("Host"),
+				r.Header.Get("Content-Type"),
+				r.Header.Get("Accept"))
+		}
+
+		// Debug logging (keep existing for detailed debugging)
 		logrus.Debugf("[%s] Incoming request: %s %s from %s", listener, r.Method, r.URL.Path, r.RemoteAddr)
 		if logrus.GetLevel() >= logrus.DebugLevel && cfg.PrintHeaders {
 			logrus.Debugf("[%s] Request headers: %+v", listener, r.Header)

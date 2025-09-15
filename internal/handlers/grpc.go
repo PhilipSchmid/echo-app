@@ -34,13 +34,32 @@ func (s *EchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (*proto.E
 		method = "unknown"
 	}
 
-	// Get peer info for debug logging
+	// Get peer info and metadata for logging
 	var remoteAddr string
+	var sourceIP string
 	if p, ok := peer.FromContext(ctx); ok {
 		remoteAddr = p.Addr.String()
+		sourceIP = extractIP(remoteAddr)
 	}
 
-	// Debug logging
+	// Enhanced request logging at INFO level for troubleshooting
+	userAgent := "unknown"
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if ua := md.Get("user-agent"); len(ua) > 0 {
+			userAgent = ua[0]
+		}
+		// Log the gRPC request with key information
+		logrus.Infof("[gRPC] Request: %s from %s (User-Agent: %s)", method, sourceIP, userAgent)
+
+		// Additional metadata information for troubleshooting
+		if contentType := md.Get("content-type"); len(contentType) > 0 {
+			logrus.Infof("[gRPC] Content-Type: %s", contentType[0])
+		}
+	} else {
+		logrus.Infof("[gRPC] Request: %s from %s (User-Agent: %s)", method, sourceIP, userAgent)
+	}
+
+	// Debug logging (keep existing for detailed debugging)
 	logrus.Debugf("[gRPC] Incoming request: %s from %s", method, remoteAddr)
 	if md, ok := metadata.FromIncomingContext(ctx); ok && logrus.GetLevel() >= logrus.DebugLevel {
 		logrus.Debugf("[gRPC] Request metadata: %+v", md)
