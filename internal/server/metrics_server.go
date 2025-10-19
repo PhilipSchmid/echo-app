@@ -34,7 +34,8 @@ func (s *MetricsServer) Name() string {
 // Start starts the metrics server
 func (s *MetricsServer) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
+	// Wrap metrics handler with timeout to prevent hung scrapers
+	mux.Handle("/metrics", http.TimeoutHandler(promhttp.Handler(), 10*time.Second, "Metrics collection timeout"))
 
 	// Add health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
