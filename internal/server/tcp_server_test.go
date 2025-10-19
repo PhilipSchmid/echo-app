@@ -35,7 +35,7 @@ func TestTCPServer_StartAndStop(t *testing.T) {
 	// Verify server is listening
 	conn, err := net.Dial("tcp", "localhost:19090")
 	require.NoError(t, err)
-	conn.Close()
+	_ = conn.Close()
 
 	// Stop server
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -70,7 +70,7 @@ func TestTCPServer_ConnectionLimit(t *testing.T) {
 	defer cancel()
 
 	// Start server
-	go server.Start(ctx)
+	go func() { _ = server.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Create connections up to the limit
@@ -110,14 +110,14 @@ func TestTCPServer_ConnectionLimit(t *testing.T) {
 	// Clean up connections
 	connMutex.Lock()
 	for _, conn := range conns {
-		conn.Close()
+		_ = conn.Close()
 	}
 	connMutex.Unlock()
 
 	// Shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-	server.Shutdown(shutdownCtx)
+	_ = server.Shutdown(shutdownCtx)
 	cancel()
 }
 
@@ -132,7 +132,7 @@ func TestTCPServer_GracefulShutdown(t *testing.T) {
 	defer cancel()
 
 	// Start server
-	go server.Start(ctx)
+	go func() { _ = server.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Create some connections
@@ -165,7 +165,7 @@ func TestTCPServer_GracefulShutdown(t *testing.T) {
 
 	// Clean up connections (they may already be closed by shutdown)
 	for _, conn := range conns {
-		conn.Close()
+		_ = conn.Close()
 	}
 
 	cancel()
@@ -182,7 +182,7 @@ func TestTCPServer_ShutdownTimeout(t *testing.T) {
 	defer cancel()
 
 	// Start server
-	go server.Start(ctx)
+	go func() { _ = server.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Create a connection
@@ -246,7 +246,7 @@ func TestTCPServer_ActiveConnectionTracking(t *testing.T) {
 	defer cancel()
 
 	// Start server
-	go server.Start(ctx)
+	go func() { _ = server.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Initially no connections
@@ -266,8 +266,8 @@ func TestTCPServer_ActiveConnectionTracking(t *testing.T) {
 	assert.LessOrEqual(t, activeConns, int32(2))
 
 	// Close connections
-	conn1.Close()
-	conn2.Close()
+	_ = conn1.Close()
+	_ = conn2.Close()
 
 	// Wait for handlers to complete
 	time.Sleep(200 * time.Millisecond)
@@ -279,7 +279,7 @@ func TestTCPServer_ActiveConnectionTracking(t *testing.T) {
 	// Shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-	server.Shutdown(shutdownCtx)
+	_ = server.Shutdown(shutdownCtx)
 	cancel()
 }
 
@@ -303,7 +303,7 @@ func TestTCPServer_ConcurrentConnections(t *testing.T) {
 	defer cancel()
 
 	// Start server
-	go server.Start(ctx)
+	go func() { _ = server.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Create many concurrent connections
@@ -322,13 +322,13 @@ func TestTCPServer_ConcurrentConnections(t *testing.T) {
 			atomic.AddInt32(&successCount, 1)
 
 			// Send some data
-			conn.Write([]byte("test"))
+			_, _ = conn.Write([]byte("test"))
 
 			// Read response
 			buf := make([]byte, 4096)
-			conn.SetReadDeadline(time.Now().Add(1 * time.Second))
-			conn.Read(buf)
-			conn.Close()
+			_ = conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+			_, _ = conn.Read(buf)
+			_ = conn.Close()
 		}()
 	}
 
@@ -340,6 +340,6 @@ func TestTCPServer_ConcurrentConnections(t *testing.T) {
 	// Shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-	server.Shutdown(shutdownCtx)
+	_ = server.Shutdown(shutdownCtx)
 	cancel()
 }

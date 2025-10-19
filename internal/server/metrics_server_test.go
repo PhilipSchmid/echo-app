@@ -87,7 +87,7 @@ func TestMetricsServer_HealthEndpoint(t *testing.T) {
 	defer cancel()
 
 	// Start server
-	go server.Start(ctx)
+	go func() { _ = server.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Test health endpoint
@@ -104,7 +104,7 @@ func TestMetricsServer_HealthEndpoint(t *testing.T) {
 	// Shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-	server.Shutdown(shutdownCtx)
+	_ = server.Shutdown(shutdownCtx)
 }
 
 func TestMetricsServer_ReadyEndpoint(t *testing.T) {
@@ -117,7 +117,7 @@ func TestMetricsServer_ReadyEndpoint(t *testing.T) {
 	defer cancel()
 
 	// Start server
-	go server.Start(ctx)
+	go func() { _ = server.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Test ready endpoint
@@ -134,7 +134,7 @@ func TestMetricsServer_ReadyEndpoint(t *testing.T) {
 	// Shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-	server.Shutdown(shutdownCtx)
+	_ = server.Shutdown(shutdownCtx)
 }
 
 func TestMetricsServer_MetricsEndpoint(t *testing.T) {
@@ -147,7 +147,7 @@ func TestMetricsServer_MetricsEndpoint(t *testing.T) {
 	defer cancel()
 
 	// Start server
-	go server.Start(ctx)
+	go func() { _ = server.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Test metrics endpoint
@@ -168,7 +168,7 @@ func TestMetricsServer_MetricsEndpoint(t *testing.T) {
 	// Shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-	server.Shutdown(shutdownCtx)
+	_ = server.Shutdown(shutdownCtx)
 }
 
 func TestMetricsServer_MetricsTimeout(t *testing.T) {
@@ -181,7 +181,7 @@ func TestMetricsServer_MetricsTimeout(t *testing.T) {
 	defer cancel()
 
 	// Start server
-	go server.Start(ctx)
+	go func() { _ = server.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Test metrics endpoint with very slow client
@@ -203,7 +203,7 @@ func TestMetricsServer_MetricsTimeout(t *testing.T) {
 	// Shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-	server.Shutdown(shutdownCtx)
+	_ = server.Shutdown(shutdownCtx)
 }
 
 func TestMetricsServer_ShutdownWithoutStart(t *testing.T) {
@@ -231,7 +231,7 @@ func TestMetricsServer_GracefulShutdown(t *testing.T) {
 	defer cancel()
 
 	// Start server
-	go server.Start(ctx)
+	go func() { _ = server.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Make a request to ensure server is working
@@ -268,7 +268,7 @@ func TestMetricsServer_MultipleEndpoints(t *testing.T) {
 	defer cancel()
 
 	// Start server
-	go server.Start(ctx)
+	go func() { _ = server.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Test all endpoints
@@ -324,5 +324,5 @@ func TestMetricsServer_MultipleEndpoints(t *testing.T) {
 	// Shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-	server.Shutdown(shutdownCtx)
+	_ = server.Shutdown(shutdownCtx)
 }

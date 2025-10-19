@@ -143,8 +143,8 @@ func TestLoad_EnvironmentVariables(t *testing.T) {
 
 			// Set environment variables
 			for key, value := range tt.envVars {
-				os.Setenv(key, value)
-				defer os.Unsetenv(key)
+				_ = os.Setenv(key, value)
+				defer func(k string) { _ = os.Unsetenv(k) }(key)
 			}
 
 			cfg, err := Load()
@@ -203,8 +203,8 @@ func TestLoad_MessageLengthValidation(t *testing.T) {
 			// Reset viper before each test
 			viper.Reset()
 
-			os.Setenv("ECHO_APP_MESSAGE", tt.message)
-			defer os.Unsetenv("ECHO_APP_MESSAGE")
+			_ = os.Setenv("ECHO_APP_MESSAGE", tt.message)
+			defer func() { _ = os.Unsetenv("ECHO_APP_MESSAGE") }()
 
 			cfg, err := Load()
 
@@ -272,8 +272,8 @@ func TestLoad_LogLevelParsing(t *testing.T) {
 			viper.Reset()
 
 			if tt.logLevel != "" {
-				os.Setenv("ECHO_APP_LOG_LEVEL", tt.logLevel)
-				defer os.Unsetenv("ECHO_APP_LOG_LEVEL")
+				_ = os.Setenv("ECHO_APP_LOG_LEVEL", tt.logLevel)
+				defer func() { _ = os.Unsetenv("ECHO_APP_LOG_LEVEL") }()
 			}
 
 			cfg, err := Load()

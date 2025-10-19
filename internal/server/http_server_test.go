@@ -37,7 +37,7 @@ func TestHTTPServer_StartAndStop(t *testing.T) {
 	// Verify server is listening
 	resp, err := http.Get("http://localhost:18080/")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Stop server
@@ -89,7 +89,7 @@ func TestTLSServer_StartAndStop(t *testing.T) {
 
 	resp, err := client.Get("https://localhost:18443/")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Stop server
@@ -125,7 +125,7 @@ func TestHTTPServer_ConnectionLimit(t *testing.T) {
 	defer cancel()
 
 	// Start server
-	go server.Start(ctx)
+	go func() { _ = server.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Create a handler that blocks to keep connections open
@@ -142,7 +142,7 @@ func TestHTTPServer_ConnectionLimit(t *testing.T) {
 			if err != nil {
 				return
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode == http.StatusOK {
 				atomic.AddInt32(&successCount, 1)
@@ -151,7 +151,7 @@ func TestHTTPServer_ConnectionLimit(t *testing.T) {
 			}
 
 			// Read and discard body
-			io.Copy(io.Discard, resp.Body)
+			_, _ = io.Copy(io.Discard, resp.Body)
 		}()
 	}
 
@@ -168,7 +168,7 @@ func TestHTTPServer_ConnectionLimit(t *testing.T) {
 	// Shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-	server.Shutdown(shutdownCtx)
+	_ = server.Shutdown(shutdownCtx)
 	cancel()
 }
 
@@ -214,13 +214,13 @@ func TestHTTPServer_GracefulShutdown(t *testing.T) {
 	defer cancel()
 
 	// Start server
-	go server.Start(ctx)
+	go func() { _ = server.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Make a request to ensure server is working
 	resp, err := http.Get("http://localhost:18083/")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Initiate graceful shutdown
@@ -254,7 +254,7 @@ func TestHTTPServer_ConcurrentRequests(t *testing.T) {
 	defer cancel()
 
 	// Start server
-	go server.Start(ctx)
+	go func() { _ = server.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Make many concurrent requests
@@ -270,14 +270,14 @@ func TestHTTPServer_ConcurrentRequests(t *testing.T) {
 			if err != nil {
 				return
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode == http.StatusOK {
 				atomic.AddInt32(&successCount, 1)
 			}
 
 			// Read and discard body
-			io.Copy(io.Discard, resp.Body)
+			_, _ = io.Copy(io.Discard, resp.Body)
 		}()
 	}
 
@@ -289,7 +289,7 @@ func TestHTTPServer_ConcurrentRequests(t *testing.T) {
 	// Shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-	server.Shutdown(shutdownCtx)
+	_ = server.Shutdown(shutdownCtx)
 	cancel()
 }
 
@@ -319,7 +319,7 @@ func TestHTTPServer_ActiveConnectionTracking(t *testing.T) {
 	defer cancel()
 
 	// Start server
-	go server.Start(ctx)
+	go func() { _ = server.Start(ctx) }()
 	time.Sleep(100 * time.Millisecond)
 
 	// Initially no connections
@@ -328,10 +328,10 @@ func TestHTTPServer_ActiveConnectionTracking(t *testing.T) {
 	// Make a request
 	resp, err := http.Get("http://localhost:18086/")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read body to complete request
-	io.Copy(io.Discard, resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	// Wait for handler to complete
 	time.Sleep(100 * time.Millisecond)
@@ -343,6 +343,6 @@ func TestHTTPServer_ActiveConnectionTracking(t *testing.T) {
 	// Shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-	server.Shutdown(shutdownCtx)
+	_ = server.Shutdown(shutdownCtx)
 	cancel()
 }
