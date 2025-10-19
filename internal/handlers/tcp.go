@@ -20,6 +20,14 @@ func TCPHandler(conn net.Conn, cfg *config.Config) {
 	remoteAddr := conn.RemoteAddr().String()
 	sourceIP := extractIP(remoteAddr)
 
+	// Panic recovery to prevent handler crashes
+	defer func() {
+		if rec := recover(); rec != nil {
+			logrus.Errorf("[TCP] Recovered from panic: %v", rec)
+			metrics.RecordError("TCP", "panic")
+		}
+	}()
+
 	// Enhanced request logging at INFO level for troubleshooting
 	logrus.Infof("[TCP] Connection from %s", sourceIP)
 
