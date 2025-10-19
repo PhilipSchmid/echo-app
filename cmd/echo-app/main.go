@@ -33,6 +33,7 @@ func main() {
 	pflag.String("quic-port", "4433", "QUIC server port")
 	pflag.String("metrics-port", "3000", "Metrics server port")
 	pflag.String("log-level", "info", "Log level (debug, info, warn, error)")
+	pflag.Int64("max-request-size", 10485760, "Maximum request body size in bytes (default: 10MB)")
 
 	// Parse the flags
 	pflag.Parse()

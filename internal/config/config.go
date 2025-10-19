@@ -8,21 +8,22 @@ import (
 )
 
 type Config struct {
-	Message      string
-	Node         string
-	PrintHeaders bool
-	TLS          bool
-	TCP          bool
-	GRPC         bool
-	QUIC         bool
-	Metrics      bool
-	HTTPPort     string
-	TLSPort      string
-	TCPPort      string
-	GRPCPort     string
-	QUICPort     string
-	MetricsPort  string
-	LogLevel     logrus.Level
+	Message        string
+	Node           string
+	PrintHeaders   bool
+	TLS            bool
+	TCP            bool
+	GRPC           bool
+	QUIC           bool
+	Metrics        bool
+	HTTPPort       string
+	TLSPort        string
+	TCPPort        string
+	GRPCPort       string
+	QUICPort       string
+	MetricsPort    string
+	LogLevel       logrus.Level
+	MaxRequestSize int64 // Maximum request body size in bytes
 }
 
 func Load() (*Config, error) {
@@ -46,23 +47,25 @@ func Load() (*Config, error) {
 	viper.SetDefault("quic-port", "4433")
 	viper.SetDefault("metrics-port", "3000")
 	viper.SetDefault("log-level", "info")
+	viper.SetDefault("max-request-size", 10485760) // 10 MB default
 
 	// Load configuration from viper
 	cfg := &Config{
-		Message:      viper.GetString("message"),
-		Node:         viper.GetString("node"),
-		PrintHeaders: viper.GetBool("print-http-request-headers"),
-		TLS:          viper.GetBool("tls"),
-		TCP:          viper.GetBool("tcp"),
-		GRPC:         viper.GetBool("grpc"),
-		QUIC:         viper.GetBool("quic"),
-		Metrics:      viper.GetBool("metrics"),
-		HTTPPort:     viper.GetString("http-port"),
-		TLSPort:      viper.GetString("tls-port"),
-		TCPPort:      viper.GetString("tcp-port"),
-		GRPCPort:     viper.GetString("grpc-port"),
-		QUICPort:     viper.GetString("quic-port"),
-		MetricsPort:  viper.GetString("metrics-port"),
+		Message:        viper.GetString("message"),
+		Node:           viper.GetString("node"),
+		PrintHeaders:   viper.GetBool("print-http-request-headers"),
+		TLS:            viper.GetBool("tls"),
+		TCP:            viper.GetBool("tcp"),
+		GRPC:           viper.GetBool("grpc"),
+		QUIC:           viper.GetBool("quic"),
+		Metrics:        viper.GetBool("metrics"),
+		HTTPPort:       viper.GetString("http-port"),
+		TLSPort:        viper.GetString("tls-port"),
+		TCPPort:        viper.GetString("tcp-port"),
+		GRPCPort:       viper.GetString("grpc-port"),
+		QUICPort:       viper.GetString("quic-port"),
+		MetricsPort:    viper.GetString("metrics-port"),
+		MaxRequestSize: viper.GetInt64("max-request-size"),
 	}
 
 	// Set log level

@@ -46,6 +46,9 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 		logrus.Infof("[%s] Request: %s %s from %s (User-Agent: %s)",
 			listener, r.Method, r.URL.Path, sourceIP, userAgent)
 
+		// Limit request body size to prevent resource exhaustion
+		r.Body = http.MaxBytesReader(w, r.Body, cfg.MaxRequestSize)
+
 		// Additional header information if configured
 		if cfg.PrintHeaders {
 			logrus.Infof("[%s] Headers: Host=%s, Content-Type=%s, Accept=%s",
