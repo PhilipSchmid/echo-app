@@ -144,9 +144,10 @@ func TestHTTPServer_ConnectionLimit(t *testing.T) {
 			}
 			defer func() { _ = resp.Body.Close() }()
 
-			if resp.StatusCode == http.StatusOK {
+			switch resp.StatusCode {
+			case http.StatusOK:
 				atomic.AddInt32(&successCount, 1)
-			} else if resp.StatusCode == http.StatusServiceUnavailable {
+			case http.StatusServiceUnavailable:
 				atomic.AddInt32(&serviceUnavailableCount, 1)
 			}
 

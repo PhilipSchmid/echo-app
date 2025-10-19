@@ -188,7 +188,7 @@ func TestTCPServer_ShutdownTimeout(t *testing.T) {
 	// Create a connection
 	conn, err := net.Dial("tcp", "localhost:19093")
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// Initiate shutdown with very short timeout
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 100*time.Millisecond)

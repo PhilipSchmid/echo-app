@@ -55,7 +55,7 @@ func TestMetricsServer_StartAndShutdown(t *testing.T) {
 	// Verify server is listening
 	resp, err := http.Get("http://localhost:13002/health")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Stop server
@@ -93,7 +93,7 @@ func TestMetricsServer_HealthEndpoint(t *testing.T) {
 	// Test health endpoint
 	resp, err := http.Get("http://localhost:13003/health")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -123,7 +123,7 @@ func TestMetricsServer_ReadyEndpoint(t *testing.T) {
 	// Test ready endpoint
 	resp, err := http.Get("http://localhost:13004/ready")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -153,7 +153,7 @@ func TestMetricsServer_MetricsEndpoint(t *testing.T) {
 	// Test metrics endpoint
 	resp, err := http.Get("http://localhost:13005/metrics")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -192,7 +192,7 @@ func TestMetricsServer_MetricsTimeout(t *testing.T) {
 
 	resp, err := client.Get("http://localhost:13006/metrics")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -237,7 +237,7 @@ func TestMetricsServer_GracefulShutdown(t *testing.T) {
 	// Make a request to ensure server is working
 	resp, err := http.Get("http://localhost:13008/health")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Initiate graceful shutdown
@@ -302,7 +302,7 @@ func TestMetricsServer_MultipleEndpoints(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			resp, err := http.Get("http://localhost:13009" + tt.endpoint)
 			require.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
 
