@@ -34,6 +34,14 @@ func (s *EchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (*proto.E
 		method = "unknown"
 	}
 
+	// Panic recovery to prevent handler crashes
+	defer func() {
+		if rec := recover(); rec != nil {
+			logrus.Errorf("[gRPC] Recovered from panic: %v", rec)
+			metrics.RecordError("gRPC", "panic")
+		}
+	}()
+
 	// Get peer info and metadata for logging
 	var remoteAddr string
 	var sourceIP string
