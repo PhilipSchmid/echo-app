@@ -31,6 +31,7 @@ type TCPServer struct {
 	shutdown     chan struct{}
 	wg           sync.WaitGroup
 	ctx          context.Context
+	mu           sync.RWMutex // Protects listener and ctx
 }
 
 // NewTCPServer creates a new TCP server
@@ -49,12 +50,16 @@ func (s *TCPServer) Name() string {
 
 // Start starts the TCP server
 func (s *TCPServer) Start(ctx context.Context) error {
-	s.ctx = ctx
 	listener, err := net.Listen("tcp", s.listenAddr)
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", s.listenAddr, err)
 	}
+
+	// Store context and listener with mutex protection
+	s.mu.Lock()
+	s.ctx = ctx
 	s.listener = listener
+	s.mu.Unlock()
 
 	logrus.Infof("TCP server listening on %s", s.listenAddr)
 
@@ -120,8 +125,13 @@ func (s *TCPServer) handleConnection(conn net.Conn) {
 		logrus.Errorf("Failed to set connection deadline: %v", err)
 	}
 
+	// Get context safely
+	s.mu.RLock()
+	ctx := s.ctx
+	s.mu.RUnlock()
+
 	// Handle the connection with context
-	handlers.TCPHandler(s.ctx, conn, s.cfg)
+	handlers.TCPHandler(ctx, conn, s.cfg)
 }
 
 // Shutdown gracefully shuts down the TCP server
@@ -132,8 +142,12 @@ func (s *TCPServer) Shutdown(ctx context.Context) error {
 		close(s.shutdown)
 
 		// Close listener
-		if s.listener != nil {
-			if cerr := s.listener.Close(); cerr != nil {
+		s.mu.RLock()
+		listener := s.listener
+		s.mu.RUnlock()
+
+		if listener != nil {
+			if cerr := listener.Close(); cerr != nil {
 				err = fmt.Errorf("failed to close listener: %w", cerr)
 			}
 		}

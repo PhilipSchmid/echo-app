@@ -15,18 +15,18 @@ import (
 
 // mockServer is a mock implementation of the Server interface for testing
 type mockServer struct {
-	name          string
-	startCalled   int32
+	name           string
+	startCalled    int32
 	shutdownCalled int32
-	startDelay    time.Duration
-	shutdownDelay time.Duration
-	startError    error
-	shutdownError error
-	blockStart    bool
-	shutdownCh    chan struct{}
-	shutdownOnce  sync.Once
-	ctx           context.Context
-	cancel        context.CancelFunc
+	startDelay     time.Duration
+	shutdownDelay  time.Duration
+	startError     error
+	shutdownError  error
+	blockStart     bool
+	shutdownCh     chan struct{}
+	shutdownOnce   sync.Once
+	ctx            context.Context
+	cancel         context.CancelFunc
 }
 
 func newMockServer(name string) *mockServer {

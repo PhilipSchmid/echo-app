@@ -19,11 +19,11 @@ const (
 
 // HTTPServer represents an HTTP server
 type HTTPServer struct {
-	cfg          *config.Config
-	server       *http.Server
-	listenAddr   string
-	listener     string
-	activeConns  int32
+	cfg         *config.Config
+	server      *http.Server
+	listenAddr  string
+	listener    string
+	activeConns int32
 }
 
 // NewHTTPServer creates a new HTTP server
