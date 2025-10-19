@@ -30,6 +30,7 @@ type TCPServer struct {
 	shutdownOnce sync.Once
 	shutdown     chan struct{}
 	wg           sync.WaitGroup
+	ctx          context.Context
 }
 
 // NewTCPServer creates a new TCP server
@@ -48,6 +49,7 @@ func (s *TCPServer) Name() string {
 
 // Start starts the TCP server
 func (s *TCPServer) Start(ctx context.Context) error {
+	s.ctx = ctx
 	listener, err := net.Listen("tcp", s.listenAddr)
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", s.listenAddr, err)
@@ -118,8 +120,8 @@ func (s *TCPServer) handleConnection(conn net.Conn) {
 		logrus.Errorf("Failed to set connection deadline: %v", err)
 	}
 
-	// Handle the connection
-	handlers.TCPHandler(conn, s.cfg)
+	// Handle the connection with context
+	handlers.TCPHandler(s.ctx, conn, s.cfg)
 }
 
 // Shutdown gracefully shuts down the TCP server

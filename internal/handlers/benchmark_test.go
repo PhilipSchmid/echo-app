@@ -112,9 +112,10 @@ func BenchmarkTCPHandler(b *testing.B) {
 		remoteAddr: "10.0.0.1:9090",
 	}
 
+	ctx := context.Background()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		TCPHandler(conn, cfg)
+		TCPHandler(ctx, conn, cfg)
 	}
 }
 

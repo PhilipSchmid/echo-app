@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -69,7 +70,8 @@ func TestTCPHandler_WriteError(t *testing.T) {
 	mockConn.On("Close").Return(nil)
 
 	// Call the handler
-	TCPHandler(mockConn, cfg)
+	ctx := context.Background()
+	TCPHandler(ctx, mockConn, cfg)
 
 	// Verify expectations
 	mockConn.AssertExpectations(t)
@@ -89,7 +91,8 @@ func TestTCPHandler_CloseError(t *testing.T) {
 	mockConn.On("Close").Return(assert.AnError)
 
 	// Call the handler
-	TCPHandler(mockConn, cfg)
+	ctx := context.Background()
+	TCPHandler(ctx, mockConn, cfg)
 
 	// Verify expectations
 	mockConn.AssertExpectations(t)
@@ -110,7 +113,8 @@ func TestTCPHandler_MalformedRemoteAddr(t *testing.T) {
 	mockConn.On("Close").Return(nil)
 
 	// Call the handler - should not panic
-	TCPHandler(mockConn, cfg)
+	ctx := context.Background()
+	TCPHandler(ctx, mockConn, cfg)
 
 	// Verify expectations
 	mockConn.AssertExpectations(t)

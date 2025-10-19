@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"time"
@@ -15,7 +16,7 @@ type TCPResponse struct {
 	BaseResponse
 }
 
-func TCPHandler(conn net.Conn, cfg *config.Config) {
+func TCPHandler(ctx context.Context, conn net.Conn, cfg *config.Config) {
 	start := time.Now()
 	remoteAddr := conn.RemoteAddr().String()
 	sourceIP := extractIP(remoteAddr)
@@ -27,6 +28,12 @@ func TCPHandler(conn net.Conn, cfg *config.Config) {
 			metrics.RecordError("TCP", "panic")
 		}
 	}()
+
+	// Check if context is already cancelled
+	if ctx.Err() != nil {
+		logrus.Debugf("[TCP] Context cancelled before processing connection from %s", remoteAddr)
+		return
+	}
 
 	// Enhanced request logging at INFO level for troubleshooting
 	logrus.Infof("[TCP] Connection from %s", sourceIP)

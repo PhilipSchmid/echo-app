@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"testing"
@@ -68,7 +69,8 @@ func TestTCPHandler(t *testing.T) {
 	mockConn.On("Close").Return(nil).Once()
 
 	// Call the handler with the mock connection
-	TCPHandler(mockConn, cfg)
+	ctx := context.Background()
+	TCPHandler(ctx, mockConn, cfg)
 
 	// Retrieve the data passed to Write
 	args := mockConn.Calls[0].Arguments // First call should be Write
