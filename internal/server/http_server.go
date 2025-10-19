@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/PhilipSchmid/echo-app/internal/config"
@@ -11,12 +12,18 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	// Maximum concurrent HTTP connections (same as TCP)
+	maxHTTPConnections = 1000
+)
+
 // HTTPServer represents an HTTP server
 type HTTPServer struct {
-	cfg        *config.Config
-	server     *http.Server
-	listenAddr string
-	listener   string
+	cfg          *config.Config
+	server       *http.Server
+	listenAddr   string
+	listener     string
+	activeConns  int32
 }
 
 // NewHTTPServer creates a new HTTP server
@@ -40,14 +47,35 @@ func (s *HTTPServer) Name() string {
 	return s.listener
 }
 
+// connectionLimitMiddleware limits concurrent connections
+func (s *HTTPServer) connectionLimitMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		currentConns := atomic.LoadInt32(&s.activeConns)
+		if currentConns >= maxHTTPConnections {
+			logrus.Warnf("[%s] Connection limit reached (%d), rejecting request from %s",
+				s.listener, maxHTTPConnections, r.RemoteAddr)
+			http.Error(w, "Service Unavailable: Connection limit reached", http.StatusServiceUnavailable)
+			return
+		}
+
+		atomic.AddInt32(&s.activeConns, 1)
+		defer atomic.AddInt32(&s.activeConns, -1)
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 // Start starts the HTTP server
 func (s *HTTPServer) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handlers.HTTPHandler(s.cfg, s.listener))
 
+	// Apply connection limit middleware
+	handler := s.connectionLimitMiddleware(mux)
+
 	s.server = &http.Server{
 		Addr:         s.listenAddr,
-		Handler:      mux,
+		Handler:      handler,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
