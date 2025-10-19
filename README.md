@@ -42,6 +42,7 @@ Configure the application using these environment variables:
 - `ECHO_APP_METRICS`: Set to `true` to enable the Prometheus metrics endpoint (default: `true`).
 - `ECHO_APP_METRICS_PORT`: Port for the metrics server (default: `3000` TCP).
 - `ECHO_APP_LOG_LEVEL`: Logging level (`debug`, `info`, `warn`, `error`; default: `info`).
+- `ECHO_APP_MAX_REQUEST_SIZE`: Maximum request body size in bytes (default: `10485760` - 10MB).
 
 ### Command-Line Flags
 Run `./echo-app --help` to see all available flags:
@@ -52,6 +53,7 @@ Usage of ./echo-app:
       --grpc-port string             gRPC server port (default "50051")
       --http-port string             HTTP server port (default "8080")
       --log-level string             Log level (debug, info, warn, error) (default "info")
+      --max-request-size int         Maximum request body size in bytes (default 10485760)
       --message string               Custom message
       --metrics                      Enable metrics server (default true)
       --metrics-port string          Metrics server port (default "3000")
