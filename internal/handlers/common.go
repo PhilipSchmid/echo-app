@@ -70,3 +70,21 @@ func extractIP(remoteAddr string) string {
 
 	return ip
 }
+
+// normalizeEndpoint normalizes HTTP endpoints to prevent high cardinality in metrics
+// Known paths are preserved, all others are grouped as "other"
+func normalizeEndpoint(path string) string {
+	// List of known paths to track individually
+	knownPaths := map[string]bool{
+		"/":        true,
+		"/health":  true,
+		"/ready":   true,
+		"/metrics": true,
+	}
+
+	if knownPaths[path] {
+		return path
+	}
+
+	return "other"
+}

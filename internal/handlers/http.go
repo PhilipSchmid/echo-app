@@ -78,7 +78,9 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 			metrics.RecordError(listener, "write_error")
 		}
 		duration := time.Since(start).Seconds()
-		metrics.RecordRequest(listener, r.Method, r.URL.Path, duration)
+		// Normalize endpoint to prevent high cardinality in metrics
+		normalizedPath := normalizeEndpoint(r.URL.Path)
+		metrics.RecordRequest(listener, r.Method, normalizedPath, duration)
 
 		// Debug logging for response
 		logrus.Debugf("[%s] Response sent: %d bytes in %.3fms", listener, len(data), duration*1000)
