@@ -1,10 +1,16 @@
 package config
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+)
+
+const (
+	// MaxMessageLength is the maximum allowed length for the custom message field
+	MaxMessageLength = 1024 // 1 KB
 )
 
 type Config struct {
@@ -75,6 +81,11 @@ func Load() (*Config, error) {
 	}
 	cfg.LogLevel = lvl
 	logrus.SetLevel(cfg.LogLevel)
+
+	// Validate message length
+	if len(cfg.Message) > MaxMessageLength {
+		return nil, fmt.Errorf("message length (%d) exceeds maximum allowed length (%d)", len(cfg.Message), MaxMessageLength)
+	}
 
 	return cfg, nil
 }
