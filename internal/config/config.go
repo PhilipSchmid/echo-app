@@ -1,6 +1,8 @@
 package config
 
 import (
+	"strings"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -24,8 +26,9 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	viper.AutomaticEnv()
 	viper.SetEnvPrefix("ECHO_APP")
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	viper.AutomaticEnv()
 
 	// Set default values
 	viper.SetDefault("message", "")

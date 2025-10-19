@@ -8,12 +8,13 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"math/big"
+	"net"
 	"time"
 )
 
 // GenerateSelfSignedCert generates a self-signed certificate
 func GenerateSelfSignedCert() (tls.Certificate, error) {
-	priv, err := rsa.GenerateKey(rand.Reader, 4096)
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return tls.Certificate{}, err
 	}
@@ -27,6 +28,8 @@ func GenerateSelfSignedCert() (tls.Certificate, error) {
 		NotAfter:    time.Now().Add(10 * 365 * 24 * time.Hour),
 		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		DNSNames:    []string{"localhost"},
+		IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
 	}
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
