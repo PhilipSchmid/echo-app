@@ -24,6 +24,18 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
+		// Panic recovery to prevent handler crashes
+		defer func() {
+			if rec := recover(); rec != nil {
+				logrus.Errorf("[%s] Recovered from panic: %v", listener, rec)
+				metrics.RecordError(listener, "panic")
+				w.WriteHeader(http.StatusInternalServerError)
+				if _, writeErr := w.Write([]byte("Internal Server Error")); writeErr != nil {
+					logrus.Errorf("Failed to write panic response: %v", writeErr)
+				}
+			}
+		}()
+
 		// Enhanced request logging at INFO level for troubleshooting
 		sourceIP := extractIP(r.RemoteAddr)
 		userAgent := r.Header.Get("User-Agent")
