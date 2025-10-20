@@ -203,13 +203,22 @@ The CI pipeline runs on every push and pull request:
 
 All checks must pass before merging.
 
-### CI Troubleshooting
+### Development Workflow Best Practices
 
-If CI fails:
-1. Run `golangci-lint run --timeout 5m` locally
-2. Run `go test -race ./...` locally
-3. Run `gofmt -l .` and fix any files listed
-4. Check GitHub Actions logs for specific errors
+**Before committing code:**
+
+1. **Clear linter cache** to ensure fresh results matching CI behavior
+2. **Run all checks locally** using the same commands as CI
+3. **Verify all checks pass** before pushing commits
+
+**When making code changes:**
+
+1. **Search comprehensively** - Use grep/search to find all instances of patterns you're modifying
+2. **Fix systematically** - Address all occurrences at once, not incrementally
+3. **Test thoroughly** - Run tests with race detector after every significant change
+4. **Validate locally** - Ensure linter returns success (exit code 0) before committing
+
+This workflow prevents CI failures by catching issues locally before they reach the remote repository.
 
 ## Security Considerations
 
