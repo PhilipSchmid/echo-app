@@ -22,17 +22,17 @@ const (
 
 // TCPServer represents a TCP server with connection management
 type TCPServer struct {
-	cfg           *config.Config
-	listener      net.Listener
-	listenAddr    string
-	connections   sync.Map
-	activeConns   int32
-	shuttingDown  int32 // Atomic flag to prevent new connections during shutdown
-	shutdownOnce  sync.Once
-	shutdown      chan struct{}
-	wg            sync.WaitGroup
-	ctx           context.Context
-	mu            sync.RWMutex // Protects listener and ctx
+	cfg          *config.Config
+	listener     net.Listener
+	listenAddr   string
+	connections  sync.Map
+	activeConns  int32
+	shuttingDown int32 // Atomic flag to prevent new connections during shutdown
+	shutdownOnce sync.Once
+	shutdown     chan struct{}
+	wg           sync.WaitGroup
+	ctx          context.Context
+	mu           sync.RWMutex // Protects listener and ctx
 }
 
 // NewTCPServer creates a new TCP server
