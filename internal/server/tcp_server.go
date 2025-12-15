@@ -22,16 +22,17 @@ const (
 
 // TCPServer represents a TCP server with connection management
 type TCPServer struct {
-	cfg          *config.Config
-	listener     net.Listener
-	listenAddr   string
-	connections  sync.Map
-	activeConns  int32
-	shutdownOnce sync.Once
-	shutdown     chan struct{}
-	wg           sync.WaitGroup
-	ctx          context.Context
-	mu           sync.RWMutex // Protects listener and ctx
+	cfg           *config.Config
+	listener      net.Listener
+	listenAddr    string
+	connections   sync.Map
+	activeConns   int32
+	shuttingDown  int32 // Atomic flag to prevent new connections during shutdown
+	shutdownOnce  sync.Once
+	shutdown      chan struct{}
+	wg            sync.WaitGroup
+	ctx           context.Context
+	mu            sync.RWMutex // Protects listener and ctx
 }
 
 // NewTCPServer creates a new TCP server
@@ -92,6 +93,14 @@ func (s *TCPServer) Start(ctx context.Context) error {
 				}
 			}
 
+			// Check if shutdown is in progress before adding to wait group
+			if atomic.LoadInt32(&s.shuttingDown) == 1 {
+				if err := conn.Close(); err != nil {
+					logrus.Errorf("Failed to close connection during shutdown: %v", err)
+				}
+				return nil
+			}
+
 			// Check connection limit
 			currentConns := atomic.LoadInt32(&s.activeConns)
 			if currentConns >= maxTCPConnections {
@@ -139,6 +148,8 @@ func (s *TCPServer) Shutdown(ctx context.Context) error {
 	var err error
 
 	s.shutdownOnce.Do(func() {
+		// Set shutdown flag before closing channel to prevent new wg.Add calls
+		atomic.StoreInt32(&s.shuttingDown, 1)
 		close(s.shutdown)
 
 		// Close listener
