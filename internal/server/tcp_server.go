@@ -157,16 +157,19 @@ func (s *TCPServer) Shutdown(ctx context.Context) error {
 		atomic.StoreInt32(&s.shuttingDown, 1)
 		close(s.shutdown)
 
-		// Close listener
-		s.mu.RLock()
+		// Acquire lock to:
+		// 1. Synchronize with Start() - ensures any in-flight wg.Add() completes
+		// 2. Safely access and close the listener
+		// Start() holds this lock while calling wg.Add(), so acquiring it here
+		// guarantees all pending wg.Add() calls have completed before wg.Wait()
+		s.mu.Lock()
 		listener := s.listener
-		s.mu.RUnlock()
-
 		if listener != nil {
 			if cerr := listener.Close(); cerr != nil {
 				err = fmt.Errorf("failed to close listener: %w", cerr)
 			}
 		}
+		s.mu.Unlock()
 
 		// Close all active connections
 		s.connections.Range(func(key, value interface{}) bool {
@@ -177,12 +180,6 @@ func (s *TCPServer) Shutdown(ctx context.Context) error {
 			}
 			return true
 		})
-
-		// Acquire and release lock to ensure no new wg.Add() calls can happen.
-		// This acts as a memory barrier synchronizing with Start() which holds
-		// the lock during wg.Add(). The empty critical section is intentional.
-		s.mu.Lock()   //nolint:staticcheck // SA2001: intentional sync barrier
-		s.mu.Unlock() //nolint:staticcheck // SA2001: intentional sync barrier
 
 		// Wait for all handlers to complete or timeout
 		done := make(chan struct{})
