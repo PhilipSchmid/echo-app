@@ -98,6 +98,10 @@ func (m *Manager) Shutdown(timeout time.Duration) error {
 
 	select {
 	case <-done:
+		// Check if we exceeded the timeout even though shutdown completed
+		if ctx.Err() != nil {
+			return fmt.Errorf("shutdown timeout exceeded")
+		}
 		logrus.Info("All servers shut down successfully")
 	case <-ctx.Done():
 		return fmt.Errorf("shutdown timeout exceeded")
