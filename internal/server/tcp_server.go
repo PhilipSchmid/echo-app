@@ -93,8 +93,11 @@ func (s *TCPServer) Start(ctx context.Context) error {
 				}
 			}
 
-			// Check if shutdown is in progress before adding to wait group
+			// Use mutex to make shutdown check and wg.Add atomic
+			// This prevents race between wg.Add() here and wg.Wait() in Shutdown
+			s.mu.Lock()
 			if atomic.LoadInt32(&s.shuttingDown) == 1 {
+				s.mu.Unlock()
 				if err := conn.Close(); err != nil {
 					logrus.Errorf("Failed to close connection during shutdown: %v", err)
 				}
@@ -104,6 +107,7 @@ func (s *TCPServer) Start(ctx context.Context) error {
 			// Check connection limit
 			currentConns := atomic.LoadInt32(&s.activeConns)
 			if currentConns >= maxTCPConnections {
+				s.mu.Unlock()
 				logrus.Warnf("Connection limit reached (%d), rejecting new connection", maxTCPConnections)
 				if err := conn.Close(); err != nil {
 					logrus.Errorf("Failed to close rejected connection: %v", err)
@@ -111,8 +115,9 @@ func (s *TCPServer) Start(ctx context.Context) error {
 				continue
 			}
 
-			// Handle connection
+			// Handle connection - wg.Add protected by mutex
 			s.wg.Add(1)
+			s.mu.Unlock()
 			atomic.AddInt32(&s.activeConns, 1)
 			go s.handleConnection(conn)
 		}
@@ -172,6 +177,12 @@ func (s *TCPServer) Shutdown(ctx context.Context) error {
 			}
 			return true
 		})
+
+		// Acquire and release lock to ensure no new wg.Add() calls can happen.
+		// This acts as a memory barrier synchronizing with Start() which holds
+		// the lock during wg.Add(). The empty critical section is intentional.
+		s.mu.Lock()   //nolint:staticcheck // SA2001: intentional sync barrier
+		s.mu.Unlock() //nolint:staticcheck // SA2001: intentional sync barrier
 
 		// Wait for all handlers to complete or timeout
 		done := make(chan struct{})
