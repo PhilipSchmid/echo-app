@@ -29,6 +29,8 @@ jobs:
       contents: read
       packages: write
       security-events: write
+      attestations: write
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -104,7 +106,7 @@ jobs:
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v4
-        if: github.event_name != 'pull_request' && always()
+        if: github.event_name != 'pull_request' && steps.build.outcome == 'success'
         with:
           sarif_file: 'trivy-results.sarif'
 
