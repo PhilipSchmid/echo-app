@@ -28,7 +28,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      security-events: write
       attestations: write
       id-token: write
     steps:
@@ -95,20 +94,6 @@ jobs:
           image: ${{ steps.first-tag.outputs.tag }}
           format: spdx-json
           output-file: sbom.spdx.json
-
-      - name: Scan image with Trivy
-        if: github.event_name != 'pull_request' && steps.build.outcome == 'success'
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ steps.first-tag.outputs.tag }}
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-
-      - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v4
-        if: github.event_name != 'pull_request' && steps.build.outcome == 'success'
-        with:
-          sarif_file: 'trivy-results.sarif'
 
       - name: Test Docker image
         if: github.event_name != 'pull_request' && steps.build.outcome == 'success'
