@@ -18,6 +18,7 @@ type Config struct {
 	Node           string
 	PrintHeaders   bool
 	TLS            bool
+	H2C            bool
 	TCP            bool
 	GRPC           bool
 	QUIC           bool
@@ -42,6 +43,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("node", "")
 	viper.SetDefault("print-http-request-headers", false)
 	viper.SetDefault("tls", false)
+	viper.SetDefault("h2c", false)
 	viper.SetDefault("tcp", false)
 	viper.SetDefault("grpc", false)
 	viper.SetDefault("quic", false)
@@ -61,6 +63,7 @@ func Load() (*Config, error) {
 		Node:           viper.GetString("node"),
 		PrintHeaders:   viper.GetBool("print-http-request-headers"),
 		TLS:            viper.GetBool("tls"),
+		H2C:            viper.GetBool("h2c"),
 		TCP:            viper.GetBool("tcp"),
 		GRPC:           viper.GetBool("grpc"),
 		QUIC:           viper.GetBool("quic"),

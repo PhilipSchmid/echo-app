@@ -10,6 +10,8 @@ import (
 	"github.com/PhilipSchmid/echo-app/internal/config"
 	"github.com/PhilipSchmid/echo-app/internal/handlers"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 const (
@@ -30,9 +32,12 @@ type HTTPServer struct {
 func NewHTTPServer(cfg *config.Config, useTLS bool) *HTTPServer {
 	port := cfg.HTTPPort
 	listener := "HTTP"
-	if useTLS {
+	switch {
+	case useTLS:
 		port = cfg.TLSPort
 		listener = "TLS"
+	case cfg.H2C:
+		listener = "H2C"
 	}
 
 	return &HTTPServer{
@@ -90,6 +95,10 @@ func (s *HTTPServer) Start(ctx context.Context) error {
 		}
 		s.server.TLSConfig = tlsConfig
 		return s.server.ListenAndServeTLS("", "")
+	}
+
+	if s.listener == "H2C" {
+		s.server.Handler = h2c.NewHandler(handler, &http2.Server{})
 	}
 
 	return s.server.ListenAndServe()

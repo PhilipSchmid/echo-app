@@ -31,6 +31,7 @@ Configure the application using these environment variables:
 - `ECHO_APP_NODE`: The name of the node where the app is running (e.g., for Kubernetes).
 - `ECHO_APP_PORT`: Port for the HTTP server (default: `8080` TCP).
 - `ECHO_APP_PRINT_HTTP_REQUEST_HEADERS`: Set to `true` to include HTTP request headers in the response.
+- `ECHO_APP_H2C`: Set to `true` to enable HTTP/2 cleartext (h2c) on the HTTP listener.
 - `ECHO_APP_TLS`: Set to `true` to enable the TLS (HTTPS) listener.
 - `ECHO_APP_TLS_PORT`: Port for the TLS server (default: `8443` TCP).
 - `ECHO_APP_TCP`: Set to `true` to enable the TCP listener.
@@ -63,6 +64,7 @@ Usage of ./echo-app:
       --quic-port string             QUIC server port (default "4433")
       --tcp                          Enable TCP server
       --tcp-port string              TCP server port (default "9090")
+      --h2c                          Enable HTTP/2 cleartext (h2c) on the HTTP listener
       --tls                          Enable TLS server
       --tls-port string              TLS server port (default "8443")
 ```
