@@ -22,6 +22,7 @@ func main() {
 	pflag.String("node", "", "Node name")
 	pflag.Bool("print-http-request-headers", false, "Print HTTP request headers")
 	pflag.Bool("tls", false, "Enable TLS server")
+	pflag.Bool("h2c", false, "Enable HTTP/2 cleartext (h2c) on the HTTP listener")
 	pflag.Bool("tcp", false, "Enable TCP server")
 	pflag.Bool("grpc", false, "Enable gRPC server")
 	pflag.Bool("quic", false, "Enable QUIC server")

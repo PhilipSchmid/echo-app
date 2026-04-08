@@ -92,8 +92,15 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 
 // buildHTTPResponse constructs the response struct
 func buildHTTPResponse(r *http.Request, cfg *config.Config, listener string) HTTPResponse {
+	// When running in H2C mode the listener serves both HTTP/1.1 and HTTP/2
+	// cleartext on the same port. Reflect the actually negotiated protocol so
+	// the response is meaningful rather than always showing "H2C".
+	effectiveListener := listener
+	if listener == "H2C" && r.ProtoMajor < 2 {
+		effectiveListener = "HTTP"
+	}
 	response := HTTPResponse{
-		BaseResponse: NewBaseResponse(cfg, listener, r.RemoteAddr),
+		BaseResponse: NewBaseResponse(cfg, effectiveListener, r.RemoteAddr),
 		HTTPVersion:  r.Proto,
 		HTTPMethod:   r.Method,
 		HTTPEndpoint: r.URL.Path,

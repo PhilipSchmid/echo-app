@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"io"
+	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -13,6 +14,7 @@ import (
 	"github.com/PhilipSchmid/echo-app/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/http2"
 )
 
 func TestHTTPServer_StartAndStop(t *testing.T) {
@@ -346,4 +348,51 @@ func TestHTTPServer_ActiveConnectionTracking(t *testing.T) {
 	defer shutdownCancel()
 	_ = server.Shutdown(shutdownCtx)
 	cancel()
+}
+
+func TestH2CServer_HTTP2Negotiation(t *testing.T) {
+	cfg := &config.Config{
+		HTTPPort: "18085",
+		H2C:      true,
+		Message:  "h2c-test",
+	}
+
+	server := NewHTTPServer(cfg, false)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_ = server.Start(ctx)
+	}()
+	time.Sleep(100 * time.Millisecond)
+
+	// h2c client: HTTP/2 over cleartext by using AllowHTTP.
+	// DialTLSContext must have the tls.Config signature; we ignore the config
+	// and dial plain TCP so the connection stays unencrypted.
+	transport := &http2.Transport{
+		AllowHTTP: true,
+		DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, addr)
+		},
+	}
+	client := &http.Client{Transport: transport}
+
+	resp, err := client.Get("http://localhost:18085/")
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	_, err = io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, 2, resp.ProtoMajor)
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	_ = server.Shutdown(shutdownCtx)
+	cancel()
+	wg.Wait()
 }
