@@ -10,8 +10,6 @@ import (
 	"github.com/PhilipSchmid/echo-app/internal/config"
 	"github.com/PhilipSchmid/echo-app/internal/handlers"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 )
 
 const (
@@ -98,7 +96,10 @@ func (s *HTTPServer) Start(ctx context.Context) error {
 	}
 
 	if s.listener == "H2C" {
-		s.server.Handler = h2c.NewHandler(handler, &http2.Server{})
+		protocols := new(http.Protocols)
+		protocols.SetHTTP1(true)
+		protocols.SetUnencryptedHTTP2(true)
+		s.server.Protocols = protocols
 	}
 
 	return s.server.ListenAndServe()
