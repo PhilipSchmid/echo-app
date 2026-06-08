@@ -17,6 +17,26 @@ import (
 	"golang.org/x/net/http2"
 )
 
+// getWithRetry performs an HTTP GET, retrying until it succeeds or the deadline
+// elapses. This avoids flakiness from relying on a fixed startup sleep, which can
+// be too short on a loaded CI runner. This is especially true for TLS servers,
+// where certificate generation and listener setup take noticeably longer.
+func getWithRetry(t *testing.T, client *http.Client, url string) *http.Response {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	var lastErr error
+	for time.Now().Before(deadline) {
+		resp, err := client.Get(url)
+		if err == nil {
+			return resp
+		}
+		lastErr = err
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("server did not become ready at %s: %v", url, lastErr)
+	return nil
+}
+
 func TestHTTPServer_StartAndStop(t *testing.T) {
 	cfg := &config.Config{
 		HTTPPort: "18080", // Use different port to avoid conflicts
@@ -33,12 +53,8 @@ func TestHTTPServer_StartAndStop(t *testing.T) {
 		errCh <- server.Start(ctx)
 	}()
 
-	// Wait for server to start
-	time.Sleep(100 * time.Millisecond)
-
-	// Verify server is listening
-	resp, err := http.Get("http://localhost:18080/")
-	require.NoError(t, err)
+	// Verify server is listening (retry to avoid flakiness from a fixed startup sleep)
+	resp := getWithRetry(t, http.DefaultClient, "http://localhost:18080/")
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -46,7 +62,7 @@ func TestHTTPServer_StartAndStop(t *testing.T) {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 
-	err = server.Shutdown(shutdownCtx)
+	err := server.Shutdown(shutdownCtx)
 	assert.NoError(t, err)
 
 	// Wait for Start() to finish
@@ -77,9 +93,6 @@ func TestTLSServer_StartAndStop(t *testing.T) {
 		errCh <- server.Start(ctx)
 	}()
 
-	// Wait for server to start (TLS setup takes a bit longer)
-	time.Sleep(200 * time.Millisecond)
-
 	// Verify server is listening (skip TLS verification for self-signed cert)
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -89,8 +102,9 @@ func TestTLSServer_StartAndStop(t *testing.T) {
 		Timeout:   5 * time.Second,
 	}
 
-	resp, err := client.Get("https://localhost:18443/")
-	require.NoError(t, err)
+	// Retry to avoid flakiness: TLS cert generation and listener setup can take
+	// longer than a fixed startup sleep on a loaded CI runner.
+	resp := getWithRetry(t, client, "https://localhost:18443/")
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -98,7 +112,7 @@ func TestTLSServer_StartAndStop(t *testing.T) {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 
-	err = server.Shutdown(shutdownCtx)
+	err := server.Shutdown(shutdownCtx)
 	assert.NoError(t, err)
 
 	// Cancel context
