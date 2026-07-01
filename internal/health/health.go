@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/PhilipSchmid/echo-app/internal/config"
+	probing "github.com/prometheus-community/pro-bing"
 	"github.com/sirupsen/logrus"
 )
 
@@ -30,17 +30,21 @@ type Checker struct {
 	lastChecked time.Time
 	probe       config.ExternalReadinessProbe
 	client      *http.Client
+	icmpProbe   icmpProbeFunc
 }
+
+type icmpProbeFunc func(context.Context, string, time.Duration) error
 
 // NewChecker creates a Checker. Without an external readiness probe the app is
 // considered ready as soon as the probe endpoint is reachable.
 func NewChecker(probe config.ExternalReadinessProbe) *Checker {
 	ready := !probe.Enabled()
 	return &Checker{
-		healthy: true,
-		ready:   ready,
-		probe:   probe,
-		client:  &http.Client{Timeout: probe.Timeout},
+		healthy:   true,
+		ready:     ready,
+		probe:     probe,
+		client:    &http.Client{Timeout: probe.Timeout},
+		icmpProbe: runICMPProbe,
 	}
 }
 
@@ -87,7 +91,7 @@ func (c *Checker) check(ctx context.Context) error {
 	case "tcp":
 		return c.checkTCP(ctx)
 	case "ping", "icmp":
-		return c.checkPing(ctx)
+		return c.checkICMP(ctx)
 	default:
 		return fmt.Errorf("unsupported external readiness probe type %q", c.probe.Type)
 	}
@@ -118,11 +122,26 @@ func (c *Checker) checkTCP(ctx context.Context) error {
 	return conn.Close()
 }
 
-func (c *Checker) checkPing(ctx context.Context) error {
-	cmd := exec.CommandContext(ctx, "ping", "-c", "1", "-W", fmt.Sprintf("%d", int(c.probe.Timeout.Seconds())), c.probe.Target)
-	output, err := cmd.CombinedOutput()
+func (c *Checker) checkICMP(ctx context.Context) error {
+	return c.icmpProbe(ctx, c.probe.Target, c.probe.Timeout)
+}
+
+func runICMPProbe(ctx context.Context, target string, timeout time.Duration) error {
+	pinger, err := probing.NewPinger(target)
 	if err != nil {
-		return fmt.Errorf("ping %s failed: %w: %s", c.probe.Target, err, strings.TrimSpace(string(output)))
+		return fmt.Errorf("create ICMP readiness probe for %s: %w", target, err)
+	}
+	pinger.Count = 1
+	pinger.Timeout = timeout
+	pinger.ResolveTimeout = timeout
+	pinger.SetPrivileged(true)
+
+	if err := pinger.RunWithContext(ctx); err != nil {
+		return fmt.Errorf("ICMP readiness probe for %s failed: %w", target, err)
+	}
+	stats := pinger.Statistics()
+	if stats.PacketsRecv == 0 {
+		return fmt.Errorf("ICMP readiness probe for %s failed: no packets received", target)
 	}
 	return nil
 }
