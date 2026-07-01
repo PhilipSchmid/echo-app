@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/PhilipSchmid/echo-app/internal/config"
+	"github.com/PhilipSchmid/echo-app/internal/health"
 	"github.com/PhilipSchmid/echo-app/internal/server"
 	"github.com/PhilipSchmid/echo-app/internal/utils"
 	"github.com/sirupsen/logrus"
@@ -35,6 +36,12 @@ func main() {
 	pflag.String("metrics-port", "3000", "Metrics server port")
 	pflag.String("log-level", "info", "Log level (debug, info, warn, error)")
 	pflag.Int64("max-request-size", 10485760, "Maximum request body size in bytes (default: 10MB)")
+	pflag.String("external-readiness-probe-type", "none", "External readiness probe type: none, http, tcp, or ping")
+	pflag.String("external-readiness-probe-target", "", "External readiness probe target URL, host:port, or host/IP")
+	pflag.Duration("external-readiness-probe-interval", 10*time.Second, "External readiness probe interval")
+	pflag.Duration("external-readiness-probe-timeout", 2*time.Second, "External readiness probe timeout")
+	pflag.String("external-readiness-http-method", "GET", "HTTP method for external readiness HTTP probes")
+	pflag.Int("external-readiness-http-expected-status", 200, "Expected HTTP status for external readiness HTTP probes")
 
 	// Parse the flags
 	pflag.Parse()
@@ -55,8 +62,11 @@ func main() {
 		logrus.Fatalf("Invalid configuration: %v", err)
 	}
 
+	// Create shared health/readiness checker
+	healthChecker := health.NewChecker(cfg.ExternalReadinessProbe)
+
 	// Create server manager
-	manager := server.NewManager(cfg)
+	manager := server.NewManager(cfg, healthChecker)
 
 	// Register servers based on configuration
 	// Always start HTTP server
@@ -75,7 +85,7 @@ func main() {
 		manager.RegisterServer(server.NewQUICServer(cfg))
 	}
 	if cfg.Metrics {
-		manager.RegisterServer(server.NewMetricsServer(cfg))
+		manager.RegisterServer(server.NewMetricsServer(cfg, healthChecker))
 	}
 
 	// Create context for server lifecycle
@@ -83,6 +93,8 @@ func main() {
 	defer cancel()
 
 	// Start all servers
+	healthChecker.Start(ctx)
+
 	if err := manager.Start(ctx); err != nil {
 		logrus.Errorf("Failed to start servers: %v", err)
 	}
@@ -127,6 +139,13 @@ func validateConfig(cfg *config.Config) error {
 	}
 	if cfg.Metrics && !utils.IsValidPort(cfg.MetricsPort) {
 		return fmt.Errorf("invalid metrics port: %s", cfg.MetricsPort)
+	}
+	if cfg.ExternalReadinessProbe.Enabled() {
+		switch cfg.ExternalReadinessProbe.Type {
+		case "http", "https", "tcp", "ping", "icmp":
+		default:
+			return fmt.Errorf("invalid external readiness probe type: %s", cfg.ExternalReadinessProbe.Type)
+		}
 	}
 
 	return nil

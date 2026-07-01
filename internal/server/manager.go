@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/PhilipSchmid/echo-app/internal/config"
+	"github.com/PhilipSchmid/echo-app/internal/health"
 	"github.com/sirupsen/logrus"
 )
 
 // Manager manages all servers and handles graceful shutdown
 type Manager struct {
 	cfg      *config.Config
+	health   *health.Checker
 	servers  []Server
 	wg       sync.WaitGroup
 	shutdown chan struct{}
@@ -27,9 +29,10 @@ type Server interface {
 }
 
 // NewManager creates a new server manager
-func NewManager(cfg *config.Config) *Manager {
+func NewManager(cfg *config.Config, healthChecker *health.Checker) *Manager {
 	return &Manager{
 		cfg:      cfg,
+		health:   healthChecker,
 		servers:  make([]Server, 0),
 		shutdown: make(chan struct{}),
 	}
@@ -58,6 +61,9 @@ func (m *Manager) Start(ctx context.Context) error {
 
 // Shutdown gracefully shuts down all servers
 func (m *Manager) Shutdown(timeout time.Duration) error {
+	if m.health != nil {
+		m.health.SetReady(false, "shutting down")
+	}
 	close(m.shutdown)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)

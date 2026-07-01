@@ -18,7 +18,7 @@ func TestNewMetricsServer(t *testing.T) {
 		MetricsPort: "13000",
 	}
 
-	server := NewMetricsServer(cfg)
+	server := NewMetricsServer(cfg, nil)
 
 	assert.NotNil(t, server)
 	assert.Equal(t, cfg, server.cfg)
@@ -30,7 +30,7 @@ func TestMetricsServer_Name(t *testing.T) {
 		MetricsPort: "13001",
 	}
 
-	server := NewMetricsServer(cfg)
+	server := NewMetricsServer(cfg, nil)
 	assert.Equal(t, "Metrics", server.Name())
 }
 
@@ -39,7 +39,7 @@ func TestMetricsServer_StartAndShutdown(t *testing.T) {
 		MetricsPort: "13002",
 	}
 
-	server := NewMetricsServer(cfg)
+	server := NewMetricsServer(cfg, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -82,7 +82,7 @@ func TestMetricsServer_HealthEndpoint(t *testing.T) {
 		MetricsPort: "13003",
 	}
 
-	server := NewMetricsServer(cfg)
+	server := NewMetricsServer(cfg, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -99,7 +99,7 @@ func TestMetricsServer_HealthEndpoint(t *testing.T) {
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	assert.Equal(t, "OK", string(body))
+	assert.Equal(t, "healthy", string(body))
 
 	// Shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -112,7 +112,7 @@ func TestMetricsServer_ReadyEndpoint(t *testing.T) {
 		MetricsPort: "13004",
 	}
 
-	server := NewMetricsServer(cfg)
+	server := NewMetricsServer(cfg, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -129,7 +129,7 @@ func TestMetricsServer_ReadyEndpoint(t *testing.T) {
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	assert.Equal(t, "Ready", string(body))
+	assert.Equal(t, "ready", string(body))
 
 	// Shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -142,7 +142,7 @@ func TestMetricsServer_MetricsEndpoint(t *testing.T) {
 		MetricsPort: "13005",
 	}
 
-	server := NewMetricsServer(cfg)
+	server := NewMetricsServer(cfg, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -176,7 +176,7 @@ func TestMetricsServer_MetricsTimeout(t *testing.T) {
 		MetricsPort: "13006",
 	}
 
-	server := NewMetricsServer(cfg)
+	server := NewMetricsServer(cfg, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -211,7 +211,7 @@ func TestMetricsServer_ShutdownWithoutStart(t *testing.T) {
 		MetricsPort: "13007",
 	}
 
-	server := NewMetricsServer(cfg)
+	server := NewMetricsServer(cfg, nil)
 
 	// Shutdown without starting should not error
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -226,7 +226,7 @@ func TestMetricsServer_GracefulShutdown(t *testing.T) {
 		MetricsPort: "13008",
 	}
 
-	server := NewMetricsServer(cfg)
+	server := NewMetricsServer(cfg, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -263,7 +263,7 @@ func TestMetricsServer_MultipleEndpoints(t *testing.T) {
 		MetricsPort: "13009",
 	}
 
-	server := NewMetricsServer(cfg)
+	server := NewMetricsServer(cfg, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -282,13 +282,13 @@ func TestMetricsServer_MultipleEndpoints(t *testing.T) {
 			name:           "health endpoint",
 			endpoint:       "/health",
 			expectedStatus: http.StatusOK,
-			expectedBody:   "OK",
+			expectedBody:   "healthy",
 		},
 		{
 			name:           "ready endpoint",
 			endpoint:       "/ready",
 			expectedStatus: http.StatusOK,
-			expectedBody:   "Ready",
+			expectedBody:   "ready",
 		},
 		{
 			name:           "metrics endpoint",

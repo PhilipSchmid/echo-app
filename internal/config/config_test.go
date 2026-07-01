@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -338,4 +339,32 @@ func TestLoad_CombinedConfiguration(t *testing.T) {
 	assert.True(t, cfg.PrintHeaders)
 	assert.Equal(t, logrus.DebugLevel, cfg.LogLevel)
 	assert.Equal(t, int64(20971520), cfg.MaxRequestSize)
+}
+
+func TestLoad_ExternalReadinessProbeConfiguration(t *testing.T) {
+	viper.Reset()
+	_ = os.Setenv("ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE", "http")
+	_ = os.Setenv("ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET", "http://upstream/health")
+	_ = os.Setenv("ECHO_APP_EXTERNAL_READINESS_PROBE_INTERVAL", "5s")
+	_ = os.Setenv("ECHO_APP_EXTERNAL_READINESS_PROBE_TIMEOUT", "500ms")
+	_ = os.Setenv("ECHO_APP_EXTERNAL_READINESS_HTTP_METHOD", "HEAD")
+	_ = os.Setenv("ECHO_APP_EXTERNAL_READINESS_HTTP_EXPECTED_STATUS", "204")
+	defer func() {
+		_ = os.Unsetenv("ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE")
+		_ = os.Unsetenv("ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET")
+		_ = os.Unsetenv("ECHO_APP_EXTERNAL_READINESS_PROBE_INTERVAL")
+		_ = os.Unsetenv("ECHO_APP_EXTERNAL_READINESS_PROBE_TIMEOUT")
+		_ = os.Unsetenv("ECHO_APP_EXTERNAL_READINESS_HTTP_METHOD")
+		_ = os.Unsetenv("ECHO_APP_EXTERNAL_READINESS_HTTP_EXPECTED_STATUS")
+	}()
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	assert.Equal(t, "http", cfg.ExternalReadinessProbe.Type)
+	assert.Equal(t, "http://upstream/health", cfg.ExternalReadinessProbe.Target)
+	assert.Equal(t, 5*time.Second, cfg.ExternalReadinessProbe.Interval)
+	assert.Equal(t, 500*time.Millisecond, cfg.ExternalReadinessProbe.Timeout)
+	assert.Equal(t, "HEAD", cfg.ExternalReadinessProbe.HTTPMethod)
+	assert.Equal(t, 204, cfg.ExternalReadinessProbe.HTTPExpectedStatus)
 }
