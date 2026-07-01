@@ -7,10 +7,12 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/PhilipSchmid/echo-app/internal/config"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -119,9 +121,94 @@ func TestCheckerICMPProbeFailure(t *testing.T) {
 	assert.Equal(t, http.StatusServiceUnavailable, readyStatus(checker))
 }
 
+func TestCheckerLogsExternalProbeStatusChangesOnly(t *testing.T) {
+	hook := captureLogEntries(t)
+	checker := NewChecker(config.ExternalReadinessProbe{
+		Type:     "icmp",
+		Target:   "192.0.2.1",
+		Interval: time.Second,
+		Timeout:  time.Second,
+	})
+	attempts := 0
+	checker.icmpProbe = func(context.Context, string, time.Duration) error {
+		attempts++
+		if attempts <= 2 {
+			return errors.New("icmp failed")
+		}
+		return nil
+	}
+
+	checker.checkOnce(context.Background())
+	checker.checkOnce(context.Background())
+	checker.checkOnce(context.Background())
+	checker.checkOnce(context.Background())
+
+	entries := hook.Entries()
+	require.Len(t, entries, 2)
+	assert.Equal(t, logrus.WarnLevel, entries[0].Level)
+	assert.Equal(t, "external readiness probe is not ready", entries[0].Message)
+	assert.Equal(t, "icmp", entries[0].Data["probe_type"])
+	assert.Equal(t, "192.0.2.1", entries[0].Data["target"])
+	loggedErr, ok := entries[0].Data[logrus.ErrorKey].(error)
+	require.True(t, ok)
+	assert.EqualError(t, loggedErr, "icmp failed")
+	assert.Equal(t, logrus.InfoLevel, entries[1].Level)
+	assert.Equal(t, "external readiness probe is ready", entries[1].Message)
+	assert.Equal(t, "icmp", entries[1].Data["probe_type"])
+	assert.Equal(t, "192.0.2.1", entries[1].Data["target"])
+}
+
 func readyStatus(checker *Checker) int {
 	w := httptest.NewRecorder()
 	checker.ReadyHandler(w, httptest.NewRequest(http.MethodGet, "/ready", nil))
 	_, _ = io.Copy(io.Discard, w.Result().Body)
 	return w.Code
+}
+
+type testLogHook struct {
+	mu      sync.Mutex
+	entries []logrus.Entry
+}
+
+func (h *testLogHook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+func (h *testLogHook) Fire(entry *logrus.Entry) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	data := make(logrus.Fields, len(entry.Data))
+	for key, value := range entry.Data {
+		data[key] = value
+	}
+	h.entries = append(h.entries, logrus.Entry{
+		Level:   entry.Level,
+		Message: entry.Message,
+		Data:    data,
+	})
+	return nil
+}
+
+func (h *testLogHook) Entries() []logrus.Entry {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	entries := make([]logrus.Entry, len(h.entries))
+	copy(entries, h.entries)
+	return entries
+}
+
+func captureLogEntries(t *testing.T) *testLogHook {
+	t.Helper()
+	logger := logrus.StandardLogger()
+	originalHooks := logger.Hooks
+	originalOutput := logger.Out
+	logger.Hooks = make(logrus.LevelHooks)
+	logger.SetOutput(io.Discard)
+	hook := &testLogHook{}
+	logger.AddHook(hook)
+	t.Cleanup(func() {
+		logger.Hooks = originalHooks
+		logger.SetOutput(originalOutput)
+	})
+	return hook
 }

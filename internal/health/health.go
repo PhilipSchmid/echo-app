@@ -23,14 +23,16 @@ const (
 
 // Checker maintains cheap, cached health and readiness state for HTTP probes.
 type Checker struct {
-	mu          sync.RWMutex
-	healthy     bool
-	ready       bool
-	lastError   string
-	lastChecked time.Time
-	probe       config.ExternalReadinessProbe
-	client      *http.Client
-	icmpProbe   icmpProbeFunc
+	mu                   sync.RWMutex
+	healthy              bool
+	ready                bool
+	lastError            string
+	lastChecked          time.Time
+	externalProbeChecked bool
+	externalProbeReady   bool
+	probe                config.ExternalReadinessProbe
+	client               *http.Client
+	icmpProbe            icmpProbeFunc
 }
 
 type icmpProbeFunc func(context.Context, string, time.Duration) error
@@ -77,11 +79,29 @@ func (c *Checker) checkOnce(parent context.Context) {
 	defer cancel()
 	err := c.check(ctx)
 	if err != nil {
-		logrus.Warnf("external readiness check failed: %v", err)
-		c.SetReady(false, err.Error())
+		if c.setExternalReady(false, err.Error()) {
+			c.logExternalReadinessChange(false, err)
+		}
 		return
 	}
-	c.SetReady(true, "")
+	if c.setExternalReady(true, "") {
+		c.logExternalReadinessChange(true, nil)
+	}
+}
+
+func (c *Checker) logExternalReadinessChange(ready bool, err error) {
+	entry := logrus.WithFields(logrus.Fields{
+		"probe_type": c.probe.Type,
+		"target":     c.probe.Target,
+	})
+	if ready {
+		entry.Info("external readiness probe is ready")
+		return
+	}
+	if err != nil {
+		entry = entry.WithError(err)
+	}
+	entry.Warn("external readiness probe is not ready")
 }
 
 func (c *Checker) check(ctx context.Context) error {
@@ -162,6 +182,20 @@ func (c *Checker) SetReady(ready bool, reason string) {
 	c.ready = ready
 	c.lastError = reason
 	c.lastChecked = time.Now()
+}
+
+// setExternalReady updates readiness from the external probe and reports
+// whether the probe's observed status changed.
+func (c *Checker) setExternalReady(ready bool, reason string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	changed := !c.externalProbeChecked || c.externalProbeReady != ready
+	c.externalProbeChecked = true
+	c.externalProbeReady = ready
+	c.ready = ready
+	c.lastError = reason
+	c.lastChecked = time.Now()
+	return changed
 }
 
 // HealthHandler returns 200 only while the app process considers itself live.
