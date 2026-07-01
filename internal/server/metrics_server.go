@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/PhilipSchmid/echo-app/internal/config"
+	"github.com/PhilipSchmid/echo-app/internal/health"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
@@ -16,13 +17,19 @@ type MetricsServer struct {
 	cfg        *config.Config
 	server     *http.Server
 	listenAddr string
+	health     *health.Checker
 }
 
 // NewMetricsServer creates a new metrics server
-func NewMetricsServer(cfg *config.Config) *MetricsServer {
+func NewMetricsServer(cfg *config.Config, healthChecker *health.Checker) *MetricsServer {
+	if healthChecker == nil {
+		healthChecker = health.NewChecker(config.ExternalReadinessProbe{})
+	}
+
 	return &MetricsServer{
 		cfg:        cfg,
 		listenAddr: ":" + cfg.MetricsPort,
+		health:     healthChecker,
 	}
 }
 
@@ -37,21 +44,10 @@ func (s *MetricsServer) Start(ctx context.Context) error {
 	// Wrap metrics handler with timeout to prevent hung scrapers
 	mux.Handle("/metrics", http.TimeoutHandler(promhttp.Handler(), 10*time.Second, "Metrics collection timeout"))
 
-	// Add health check endpoint
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte("OK")); err != nil {
-			logrus.Errorf("Failed to write health response: %v", err)
-		}
-	})
-
-	// Add readiness endpoint
-	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte("Ready")); err != nil {
-			logrus.Errorf("Failed to write readiness response: %v", err)
-		}
-	})
+	if s.health != nil {
+		mux.HandleFunc("/health", s.health.HealthHandler)
+		mux.HandleFunc("/ready", s.health.ReadyHandler)
+	}
 
 	s.server = &http.Server{
 		Addr:         s.listenAddr,

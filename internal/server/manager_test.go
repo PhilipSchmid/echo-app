@@ -83,7 +83,7 @@ func (m *mockServer) Name() string {
 
 func TestNewManager(t *testing.T) {
 	cfg := &config.Config{}
-	manager := NewManager(cfg)
+	manager := NewManager(cfg, nil)
 
 	assert.NotNil(t, manager)
 	assert.Equal(t, cfg, manager.cfg)
@@ -94,7 +94,7 @@ func TestNewManager(t *testing.T) {
 
 func TestManager_RegisterServer(t *testing.T) {
 	cfg := &config.Config{}
-	manager := NewManager(cfg)
+	manager := NewManager(cfg, nil)
 
 	// Register first server
 	srv1 := newMockServer("server1")
@@ -113,7 +113,7 @@ func TestManager_RegisterServer(t *testing.T) {
 
 func TestManager_StartAndShutdown(t *testing.T) {
 	cfg := &config.Config{}
-	manager := NewManager(cfg)
+	manager := NewManager(cfg, nil)
 
 	// Create mock servers
 	srv1 := newMockServer("server1")
@@ -151,7 +151,7 @@ func TestManager_StartAndShutdown(t *testing.T) {
 
 func TestManager_ShutdownTimeout(t *testing.T) {
 	cfg := &config.Config{}
-	manager := NewManager(cfg)
+	manager := NewManager(cfg, nil)
 
 	// Create a mock server that takes too long to shut down
 	srv := newMockServer("slow-server")
@@ -185,7 +185,7 @@ func TestManager_ShutdownTimeout(t *testing.T) {
 
 func TestManager_ShutdownErrors(t *testing.T) {
 	cfg := &config.Config{}
-	manager := NewManager(cfg)
+	manager := NewManager(cfg, nil)
 
 	// Create mock servers with shutdown errors
 	srv1 := newMockServer("server1")
@@ -221,7 +221,7 @@ func TestManager_ShutdownErrors(t *testing.T) {
 
 func TestManager_Wait(t *testing.T) {
 	cfg := &config.Config{}
-	manager := NewManager(cfg)
+	manager := NewManager(cfg, nil)
 
 	// Create mock server that completes quickly
 	srv := newMockServer("server")
@@ -254,7 +254,7 @@ func TestManager_Wait(t *testing.T) {
 
 func TestManager_MultipleServers(t *testing.T) {
 	cfg := &config.Config{}
-	manager := NewManager(cfg)
+	manager := NewManager(cfg, nil)
 
 	// Create multiple mock servers
 	numServers := 5
@@ -295,7 +295,7 @@ func TestManager_MultipleServers(t *testing.T) {
 
 func TestManager_EmptyManager(t *testing.T) {
 	cfg := &config.Config{}
-	manager := NewManager(cfg)
+	manager := NewManager(cfg, nil)
 
 	// Start with no servers
 	ctx, cancel := context.WithCancel(context.Background())
@@ -314,7 +314,7 @@ func TestManager_EmptyManager(t *testing.T) {
 
 func TestManager_ShutdownBeforeStart(t *testing.T) {
 	cfg := &config.Config{}
-	manager := NewManager(cfg)
+	manager := NewManager(cfg, nil)
 
 	srv := newMockServer("server")
 	manager.RegisterServer(srv)
@@ -331,7 +331,7 @@ func TestManager_ShutdownBeforeStart(t *testing.T) {
 
 func TestManager_ConcurrentShutdown(t *testing.T) {
 	cfg := &config.Config{}
-	manager := NewManager(cfg)
+	manager := NewManager(cfg, nil)
 
 	// Create servers with different shutdown delays
 	srv1 := newMockServer("fast-server")

@@ -44,12 +44,30 @@ Configure the application using these environment variables:
 - `ECHO_APP_METRICS_PORT`: Port for the metrics server (default: `3000` TCP).
 - `ECHO_APP_LOG_LEVEL`: Logging level (`debug`, `info`, `warn`, `error`; default: `info`).
 - `ECHO_APP_MAX_REQUEST_SIZE`: Maximum request body size in bytes (default: `10485760` - 10MB).
+- `ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE`: Optional external readiness probe type: `none`, `http`, `tcp`, or `ping` (default: `none`).
+- `ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET`: External readiness target, such as `https://api.example.com/ready`, `db.example.com:5432`, or `10.0.0.10`.
+- `ECHO_APP_EXTERNAL_READINESS_PROBE_INTERVAL`: How often the background readiness controller checks the target (default: `10s`).
+- `ECHO_APP_EXTERNAL_READINESS_PROBE_TIMEOUT`: Per-check timeout before the app marks itself not ready (default: `2s`).
+- `ECHO_APP_EXTERNAL_READINESS_HTTP_METHOD`: HTTP method for external HTTP readiness probes (default: `GET`).
+- `ECHO_APP_EXTERNAL_READINESS_HTTP_EXPECTED_STATUS`: Expected HTTP status code for external HTTP readiness probes (default: `200`).
 
 ### Command-Line Flags
 Run `./echo-app --help` to see all available flags:
 
 ```bash
 Usage of ./echo-app:
+      --external-readiness-http-expected-status int
+                                     Expected HTTP status for external readiness HTTP probes (default 200)
+      --external-readiness-http-method string
+                                     HTTP method for external readiness HTTP probes (default "GET")
+      --external-readiness-probe-interval duration
+                                     External readiness probe interval (default 10s)
+      --external-readiness-probe-target string
+                                     External readiness probe target URL, host:port, or host/IP
+      --external-readiness-probe-timeout duration
+                                     External readiness probe timeout (default 2s)
+      --external-readiness-probe-type string
+                                     External readiness probe type: none, http, tcp, or ping (default "none")
       --grpc                         Enable gRPC server
       --grpc-port string             gRPC server port (default "50051")
       --http-port string             HTTP server port (default "8080")
@@ -255,16 +273,40 @@ grpcurl -plaintext -emit-defaults localhost:50051 echo.EchoService.Echo
 
 #### Health Checks
 ```bash
-# Health endpoint
+# Health endpoint (liveness): returns 200 only when the echo app process is healthy
 curl -s http://localhost:3000/health
-# Returns: OK
+# Returns: healthy
 
-# Readiness endpoint
+# Readiness endpoint: returns 200 only when the echo app is ready and any configured external readiness probe is passing
 curl -s http://localhost:3000/ready
-# Returns: Ready
+# Returns: ready
+
+# Kubernetes probes should use the dedicated metrics/admin listener (default port 3000), not the echo traffic listeners.
 
 # Prometheus metrics
 curl -s http://localhost:3000/metrics | grep echo_app
+```
+
+#### External Readiness Probe Examples
+The external readiness probe is optional. When enabled, the app keeps checking the configured target in the background and `/ready` returns `503` until the target succeeds within the configured timeout.
+
+```bash
+# HTTP readiness dependency: expect a 200 from the upstream readiness URL
+ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE=http \
+ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET=https://upstream.example.com/ready \
+ECHO_APP_EXTERNAL_READINESS_PROBE_TIMEOUT=2s \
+ECHO_APP_EXTERNAL_READINESS_PROBE_INTERVAL=10s \
+./echo-app
+
+# TCP readiness dependency: require a connectable host:port
+ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE=tcp \
+ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET=db.example.com:5432 \
+./echo-app
+
+# Ping readiness dependency: require one successful ping within the timeout
+ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE=ping \
+ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET=10.0.0.10 \
+./echo-app
 ```
 
 ### Unified Metrics
@@ -301,6 +343,13 @@ data:
   ECHO_APP_GRPC: "true"
   ECHO_APP_TCP: "true"
   ECHO_APP_METRICS: "true"
+  # Optional: mark this pod not-ready when a required upstream stops responding.
+  ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE: "http"
+  ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET: "https://upstream.example.com/ready"
+  ECHO_APP_EXTERNAL_READINESS_HTTP_METHOD: "GET"
+  ECHO_APP_EXTERNAL_READINESS_HTTP_EXPECTED_STATUS: "200"
+  ECHO_APP_EXTERNAL_READINESS_PROBE_TIMEOUT: "2s"
+  ECHO_APP_EXTERNAL_READINESS_PROBE_INTERVAL: "10s"
 ---
 apiVersion: apps/v1
 kind: Deployment

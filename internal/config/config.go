@@ -14,23 +14,24 @@ const (
 )
 
 type Config struct {
-	Message        string
-	Node           string
-	PrintHeaders   bool
-	TLS            bool
-	H2C            bool
-	TCP            bool
-	GRPC           bool
-	QUIC           bool
-	Metrics        bool
-	HTTPPort       string
-	TLSPort        string
-	TCPPort        string
-	GRPCPort       string
-	QUICPort       string
-	MetricsPort    string
-	LogLevel       logrus.Level
-	MaxRequestSize int64 // Maximum request body size in bytes
+	Message                string
+	Node                   string
+	PrintHeaders           bool
+	TLS                    bool
+	H2C                    bool
+	TCP                    bool
+	GRPC                   bool
+	QUIC                   bool
+	Metrics                bool
+	HTTPPort               string
+	TLSPort                string
+	TCPPort                string
+	GRPCPort               string
+	QUICPort               string
+	MetricsPort            string
+	LogLevel               logrus.Level
+	MaxRequestSize         int64 // Maximum request body size in bytes
+	ExternalReadinessProbe ExternalReadinessProbe
 }
 
 func Load() (*Config, error) {
@@ -56,6 +57,12 @@ func Load() (*Config, error) {
 	viper.SetDefault("metrics-port", "3000")
 	viper.SetDefault("log-level", "info")
 	viper.SetDefault("max-request-size", 10485760) // 10 MB default
+	viper.SetDefault("external-readiness-probe-type", "none")
+	viper.SetDefault("external-readiness-probe-target", "")
+	viper.SetDefault("external-readiness-probe-interval", "10s")
+	viper.SetDefault("external-readiness-probe-timeout", "2s")
+	viper.SetDefault("external-readiness-http-method", "GET")
+	viper.SetDefault("external-readiness-http-expected-status", 200)
 
 	// Load configuration from viper
 	cfg := &Config{
@@ -75,6 +82,14 @@ func Load() (*Config, error) {
 		QUICPort:       viper.GetString("quic-port"),
 		MetricsPort:    viper.GetString("metrics-port"),
 		MaxRequestSize: viper.GetInt64("max-request-size"),
+		ExternalReadinessProbe: ExternalReadinessProbe{
+			Type:               strings.ToLower(viper.GetString("external-readiness-probe-type")),
+			Target:             viper.GetString("external-readiness-probe-target"),
+			Interval:           viper.GetDuration("external-readiness-probe-interval"),
+			Timeout:            viper.GetDuration("external-readiness-probe-timeout"),
+			HTTPMethod:         strings.ToUpper(viper.GetString("external-readiness-http-method")),
+			HTTPExpectedStatus: viper.GetInt("external-readiness-http-expected-status"),
+		},
 	}
 
 	// Set log level
@@ -84,6 +99,19 @@ func Load() (*Config, error) {
 	}
 	cfg.LogLevel = lvl
 	logrus.SetLevel(cfg.LogLevel)
+
+	// Validate external readiness settings
+	if cfg.ExternalReadinessProbe.Enabled() {
+		if cfg.ExternalReadinessProbe.Interval <= 0 {
+			return nil, fmt.Errorf("external readiness probe interval must be greater than zero")
+		}
+		if cfg.ExternalReadinessProbe.Timeout <= 0 {
+			return nil, fmt.Errorf("external readiness probe timeout must be greater than zero")
+		}
+		if cfg.ExternalReadinessProbe.HTTPExpectedStatus < 100 || cfg.ExternalReadinessProbe.HTTPExpectedStatus > 599 {
+			return nil, fmt.Errorf("external readiness HTTP expected status must be between 100 and 599")
+		}
+	}
 
 	// Validate message length
 	if len(cfg.Message) > MaxMessageLength {
