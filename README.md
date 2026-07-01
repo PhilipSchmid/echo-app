@@ -44,7 +44,7 @@ Configure the application using these environment variables:
 - `ECHO_APP_METRICS_PORT`: Port for the metrics server (default: `3000` TCP).
 - `ECHO_APP_LOG_LEVEL`: Logging level (`debug`, `info`, `warn`, `error`; default: `info`).
 - `ECHO_APP_MAX_REQUEST_SIZE`: Maximum request body size in bytes (default: `10485760` - 10MB).
-- `ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE`: Optional external readiness probe type: `none`, `http`, `tcp`, or `ping` (default: `none`).
+- `ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE`: Optional external readiness probe type: `none`, `http`, `tcp`, or `icmp` (default: `none`).
 - `ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET`: External readiness target, such as `https://api.example.com/ready`, `db.example.com:5432`, or `10.0.0.10`.
 - `ECHO_APP_EXTERNAL_READINESS_PROBE_INTERVAL`: How often the background readiness controller checks the target (default: `10s`).
 - `ECHO_APP_EXTERNAL_READINESS_PROBE_TIMEOUT`: Per-check timeout before the app marks itself not ready (default: `2s`).
@@ -67,7 +67,7 @@ Usage of ./echo-app:
       --external-readiness-probe-timeout duration
                                      External readiness probe timeout (default 2s)
       --external-readiness-probe-type string
-                                     External readiness probe type: none, http, tcp, or ping (default "none")
+                                     External readiness probe type: none, http, tcp, or icmp (default "none")
       --grpc                         Enable gRPC server
       --grpc-port string             gRPC server port (default "50051")
       --http-port string             HTTP server port (default "8080")
@@ -303,11 +303,15 @@ ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE=tcp \
 ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET=db.example.com:5432 \
 ./echo-app
 
-# Ping readiness dependency: require one successful ping within the timeout
-ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE=ping \
+# ICMP readiness dependency: require one successful echo reply within the timeout
+ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE=icmp \
 ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET=10.0.0.10 \
 ./echo-app
 ```
+
+The ICMP probe runs in-process and does not require a `ping` binary in the
+container. It uses raw ICMP sockets, so container runtimes that drop
+`CAP_NET_RAW` must add that capability back for ICMP readiness probes.
 
 ### Unified Metrics
 

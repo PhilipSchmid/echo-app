@@ -12,6 +12,8 @@ ARG VCS_REF
 # Set the working directory inside the container
 WORKDIR /app
 
+RUN apk add --no-cache ca-certificates
+
 # Copy go.mod to download dependencies
 COPY go.mod ./
 # Download dependencies
@@ -42,6 +44,7 @@ LABEL org.opencontainers.image.title="echo-app" \
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /main /main
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
 # Set the binary as the entrypoint of the container
 ENTRYPOINT ["/main"]

@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -78,6 +79,44 @@ func TestCheckerTCPProbe(t *testing.T) {
 	})
 	checker.checkOnce(context.Background())
 	assert.Equal(t, http.StatusOK, readyStatus(checker))
+}
+
+func TestCheckerICMPProbe(t *testing.T) {
+	checker := NewChecker(config.ExternalReadinessProbe{
+		Type:     "icmp",
+		Target:   "192.0.2.1",
+		Interval: time.Second,
+		Timeout:  250 * time.Millisecond,
+	})
+	called := false
+	checker.icmpProbe = func(ctx context.Context, target string, timeout time.Duration) error {
+		called = true
+		assert.NoError(t, ctx.Err())
+		assert.Equal(t, "192.0.2.1", target)
+		assert.Equal(t, 250*time.Millisecond, timeout)
+		return nil
+	}
+
+	checker.checkOnce(context.Background())
+
+	assert.True(t, called)
+	assert.Equal(t, http.StatusOK, readyStatus(checker))
+}
+
+func TestCheckerICMPProbeFailure(t *testing.T) {
+	checker := NewChecker(config.ExternalReadinessProbe{
+		Type:     "icmp",
+		Target:   "192.0.2.1",
+		Interval: time.Second,
+		Timeout:  time.Second,
+	})
+	checker.icmpProbe = func(context.Context, string, time.Duration) error {
+		return errors.New("icmp failed")
+	}
+
+	checker.checkOnce(context.Background())
+
+	assert.Equal(t, http.StatusServiceUnavailable, readyStatus(checker))
 }
 
 func readyStatus(checker *Checker) int {

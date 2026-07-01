@@ -236,7 +236,7 @@ test-integration: build-quick ## TEST: Run integration tests with all endpoints
 	fi; \
 	\
 	printf "$(BLUE)Testing health endpoint...$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	if [ "$$(curl -s http://localhost:3000/health)" = "OK" ]; then \
+	if [ "$$(curl -s http://localhost:3000/health)" = "healthy" ]; then \
 		printf "$(GREEN)✓ Health check passed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
 	else \
 		printf "$(RED)✗ Health check failed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
@@ -244,7 +244,7 @@ test-integration: build-quick ## TEST: Run integration tests with all endpoints
 	fi; \
 	\
 	printf "$(BLUE)Testing readiness endpoint...$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	if [ "$$(curl -s http://localhost:3000/ready)" = "Ready" ]; then \
+	if [ "$$(curl -s http://localhost:3000/ready)" = "ready" ]; then \
 		printf "$(GREEN)✓ Readiness check passed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
 	else \
 		printf "$(RED)✗ Readiness check failed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \

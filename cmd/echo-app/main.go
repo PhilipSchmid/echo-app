@@ -36,7 +36,7 @@ func main() {
 	pflag.String("metrics-port", "3000", "Metrics server port")
 	pflag.String("log-level", "info", "Log level (debug, info, warn, error)")
 	pflag.Int64("max-request-size", 10485760, "Maximum request body size in bytes (default: 10MB)")
-	pflag.String("external-readiness-probe-type", "none", "External readiness probe type: none, http, tcp, or ping")
+	pflag.String("external-readiness-probe-type", "none", "External readiness probe type: none, http, tcp, or icmp")
 	pflag.String("external-readiness-probe-target", "", "External readiness probe target URL, host:port, or host/IP")
 	pflag.Duration("external-readiness-probe-interval", 10*time.Second, "External readiness probe interval")
 	pflag.Duration("external-readiness-probe-timeout", 2*time.Second, "External readiness probe timeout")
@@ -141,6 +141,7 @@ func validateConfig(cfg *config.Config) error {
 		return fmt.Errorf("invalid metrics port: %s", cfg.MetricsPort)
 	}
 	if cfg.ExternalReadinessProbe.Enabled() {
+		// Keep "ping" as a compatibility alias for the in-process ICMP probe.
 		switch cfg.ExternalReadinessProbe.Type {
 		case "http", "https", "tcp", "ping", "icmp":
 		default:
