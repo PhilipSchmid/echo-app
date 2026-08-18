@@ -83,7 +83,7 @@ jobs:
           files: |
             build/*.tar.gz
             build/*.zip
-          generate_release_notes: true
+          generate_release_notes: false
           draft: false
           prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
 
