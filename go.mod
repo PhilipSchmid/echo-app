@@ -1,8 +1,6 @@
 module github.com/PhilipSchmid/echo-app
 
-go 1.25.0
-
-toolchain go1.25.1
+go 1.26.0
 
 require (
 	github.com/prometheus-community/pro-bing v0.9.1
@@ -36,7 +34,7 @@ require (
 
 require (
 	github.com/prometheus/client_golang v1.24.1
-	github.com/quic-go/quic-go v0.61.0
+	github.com/quic-go/quic-go v0.62.0
 	github.com/sirupsen/logrus v1.10.1
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/net v0.58.0
