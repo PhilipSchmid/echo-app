@@ -16,7 +16,7 @@ The application is designed for debugging, testing, and demonstrating various ne
 
 ## Technology Stack
 
-- **Language**: Go 1.25+
+- **Language**: Go 1.26+
 - **Build Tool**: Go modules
 - **Testing**: Go standard testing, testify/assert
 - **Linting**: golangci-lint
