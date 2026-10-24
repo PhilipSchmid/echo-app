@@ -148,129 +148,9 @@ test-short: ## TEST: Run only short tests
 	@printf "$(GREEN)✓ Short tests completed$(NC)\n"
 
 .PHONY: test-integration
-test-integration: build-quick ## TEST: Run integration tests with all endpoints
-	@printf "$(BLUE)Starting integration tests...$(NC)\n"
+test-integration: ## TEST: Run wire tests for every protocol
 	@mkdir -p $(BUILD_DIR)
-	@rm -f $(BUILD_DIR)/app.log $(BUILD_DIR)/test-results.log
-	@./$(APP_NAME) \
-		--tls \
-		--tcp \
-		--grpc \
-		--quic \
-		--metrics \
-		--log-level info \
-		--message="integration-test" \
-		--node="test-node" \
-		--print-http-request-headers \
-		> $(BUILD_DIR)/app.log 2>&1 & \
-	APP_PID=$$!; \
-	printf "$(YELLOW)→ Application started with PID: $$APP_PID$(NC)\n"; \
-	printf "$(YELLOW)→ Waiting for services to start...$(NC)\n"; \
-	sleep 3; \
-	\
-	echo "" > $(BUILD_DIR)/test-results.log; \
-	FAILED=0; \
-	\
-	printf "$(BLUE)Testing HTTP endpoint (port 8080)...$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	if curl -s http://localhost:8080 | jq . >> $(BUILD_DIR)/test-results.log 2>&1; then \
-		printf "$(GREEN)✓ HTTP test passed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	else \
-		printf "$(RED)✗ HTTP test failed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-		FAILED=$$((FAILED + 1)); \
-	fi; \
-	\
-	printf "$(BLUE)Testing HTTP with custom path...$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	if curl -s http://localhost:8080/test/path | jq . >> $(BUILD_DIR)/test-results.log 2>&1; then \
-		printf "$(GREEN)✓ HTTP path test passed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	else \
-		printf "$(RED)✗ HTTP path test failed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-		FAILED=$$((FAILED + 1)); \
-	fi; \
-	\
-	printf "$(BLUE)Testing TLS endpoint (port 8443)...$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	if curl -s --insecure https://localhost:8443 | jq . >> $(BUILD_DIR)/test-results.log 2>&1; then \
-		printf "$(GREEN)✓ TLS test passed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	else \
-		printf "$(RED)✗ TLS test failed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-		FAILED=$$((FAILED + 1)); \
-	fi; \
-	\
-	printf "$(BLUE)Testing TCP endpoint (port 9090)...$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	if echo "test" | nc -w 2 localhost 9090 | jq . >> $(BUILD_DIR)/test-results.log 2>&1; then \
-		printf "$(GREEN)✓ TCP test passed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	else \
-		printf "$(RED)✗ TCP test failed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-		FAILED=$$((FAILED + 1)); \
-	fi; \
-	\
-	printf "$(BLUE)Testing gRPC endpoint (port 50051)...$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	if command -v grpcurl >/dev/null 2>&1; then \
-		if grpcurl -plaintext -emit-defaults localhost:50051 echo.EchoService.Echo | jq . >> $(BUILD_DIR)/test-results.log 2>&1; then \
-			printf "$(GREEN)✓ gRPC test passed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-		else \
-			printf "$(RED)✗ gRPC test failed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-			FAILED=$$((FAILED + 1)); \
-		fi; \
-	else \
-		printf "$(YELLOW)⚠ grpcurl not installed, skipping gRPC test$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	fi; \
-	\
-	printf "$(BLUE)Testing QUIC endpoint (port 4433)...$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	if curl --version | grep -q "HTTP3"; then \
-		if curl -k -sS --http3 https://localhost:4433 | jq . >> $(BUILD_DIR)/test-results.log 2>&1; then \
-			printf "$(GREEN)✓ QUIC test passed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-		else \
-			printf "$(RED)✗ QUIC test failed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-			FAILED=$$((FAILED + 1)); \
-		fi; \
-	else \
-		printf "$(YELLOW)⚠ curl does not support HTTP/3, skipping QUIC test$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	fi; \
-	\
-	printf "$(BLUE)Testing metrics endpoint (port 3000)...$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	if curl -s http://localhost:3000/metrics | grep -q "echo_app_requests_total"; then \
-		printf "$(GREEN)✓ Metrics test passed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	else \
-		printf "$(RED)✗ Metrics test failed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-		FAILED=$$((FAILED + 1)); \
-	fi; \
-	\
-	printf "$(BLUE)Testing health endpoint...$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	if [ "$$(curl -s http://localhost:3000/health)" = "healthy" ]; then \
-		printf "$(GREEN)✓ Health check passed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	else \
-		printf "$(RED)✗ Health check failed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-		FAILED=$$((FAILED + 1)); \
-	fi; \
-	\
-	printf "$(BLUE)Testing readiness endpoint...$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	if [ "$$(curl -s http://localhost:3000/ready)" = "ready" ]; then \
-		printf "$(GREEN)✓ Readiness check passed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	else \
-		printf "$(RED)✗ Readiness check failed$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-		FAILED=$$((FAILED + 1)); \
-	fi; \
-	\
-	printf "$(BLUE)Testing graceful shutdown...$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	kill -TERM $$APP_PID; \
-	SHUTDOWN_START=$$(date +%s); \
-	while kill -0 $$APP_PID 2>/dev/null; do \
-		sleep 0.1; \
-	done; \
-	SHUTDOWN_END=$$(date +%s); \
-	SHUTDOWN_TIME=$$((SHUTDOWN_END - SHUTDOWN_START)); \
-	printf "$(GREEN)✓ Application shut down gracefully in $$SHUTDOWN_TIME seconds$(NC)\n" | tee -a $(BUILD_DIR)/test-results.log; \
-	\
-	echo ""; \
-	printf "$(BLUE)========================================$(NC)\n"; \
-	if [ $$FAILED -eq 0 ]; then \
-		printf "$(GREEN)✓ All integration tests passed!$(NC)\n"; \
-		exit 0; \
-	else \
-		printf "$(RED)✗ $$FAILED integration tests failed$(NC)\n"; \
-		printf "$(YELLOW)Check $(BUILD_DIR)/test-results.log for details$(NC)\n"; \
-		exit 1; \
-	fi
+	@set -o pipefail; go test -race -tags=integration -count=1 -v ./tests | tee $(BUILD_DIR)/test-results.log
 
 .PHONY: benchmark
 benchmark: ## TEST: Run benchmarks
@@ -450,7 +330,7 @@ info: ## MAINT: Show project information
 .PHONY: tools
 tools: ## MAINT: Install required development tools
 	@printf "$(BLUE)Installing development tools...$(NC)\n"
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 	@go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 	@go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 	@printf "$(GREEN)✓ Development tools installed$(NC)\n"

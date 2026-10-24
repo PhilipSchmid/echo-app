@@ -1,4 +1,13 @@
+.git/
 .github/
+build/
+echo-app
+*.log
+coverage.*
+.env*
+*.pem
+*.key
+*.crt
 README.md
 LICENSE
 CODEOWNER

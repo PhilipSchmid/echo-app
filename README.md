@@ -18,7 +18,7 @@ The `echo-app` is a versatile Go application designed to echo back a JSON payloa
 - **HTTP Listener**: Serves the JSON payload over HTTP.
 - **TLS (HTTPS) Listener**: Uses an in-memory self-signed certificate for secure HTTPS communication.
 - **QUIC Listener**: Supports HTTP/3 over QUIC with TLS encryption.
-- **TCP Listener**: Provides the JSON payload over a raw TCP connection with connection pooling.
+- **TCP Listener**: Sends one JSON metadata response and closes the connection.
 - **gRPC Listener**: Delivers the same details via a gRPC service with reflection support.
 - **Prometheus Metrics**: Exposes unified request metrics for monitoring.
 
@@ -29,8 +29,9 @@ Configure the application using these environment variables:
 
 - `ECHO_APP_MESSAGE`: A customizable message included in the response. If unset, no message is included.
 - `ECHO_APP_NODE`: The name of the node where the app is running (e.g., for Kubernetes).
-- `ECHO_APP_PORT`: Port for the HTTP server (default: `8080` TCP).
+- `ECHO_APP_HTTP_PORT`: Port for the HTTP server (default: `8080` TCP).
 - `ECHO_APP_PRINT_HTTP_REQUEST_HEADERS`: Set to `true` to include HTTP request headers in the response.
+- `ECHO_APP_UNSAFE_HEADERS`: Set to `true` to include sensitive header and gRPC metadata values in diagnostics (default: `false`).
 - `ECHO_APP_H2C`: Set to `true` to enable HTTP/2 cleartext (h2c) on the HTTP listener.
 - `ECHO_APP_TLS`: Set to `true` to enable the TLS (HTTPS) listener.
 - `ECHO_APP_TLS_PORT`: Port for the TLS server (default: `8443` TCP).
@@ -136,7 +137,7 @@ The Makefile has been significantly enhanced with categorized targets and color-
 - `make test` - Run unit tests with coverage
 - `make test-coverage` - Generate detailed HTML coverage report
 - `make test-short` - Run only short tests
-- `make test-integration` - Run comprehensive integration tests
+- `make test-integration` - Run real protocol integration tests, including HTTP/3
 - `make benchmark` - Run performance benchmarks
 - `make lint` - Run golangci-lint
 - `make lint-fix` - Run golangci-lint with auto-fix
@@ -231,7 +232,7 @@ This will test:
 - TLS/HTTPS endpoint
 - TCP raw connections
 - gRPC service calls
-- QUIC/HTTP3 (if curl supports it)
+- QUIC/HTTP3 using a native Go client
 - Prometheus metrics endpoint
 - Health and readiness checks
 - Graceful shutdown behavior
@@ -309,9 +310,29 @@ ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET=10.0.0.10 \
 ./echo-app
 ```
 
-The ICMP probe runs in-process and does not require a `ping` binary in the
-container. It uses raw ICMP sockets, so container runtimes that drop
-`CAP_NET_RAW` must add that capability back for ICMP readiness probes.
+The ICMP probe runs in-process and does not require a `ping` binary. The image
+runs as user 65532 without requiring capabilities for ordinary operation.
+ICMP probes use raw sockets and require `CAP_NET_RAW`; enable that capability
+explicitly only in deployments that need ICMP readiness.
+
+### Safety and protocol behavior
+
+The default response describes the request and the receiving server. Request
+bodies are consumed within `ECHO_APP_MAX_REQUEST_SIZE` and discarded; oversized
+bodies return `413`. TCP sends a single JSON document followed by EOF, and gRPC
+accepts an empty request. Neither currently echoes application payloads.
+
+Header diagnostics redact credentials, cookies, and secret/token/key fields by
+default. `--unsafe-headers` deliberately disables this redaction for response
+headers and debug metadata logs; use it only with synthetic credentials.
+Diagnostic HTTP responses use `Cache-Control: no-store`.
+
+Readiness requires every configured listener to bind and any configured external
+probe to pass. A listener failure terminates the process. Liveness does not depend
+on an external service. Invalid or incomplete probe settings fail at startup.
+
+Keep the metrics/admin listener private and apply network policies to diagnostic
+listeners. Pin an image version or digest for repeatable deployments.
 
 ### Unified Metrics
 
@@ -348,12 +369,12 @@ data:
   ECHO_APP_TCP: "true"
   ECHO_APP_METRICS: "true"
   # Optional: mark this pod not-ready when a required upstream stops responding.
-  ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE: "http"
-  ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET: "https://upstream.example.com/ready"
-  ECHO_APP_EXTERNAL_READINESS_HTTP_METHOD: "GET"
-  ECHO_APP_EXTERNAL_READINESS_HTTP_EXPECTED_STATUS: "200"
-  ECHO_APP_EXTERNAL_READINESS_PROBE_TIMEOUT: "2s"
-  ECHO_APP_EXTERNAL_READINESS_PROBE_INTERVAL: "10s"
+  # ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE: "http"
+  # ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET: "https://upstream.example.com/ready"
+  # ECHO_APP_EXTERNAL_READINESS_HTTP_METHOD: "GET"
+  # ECHO_APP_EXTERNAL_READINESS_HTTP_EXPECTED_STATUS: "200"
+  # ECHO_APP_EXTERNAL_READINESS_PROBE_TIMEOUT: "2s"
+  # ECHO_APP_EXTERNAL_READINESS_PROBE_INTERVAL: "10s"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -371,9 +392,21 @@ spec:
       labels:
         app: echo-app
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: echo-app
         image: ghcr.io/philipschmid/echo-app:main
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
         ports:
         - name: http
           containerPort: 8080
