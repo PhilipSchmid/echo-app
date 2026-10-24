@@ -9,12 +9,14 @@ import (
 	"github.com/PhilipSchmid/echo-app/internal/handlers"
 	pb "github.com/PhilipSchmid/echo-app/proto"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/netutil"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
 // GRPCServer represents a gRPC server
 type GRPCServer struct {
+	lifecycle
 	cfg        *config.Config
 	server     *grpc.Server
 	listener   net.Listener
@@ -24,6 +26,7 @@ type GRPCServer struct {
 // NewGRPCServer creates a new gRPC server
 func NewGRPCServer(cfg *config.Config) *GRPCServer {
 	return &GRPCServer{
+		lifecycle:  newLifecycle(),
 		cfg:        cfg,
 		listenAddr: ":" + cfg.GRPCPort,
 	}
@@ -36,10 +39,17 @@ func (s *GRPCServer) Name() string {
 
 // Start starts the gRPC server
 func (s *GRPCServer) Start(ctx context.Context) error {
+	s.mu.Lock()
+	if err := s.checkStart(ctx); err != nil {
+		s.mu.Unlock()
+		return err
+	}
 	listener, err := net.Listen("tcp", s.listenAddr)
 	if err != nil {
+		s.mu.Unlock()
 		return fmt.Errorf("failed to listen on %s: %w", s.listenAddr, err)
 	}
+	listener = netutil.LimitListener(listener, maxTCPConnections)
 	s.listener = listener
 
 	// Create gRPC server with options
@@ -55,33 +65,30 @@ func (s *GRPCServer) Start(ctx context.Context) error {
 	// Register reflection service for grpcurl
 	reflection.Register(s.server)
 
-	logrus.Infof("gRPC server listening on %s", s.listenAddr)
-
-	// Start serving in a goroutine to handle context cancellation
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- s.server.Serve(listener)
-	}()
-
-	select {
-	case <-ctx.Done():
-		s.server.GracefulStop()
-		return ctx.Err()
-	case err := <-errCh:
-		return err
-	}
+	close(s.ready)
+	s.mu.Unlock()
+	logrus.Infof("gRPC server listening on %s", listener.Addr())
+	return serveWithContext(ctx, func() error { return s.server.Serve(listener) }, s.Shutdown)
 }
 
 // Shutdown gracefully shuts down the gRPC server
 func (s *GRPCServer) Shutdown(ctx context.Context) error {
-	if s.server == nil {
+	s.mu.Lock()
+	s.stopped = true
+	srv := s.server
+	listener := s.listener
+	s.mu.Unlock()
+	if listener != nil {
+		defer func() { _ = listener.Close() }()
+	}
+	if srv == nil {
 		return nil
 	}
 
 	// Try graceful stop first
 	stopped := make(chan struct{})
 	go func() {
-		s.server.GracefulStop()
+		srv.GracefulStop()
 		close(stopped)
 	}()
 
@@ -90,7 +97,7 @@ func (s *GRPCServer) Shutdown(ctx context.Context) error {
 		return nil
 	case <-ctx.Done():
 		// Force stop if graceful stop times out
-		s.server.Stop()
+		srv.Stop()
 		return fmt.Errorf("gRPC server forced shutdown due to timeout")
 	}
 }

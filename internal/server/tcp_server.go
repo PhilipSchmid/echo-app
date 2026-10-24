@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -22,6 +23,7 @@ const (
 
 // TCPServer represents a TCP server with connection management
 type TCPServer struct {
+	lifecycle
 	cfg          *config.Config
 	listener     net.Listener
 	listenAddr   string
@@ -32,12 +34,12 @@ type TCPServer struct {
 	shutdown     chan struct{}
 	wg           sync.WaitGroup
 	ctx          context.Context
-	mu           sync.RWMutex // Protects listener and ctx
 }
 
 // NewTCPServer creates a new TCP server
 func NewTCPServer(cfg *config.Config) *TCPServer {
 	return &TCPServer{
+		lifecycle:  newLifecycle(),
 		cfg:        cfg,
 		listenAddr: ":" + cfg.TCPPort,
 		shutdown:   make(chan struct{}),
@@ -51,16 +53,23 @@ func (s *TCPServer) Name() string {
 
 // Start starts the TCP server
 func (s *TCPServer) Start(ctx context.Context) error {
+	s.mu.Lock()
+	if err := s.checkStart(ctx); err != nil {
+		s.mu.Unlock()
+		return err
+	}
 	listener, err := net.Listen("tcp", s.listenAddr)
 	if err != nil {
+		s.mu.Unlock()
 		return fmt.Errorf("failed to listen on %s: %w", s.listenAddr, err)
 	}
 
 	// Store context and listener with mutex protection
-	s.mu.Lock()
 	s.ctx = ctx
 	s.listener = listener
+	close(s.ready)
 	s.mu.Unlock()
+	defer func() { _ = listener.Close() }()
 
 	logrus.Infof("TCP server listening on %s", s.listenAddr)
 
@@ -88,8 +97,7 @@ func (s *TCPServer) Start(ctx context.Context) error {
 				case <-s.shutdown:
 					return nil
 				default:
-					logrus.Errorf("Failed to accept connection: %v", err)
-					continue
+					return fmt.Errorf("accept TCP connection: %w", err)
 				}
 			}
 
@@ -116,9 +124,10 @@ func (s *TCPServer) Start(ctx context.Context) error {
 			}
 
 			// Handle connection - wg.Add protected by mutex
+			s.connections.Store(conn.RemoteAddr().String(), conn)
 			s.wg.Add(1)
-			s.mu.Unlock()
 			atomic.AddInt32(&s.activeConns, 1)
+			s.mu.Unlock()
 			go s.handleConnection(conn)
 		}
 	}
@@ -131,7 +140,6 @@ func (s *TCPServer) handleConnection(conn net.Conn) {
 
 	// Store connection for graceful shutdown
 	connID := conn.RemoteAddr().String()
-	s.connections.Store(connID, conn)
 	defer s.connections.Delete(connID)
 
 	// Set connection timeout
@@ -140,9 +148,9 @@ func (s *TCPServer) handleConnection(conn net.Conn) {
 	}
 
 	// Get context safely
-	s.mu.RLock()
+	s.mu.Lock()
 	ctx := s.ctx
-	s.mu.RUnlock()
+	s.mu.Unlock()
 
 	// Handle the connection with context
 	handlers.TCPHandler(ctx, conn, s.cfg)
@@ -163,9 +171,10 @@ func (s *TCPServer) Shutdown(ctx context.Context) error {
 		// Start() holds this lock while calling wg.Add(), so acquiring it here
 		// guarantees all pending wg.Add() calls have completed before wg.Wait()
 		s.mu.Lock()
+		s.stopped = true
 		listener := s.listener
 		if listener != nil {
-			if cerr := listener.Close(); cerr != nil {
+			if cerr := listener.Close(); cerr != nil && !errors.Is(cerr, net.ErrClosed) {
 				err = fmt.Errorf("failed to close listener: %w", cerr)
 			}
 		}

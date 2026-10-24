@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,7 +10,6 @@ import (
 	"github.com/PhilipSchmid/echo-app/internal/config"
 	"github.com/PhilipSchmid/echo-app/internal/health"
 	"github.com/PhilipSchmid/echo-app/internal/server"
-	"github.com/PhilipSchmid/echo-app/internal/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -22,6 +20,7 @@ func main() {
 	pflag.String("message", "", "Custom message")
 	pflag.String("node", "", "Node name")
 	pflag.Bool("print-http-request-headers", false, "Print HTTP request headers")
+	pflag.Bool("unsafe-headers", false, "Include sensitive values in diagnostic headers")
 	pflag.Bool("tls", false, "Enable TLS server")
 	pflag.Bool("h2c", false, "Enable HTTP/2 cleartext (h2c) on the HTTP listener")
 	pflag.Bool("tcp", false, "Enable TCP server")
@@ -57,11 +56,6 @@ func main() {
 		logrus.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	// Validate configuration
-	if err := validateConfig(cfg); err != nil {
-		logrus.Fatalf("Invalid configuration: %v", err)
-	}
-
 	// Create shared health/readiness checker
 	healthChecker := health.NewChecker(cfg.ExternalReadinessProbe)
 
@@ -92,20 +86,27 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
+
 	// Start all servers
 	healthChecker.Start(ctx)
 
 	if err := manager.Start(ctx); err != nil {
 		logrus.Errorf("Failed to start servers: %v", err)
+		_ = manager.Shutdown(30 * time.Second)
+		os.Exit(1)
 	}
 
-	// Wait for shutdown signal
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	<-sigChan
-
-	// Cancel context to signal shutdown
-	cancel()
+	// A listener failure is fatal even when other listeners remain available.
+	failed := false
+	select {
+	case <-sigChan:
+	case err := <-manager.Errors():
+		logrus.Errorf("Listener failed: %v", err)
+		failed = true
+	}
 
 	// Graceful shutdown with timeout
 	shutdownTimeout := 30 * time.Second
@@ -116,38 +117,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	cancel()
+	if failed {
+		os.Exit(1)
+	}
 	logrus.Info("Shutdown complete")
-}
-
-// validateConfig validates the configuration
-func validateConfig(cfg *config.Config) error {
-	// Validate ports
-	if !utils.IsValidPort(cfg.HTTPPort) {
-		return fmt.Errorf("invalid HTTP port: %s", cfg.HTTPPort)
-	}
-	if cfg.TLS && !utils.IsValidPort(cfg.TLSPort) {
-		return fmt.Errorf("invalid TLS port: %s", cfg.TLSPort)
-	}
-	if cfg.TCP && !utils.IsValidPort(cfg.TCPPort) {
-		return fmt.Errorf("invalid TCP port: %s", cfg.TCPPort)
-	}
-	if cfg.GRPC && !utils.IsValidPort(cfg.GRPCPort) {
-		return fmt.Errorf("invalid gRPC port: %s", cfg.GRPCPort)
-	}
-	if cfg.QUIC && !utils.IsValidPort(cfg.QUICPort) {
-		return fmt.Errorf("invalid QUIC port: %s", cfg.QUICPort)
-	}
-	if cfg.Metrics && !utils.IsValidPort(cfg.MetricsPort) {
-		return fmt.Errorf("invalid metrics port: %s", cfg.MetricsPort)
-	}
-	if cfg.ExternalReadinessProbe.Enabled() {
-		// Keep "ping" as a compatibility alias for the in-process ICMP probe.
-		switch cfg.ExternalReadinessProbe.Type {
-		case "http", "https", "tcp", "ping", "icmp":
-		default:
-			return fmt.Errorf("invalid external readiness probe type: %s", cfg.ExternalReadinessProbe.Type)
-		}
-	}
-
-	return nil
 }

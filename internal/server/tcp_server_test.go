@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -60,65 +61,33 @@ func TestTCPServer_StartAndStop(t *testing.T) {
 }
 
 func TestTCPServer_ConnectionLimit(t *testing.T) {
-	cfg := &config.Config{
-		TCPPort: "19091",
-		Message: "test",
+	srv := NewTCPServer(&config.Config{TCPPort: "0"})
+	atomic.StoreInt32(&srv.activeConns, maxTCPConnections)
+	done := make(chan error, 1)
+	go func() { done <- srv.Start(context.Background()) }()
+	select {
+	case <-srv.Ready():
+	case <-time.After(time.Second):
+		t.Fatal("TCP did not bind")
 	}
-
-	server := NewTCPServer(cfg)
-	ctx, cancel := context.WithCancel(context.Background())
+	conn, err := net.DialTimeout("tcp", srv.listener.Addr().String(), time.Second)
+	require.NoError(t, err)
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(time.Second)))
+	_, err = conn.Read(make([]byte, 1))
+	require.ErrorIs(t, err, io.EOF, "a full server must reject rather than return an echo")
+	_ = conn.Close()
+	atomic.StoreInt32(&srv.activeConns, 0)
+	conn, err = net.DialTimeout("tcp", srv.listener.Addr().String(), time.Second)
+	require.NoError(t, err)
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(time.Second)))
+	data, err := io.ReadAll(conn)
+	require.NoError(t, err)
+	require.Contains(t, string(data), "TCP")
+	_ = conn.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-
-	// Start server
-	go func() { _ = server.Start(ctx) }()
-	time.Sleep(100 * time.Millisecond)
-
-	// Create connections up to the limit
-	var conns []net.Conn
-	var connMutex sync.Mutex
-
-	// Try to create more than maxTCPConnections
-	attempts := maxTCPConnections + 10
-	var successCount int32
-
-	var wg sync.WaitGroup
-	for i := 0; i < attempts; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			conn, err := net.Dial("tcp", "localhost:19091")
-			if err == nil {
-				atomic.AddInt32(&successCount, 1)
-				connMutex.Lock()
-				conns = append(conns, conn)
-				connMutex.Unlock()
-			}
-		}()
-	}
-
-	wg.Wait()
-
-	// Verify we didn't exceed the limit by much (allow small overage due to race conditions)
-	successfulConns := atomic.LoadInt32(&successCount)
-	// Allow up to 5% overage due to race between accept and counter check
-	maxAllowed := maxTCPConnections + 50
-	assert.LessOrEqual(t, int(successfulConns), maxAllowed,
-		"Connection count should be near limit (got %d, limit %d, max allowed %d)",
-		successfulConns, maxTCPConnections, maxAllowed)
-	t.Logf("Successfully created %d connections (limit: %d)", successfulConns, maxTCPConnections)
-
-	// Clean up connections
-	connMutex.Lock()
-	for _, conn := range conns {
-		_ = conn.Close()
-	}
-	connMutex.Unlock()
-
-	// Shutdown
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer shutdownCancel()
-	_ = server.Shutdown(shutdownCtx)
-	cancel()
+	require.NoError(t, srv.Shutdown(ctx))
+	require.NoError(t, <-done)
 }
 
 func TestTCPServer_GracefulShutdown(t *testing.T) {

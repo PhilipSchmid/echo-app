@@ -3,82 +3,102 @@ package server
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/PhilipSchmid/echo-app/internal/config"
 	"github.com/PhilipSchmid/echo-app/internal/handlers"
+	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/sirupsen/logrus"
 )
 
-// QUICServer represents a QUIC/HTTP3 server
 type QUICServer struct {
-	cfg        *config.Config
-	server     *http3.Server
-	listenAddr string
+	lifecycle
+	cfg            *config.Config
+	server         *http3.Server
+	listenAddr     string
+	packet         net.PacketConn
+	transport      *quic.Transport
+	listener       *quic.EarlyListener
+	connections    chan struct{}
+	activeRequests int32
 }
 
-// NewQUICServer creates a new QUIC server
 func NewQUICServer(cfg *config.Config) *QUICServer {
-	return &QUICServer{
-		cfg:        cfg,
-		listenAddr: ":" + cfg.QUICPort,
-	}
-}
-
-// Name returns the server name
-func (s *QUICServer) Name() string {
-	return "QUIC"
-}
-
-// Start starts the QUIC server
-func (s *QUICServer) Start(ctx context.Context) error {
-	// Get TLS config
-	tlsConfig, err := handlers.GetTLSConfig()
-	if err != nil {
-		return fmt.Errorf("failed to get TLS config: %w", err)
-	}
-
-	// Configure TLS for QUIC
-	tlsConfig.NextProtos = []string{"h3", "h3-29"}
-
-	// Create HTTP handler
+	s := &QUICServer{lifecycle: newLifecycle(), cfg: cfg, listenAddr: ":" + cfg.QUICPort, connections: make(chan struct{}, maxTCPConnections)}
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handlers.QUICHandler(s.cfg))
+	mux.HandleFunc("/", handlers.QUICHandler(cfg))
+	s.server = &http3.Server{Addr: s.listenAddr, Handler: requestLimitMiddleware(&s.activeRequests, mux), IdleTimeout: 30 * time.Second, MaxHeaderBytes: 1 << 20}
+	return s
+}
 
-	// Create QUIC server
-	s.server = &http3.Server{
-		Addr:      s.listenAddr,
-		Handler:   mux,
-		TLSConfig: tlsConfig,
-	}
+func (s *QUICServer) Name() string { return "QUIC" }
 
-	logrus.Infof("QUIC server listening on %s", s.listenAddr)
-
-	// Start serving in a goroutine to handle context cancellation
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- s.server.ListenAndServe()
-	}()
-
+func (s *QUICServer) connectionContext(ctx context.Context, _ *quic.ClientInfo) (context.Context, error) {
 	select {
-	case <-ctx.Done():
-		return s.server.Close()
-	case err := <-errCh:
+	case s.connections <- struct{}{}:
+		context.AfterFunc(ctx, func() { <-s.connections })
+		return ctx, nil
+	default:
+		return nil, fmt.Errorf("QUIC connection limit reached")
+	}
+}
+
+func (s *QUICServer) Start(ctx context.Context) error {
+	s.mu.Lock()
+	if err := s.checkStart(ctx); err != nil {
+		s.mu.Unlock()
 		return err
 	}
+	tlsConfig, err := handlers.GetTLSConfig()
+	if err != nil {
+		s.mu.Unlock()
+		return fmt.Errorf("failed to get TLS config: %w", err)
+	}
+	packet, err := net.ListenPacket("udp", s.listenAddr)
+	if err != nil {
+		s.mu.Unlock()
+		return err
+	}
+	transport := &quic.Transport{Conn: packet, ConnContext: s.connectionContext}
+	listener, err := transport.ListenEarly(http3.ConfigureTLSConfig(tlsConfig), &quic.Config{
+		MaxIncomingStreams:   100,
+		HandshakeIdleTimeout: 5 * time.Second,
+		MaxIdleTimeout:       30 * time.Second,
+	})
+	if err != nil {
+		_ = transport.Close()
+		_ = packet.Close()
+		s.mu.Unlock()
+		return err
+	}
+	s.packet, s.transport, s.listener = packet, transport, listener
+	s.server.TLSConfig = tlsConfig
+	close(s.ready)
+	s.mu.Unlock()
+	logrus.Infof("QUIC server listening on %s", packet.LocalAddr())
+	return serveWithContext(ctx, func() error { return s.server.ServeListener(listener) }, s.Shutdown)
 }
 
-// Shutdown gracefully shuts down the QUIC server
 func (s *QUICServer) Shutdown(ctx context.Context) error {
-	if s.server == nil {
+	s.mu.Lock()
+	s.stopped = true
+	srv, listener, transport, packet := s.server, s.listener, s.transport, s.packet
+	s.mu.Unlock()
+	if srv == nil {
 		return nil
 	}
-
-	// QUIC server doesn't have a graceful shutdown method, just close
-	if err := s.server.Close(); err != nil {
-		return fmt.Errorf("failed to close QUIC server: %w", err)
+	err := srv.Shutdown(ctx)
+	if listener != nil {
+		_ = listener.Close()
 	}
-
-	return nil
+	if transport != nil {
+		_ = transport.Close()
+	}
+	if packet != nil {
+		_ = packet.Close()
+	}
+	return err
 }
