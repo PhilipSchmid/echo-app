@@ -30,6 +30,7 @@ type Checker struct {
 	lastChecked          time.Time
 	externalProbeChecked bool
 	externalProbeReady   bool
+	externalError        string
 	probe                config.ExternalReadinessProbe
 	client               *http.Client
 	icmpProbe            icmpProbeFunc
@@ -37,16 +38,15 @@ type Checker struct {
 
 type icmpProbeFunc func(context.Context, string, time.Duration) error
 
-// NewChecker creates a Checker. Without an external readiness probe the app is
-// considered ready as soon as the probe endpoint is reachable.
+// NewChecker creates a Checker; the server manager controls application readiness.
 func NewChecker(probe config.ExternalReadinessProbe) *Checker {
-	ready := !probe.Enabled()
 	return &Checker{
-		healthy:   true,
-		ready:     ready,
-		probe:     probe,
-		client:    &http.Client{Timeout: probe.Timeout},
-		icmpProbe: runICMPProbe,
+		healthy:            true,
+		ready:              true,
+		externalProbeReady: !probe.Enabled(),
+		probe:              probe,
+		client:             &http.Client{Timeout: probe.Timeout},
+		icmpProbe:          runICMPProbe,
 	}
 }
 
@@ -147,10 +147,20 @@ func (c *Checker) checkICMP(ctx context.Context) error {
 }
 
 func runICMPProbe(ctx context.Context, target string, timeout time.Duration) error {
-	pinger, err := probing.NewPinger(target)
-	if err != nil {
-		return fmt.Errorf("create ICMP readiness probe for %s: %w", target, err)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	if err := ctx.Err(); err != nil {
+		return err
 	}
+	addresses, err := net.DefaultResolver.LookupIPAddr(ctx, target)
+	if err != nil {
+		return fmt.Errorf("resolve ICMP readiness target %s: %w", target, err)
+	}
+	if len(addresses) == 0 {
+		return fmt.Errorf("resolve ICMP readiness target %s: no addresses", target)
+	}
+	pinger := probing.New(target)
+	pinger.SetIPAddr(&addresses[0])
 	pinger.Count = 1
 	pinger.Timeout = timeout
 	pinger.ResolveTimeout = timeout
@@ -192,10 +202,16 @@ func (c *Checker) setExternalReady(ready bool, reason string) bool {
 	changed := !c.externalProbeChecked || c.externalProbeReady != ready
 	c.externalProbeChecked = true
 	c.externalProbeReady = ready
-	c.ready = ready
-	c.lastError = reason
+	c.externalError = reason
 	c.lastChecked = time.Now()
 	return changed
+}
+
+// IsReady reports the combined application, liveness and dependency state.
+func (c *Checker) IsReady() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.ready && c.healthy && c.externalProbeReady
 }
 
 // HealthHandler returns 200 only while the app process considers itself live.
@@ -214,8 +230,11 @@ func (c *Checker) HealthHandler(w http.ResponseWriter, _ *http.Request) {
 // ReadyHandler returns cached readiness without blocking on external checks.
 func (c *Checker) ReadyHandler(w http.ResponseWriter, _ *http.Request) {
 	c.mu.RLock()
-	ready := c.ready && c.healthy
+	ready := c.ready && c.healthy && c.externalProbeReady
 	reason := c.lastError
+	if c.ready && c.healthy && !c.externalProbeReady {
+		reason = c.externalError
+	}
 	c.mu.RUnlock()
 	if !ready {
 		http.Error(w, StatusNotReady+": "+reason, http.StatusServiceUnavailable)

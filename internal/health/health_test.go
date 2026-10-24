@@ -31,6 +31,44 @@ func TestCheckerDefaultReady(t *testing.T) {
 	assert.Equal(t, StatusHealthy, healthy.Body.String())
 }
 
+func TestExternalProbeCannotOverrideApplicationReadiness(t *testing.T) {
+	checker := NewChecker(config.ExternalReadinessProbe{Type: "tcp", Target: "localhost:80"})
+	checker.SetReady(false, "starting listeners")
+	checker.setExternalReady(true, "")
+	assert.False(t, checker.IsReady())
+	assert.Equal(t, http.StatusServiceUnavailable, readyStatus(checker))
+	checker.SetReady(true, "")
+	assert.True(t, checker.IsReady())
+	checker.setExternalReady(false, "dependency failed")
+	assert.False(t, checker.IsReady())
+	checker.SetReady(false, "shutting down")
+	checker.setExternalReady(true, "")
+	assert.False(t, checker.IsReady())
+	checker.SetHealthy(false, "unhealthy")
+	checker.SetReady(true, "")
+	assert.False(t, checker.IsReady())
+}
+
+func TestICMPDNSRespectsDeadlineAndCancellation(t *testing.T) {
+	original := net.DefaultResolver
+	net.DefaultResolver = &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		},
+	}
+	t.Cleanup(func() { net.DefaultResolver = original })
+	started := time.Now()
+	err := runICMPProbe(context.Background(), "slow-dns.invalid", 20*time.Millisecond)
+	require.Error(t, err)
+	assert.Less(t, time.Since(started), time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err = runICMPProbe(ctx, "slow-dns.invalid", time.Minute)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
 func TestCheckerReadinessTracksHTTPProbe(t *testing.T) {
 	upstreamReady := make(chan struct{})
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
