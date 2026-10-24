@@ -62,7 +62,7 @@ jobs:
           fi
           
           # Save to file for release notes
-          cat > CHANGELOG.md << EOF
+          cat > "$RUNNER_TEMP/echo-app-release-notes.md" << EOF
           ## What's Changed
           
           $CHANGELOG
@@ -100,7 +100,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
-          body_path: CHANGELOG.md
+          body_path: ${{ runner.temp }}/echo-app-release-notes.md
           files: |
             build/*.tar.gz
             build/*.zip
