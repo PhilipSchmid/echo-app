@@ -23,6 +23,11 @@ func TestLoad_DefaultValues(t *testing.T) {
 	assert.Equal(t, "", cfg.Message)
 	assert.Equal(t, "", cfg.Node)
 	assert.False(t, cfg.PrintHeaders)
+	assert.False(t, cfg.ResponseControls)
+	assert.False(t, cfg.GRPCTLS)
+	assert.Empty(t, cfg.TLSCertFile)
+	assert.Empty(t, cfg.TLSKeyFile)
+	assert.Empty(t, cfg.TLSClientCAFile)
 	assert.False(t, cfg.TLS)
 	assert.False(t, cfg.TCP)
 	assert.False(t, cfg.GRPC)
@@ -44,6 +49,21 @@ func TestLoad_EnvironmentVariables(t *testing.T) {
 		envVars  map[string]string
 		validate func(t *testing.T, cfg *Config)
 	}{
+		{
+			name:     "response controls",
+			envVars:  map[string]string{"ECHO_APP_RESPONSE_CONTROLS": "true"},
+			validate: func(t *testing.T, cfg *Config) { assert.True(t, cfg.ResponseControls) },
+		},
+		{
+			name:    "TLS files and gRPC TLS",
+			envVars: map[string]string{"ECHO_APP_GRPC": "true", "ECHO_APP_GRPC_TLS": "true", "ECHO_APP_TLS_CERT_FILE": "server.pem", "ECHO_APP_TLS_KEY_FILE": "server.key", "ECHO_APP_TLS_CLIENT_CA_FILE": "ca.pem"},
+			validate: func(t *testing.T, cfg *Config) {
+				assert.True(t, cfg.GRPCTLS)
+				assert.Equal(t, "server.pem", cfg.TLSCertFile)
+				assert.Equal(t, "server.key", cfg.TLSKeyFile)
+				assert.Equal(t, "ca.pem", cfg.TLSClientCAFile)
+			},
+		},
 		{
 			name: "custom message",
 			envVars: map[string]string{
@@ -408,4 +428,25 @@ func TestLoadAllowsSharedUDPPort(t *testing.T) {
 	cfg, err := Load()
 	require.NoError(t, err)
 	assert.True(t, cfg.UnsafeHeaders)
+}
+
+func TestValidateTLSSettings(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		change func(*Config)
+	}{
+		{"missing key", func(c *Config) { c.TLS = true; c.TLSCertFile = "server.pem" }},
+		{"missing certificate", func(c *Config) { c.TLS = true; c.TLSKeyFile = "server.key" }},
+		{"unused certificates", func(c *Config) { c.TLSCertFile = "server.pem"; c.TLSKeyFile = "server.key" }},
+		{"unused CA", func(c *Config) { c.TLSClientCAFile = "ca.pem" }},
+		{"gRPC TLS without gRPC", func(c *Config) { c.GRPCTLS = true }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			viper.Reset()
+			cfg, err := Load()
+			require.NoError(t, err)
+			test.change(cfg)
+			require.Error(t, cfg.Validate())
+		})
+	}
 }

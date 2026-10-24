@@ -24,6 +24,10 @@ type Config struct {
 	PrintHeaders           bool
 	UnsafeHeaders          bool
 	ResponseControls       bool
+	TLSCertFile            string
+	TLSKeyFile             string
+	TLSClientCAFile        string
+	GRPCTLS                bool
 	TLS                    bool
 	H2C                    bool
 	TCP                    bool
@@ -52,6 +56,10 @@ func Load() (*Config, error) {
 	viper.SetDefault("print-http-request-headers", false)
 	viper.SetDefault("unsafe-headers", false)
 	viper.SetDefault("response-controls", false)
+	viper.SetDefault("tls-cert-file", "")
+	viper.SetDefault("tls-key-file", "")
+	viper.SetDefault("tls-client-ca-file", "")
+	viper.SetDefault("grpc-tls", false)
 	viper.SetDefault("tls", false)
 	viper.SetDefault("h2c", false)
 	viper.SetDefault("tcp", false)
@@ -80,6 +88,10 @@ func Load() (*Config, error) {
 		PrintHeaders:     viper.GetBool("print-http-request-headers"),
 		UnsafeHeaders:    viper.GetBool("unsafe-headers"),
 		ResponseControls: viper.GetBool("response-controls"),
+		TLSCertFile:      viper.GetString("tls-cert-file"),
+		TLSKeyFile:       viper.GetString("tls-key-file"),
+		TLSClientCAFile:  viper.GetString("tls-client-ca-file"),
+		GRPCTLS:          viper.GetBool("grpc-tls"),
 		TLS:              viper.GetBool("tls"),
 		H2C:              viper.GetBool("h2c"),
 		TCP:              viper.GetBool("tcp"),
@@ -120,6 +132,15 @@ func Load() (*Config, error) {
 
 // Validate rejects incomplete settings before any listeners are opened.
 func (c *Config) Validate() error {
+	if (c.TLSCertFile == "") != (c.TLSKeyFile == "") {
+		return fmt.Errorf("TLS certificate and key files must be supplied together")
+	}
+	if c.GRPCTLS && !c.GRPC {
+		return fmt.Errorf("grpc-tls requires the gRPC listener")
+	}
+	if (c.TLSCertFile != "" || c.TLSClientCAFile != "") && !c.TLS && !c.QUIC && !c.GRPCTLS {
+		return fmt.Errorf("TLS files require a TLS, QUIC or grpc-tls listener")
+	}
 	if len(c.Message) > MaxMessageLength {
 		return fmt.Errorf("message length (%d) exceeds maximum allowed length (%d)", len(c.Message), MaxMessageLength)
 	}

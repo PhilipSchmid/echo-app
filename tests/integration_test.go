@@ -35,7 +35,14 @@ func TestAllProtocols(t *testing.T) {
 		t.Fatalf("build: %v\n%s", err, output)
 	}
 	ports := make(map[string]string)
-	args := []string{"--tls", "--h2c", "--tcp", "--grpc", "--quic", "--metrics", "--message=integration-test", "--node=test-node", "--max-request-size=4"}
+	dependencyURL, setDependencyReady := newReadinessDependency(t)
+	args := []string{
+		"--tls", "--h2c", "--tcp", "--grpc", "--quic", "--metrics",
+		"--message=integration-test", "--node=test-node", "--max-request-size=4",
+		"--response-controls", "--print-http-request-headers",
+		"--external-readiness-probe-type=http", "--external-readiness-probe-target=" + dependencyURL,
+		"--external-readiness-probe-interval=20ms", "--external-readiness-probe-timeout=500ms",
+	}
 	for _, listener := range []string{"http", "tls", "tcp", "grpc", "quic", "metrics"} {
 		ports[listener] = unusedPort(t, listener == "quic")
 		args = append(args, "--"+listener+"-port="+ports[listener])
@@ -107,7 +114,7 @@ func TestAllProtocols(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var transport http.RoundTripper
 			if tc.name == "HTTP3" {
-				h3 := &http3.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} // Self-signed demo certificate.
+				h3 := &http3.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true, ServerName: "diagnostic.example"}} // Self-signed demo certificate.
 				defer func() { _ = h3.Close() }()
 				transport = h3
 			} else {
@@ -115,13 +122,16 @@ func TestAllProtocols(t *testing.T) {
 				protocols.SetHTTP1(tc.protocol == "HTTP/1.1")
 				protocols.SetHTTP2(tc.name == "HTTPS_HTTP2")
 				protocols.SetUnencryptedHTTP2(tc.name == "H2C")
-				tr := &http.Transport{Protocols: protocols, TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} // Self-signed demo certificate.
+				tr := &http.Transport{Protocols: protocols, TLSClientConfig: &tls.Config{InsecureSkipVerify: true, ServerName: "diagnostic.example"}} // Self-signed demo certificate.
 				defer tr.CloseIdleConnections()
 				transport = tr
 			}
 			client := &http.Client{Transport: transport, Timeout: 3 * time.Second}
-			if err := checkJSON(client, tc.scheme+"://127.0.0.1:"+tc.port+"/test/path", tc.listener, tc.protocol); err != nil {
+			if err := checkJSON(client, tc.scheme+"://127.0.0.1:"+tc.port+"/test%2Fpath?item=42&encoded=a%2Bb", tc.listener, tc.protocol); err != nil {
 				t.Fatal(err)
+			}
+			if tc.name == "HTTP" || tc.name == "HTTP3" {
+				checkResponseControls(t, client, tc.scheme+"://127.0.0.1:"+tc.port)
 			}
 		})
 	}
@@ -173,10 +183,12 @@ func TestAllProtocols(t *testing.T) {
 			t.Fatalf("%s: status=%d body=%s err=%v", path, resp.StatusCode, body, readErr)
 		}
 	}
+	finishFeatureShutdown := prepareFeatureShutdown(t, ports, setDependencyReady)
 	plain.CloseIdleConnections()
 	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
 		t.Fatal(err)
 	}
+	finishFeatureShutdown()
 	select {
 	case err := <-done:
 		waited = true
@@ -207,7 +219,16 @@ func unusedPort(t *testing.T, udp bool) string {
 }
 
 func checkJSON(client *http.Client, url, listener, protocol string) error {
-	resp, err := client.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Host = "diagnostic.example:8443"
+	req.Header.Set("Authorization", "Bearer integration-secret")
+	req.Header.Set("Cookie", "session=integration-secret")
+	req.Header.Set("Forwarded", "for=203.0.113.10;proto=https;host=proxy.example")
+	req.Header.Set("X-Forwarded-For", "203.0.113.10")
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -222,7 +243,7 @@ func checkJSON(client *http.Client, url, listener, protocol string) error {
 	if body["listener"] != listener || body["message"] != "integration-test" || body["source_ip"] != "127.0.0.1" || body["http_endpoint"] != "/test/path" {
 		return fmt.Errorf("unexpected response: %v", body)
 	}
-	return nil
+	return checkRequestDiagnostics(resp, body)
 }
 
 func TestWireAssertionsRejectUnavailableOrInvalidResponses(t *testing.T) {

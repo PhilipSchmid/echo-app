@@ -22,12 +22,13 @@ const (
 // HTTPServer represents an HTTP server
 type HTTPServer struct {
 	lifecycle
-	cfg         *config.Config
-	server      *http.Server
-	netListener net.Listener
-	listenAddr  string
-	listener    string
-	activeConns int32
+	cfg             *config.Config
+	server          *http.Server
+	netListener     net.Listener
+	listenAddr      string
+	listener        string
+	activeConns     int32
+	closeWebSockets func()
 }
 
 // NewHTTPServer creates a new HTTP server
@@ -49,6 +50,9 @@ func NewHTTPServer(cfg *config.Config, useTLS bool) *HTTPServer {
 		listener:   listener,
 	}
 	mux := http.NewServeMux()
+	websocketHandler, closeWebSockets := handlers.NewWebSocketHandler(cfg)
+	s.closeWebSockets = closeWebSockets
+	mux.Handle("/ws", websocketHandler)
 	mux.HandleFunc("/", handlers.HTTPHandler(cfg, listener))
 	s.server = &http.Server{
 		Addr:         s.listenAddr,
@@ -93,7 +97,7 @@ func (s *HTTPServer) Start(ctx context.Context) error {
 	}
 
 	if s.listener == "TLS" {
-		tlsConfig, err := handlers.GetTLSConfig()
+		tlsConfig, err := handlers.GetTLSConfig(s.cfg)
 		if err != nil {
 			s.mu.Unlock()
 			return fmt.Errorf("failed to get TLS config: %w", err)
@@ -131,7 +135,11 @@ func (s *HTTPServer) Shutdown(ctx context.Context) error {
 	s.mu.Lock()
 	s.stopped = true
 	srv := s.server
+	closeWebSockets := s.closeWebSockets
 	s.mu.Unlock()
+	if closeWebSockets != nil {
+		closeWebSockets()
+	}
 	if srv == nil {
 		return nil
 	}

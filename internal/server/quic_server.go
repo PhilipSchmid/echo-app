@@ -29,6 +29,9 @@ type QUICServer struct {
 func NewQUICServer(cfg *config.Config) *QUICServer {
 	s := &QUICServer{lifecycle: newLifecycle(), cfg: cfg, listenAddr: ":" + cfg.QUICPort, connections: make(chan struct{}, maxTCPConnections)}
 	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "WebSocket requires HTTP/1.1", http.StatusUpgradeRequired)
+	})
 	mux.HandleFunc("/", handlers.QUICHandler(cfg))
 	s.server = &http3.Server{Addr: s.listenAddr, Handler: requestLimitMiddleware(&s.activeRequests, mux), IdleTimeout: 30 * time.Second, MaxHeaderBytes: 1 << 20}
 	return s
@@ -52,7 +55,7 @@ func (s *QUICServer) Start(ctx context.Context) error {
 		s.mu.Unlock()
 		return err
 	}
-	tlsConfig, err := handlers.GetTLSConfig()
+	tlsConfig, err := handlers.GetTLSConfig(s.cfg)
 	if err != nil {
 		s.mu.Unlock()
 		return fmt.Errorf("failed to get TLS config: %w", err)

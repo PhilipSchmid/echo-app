@@ -98,5 +98,6 @@ func TestGenerateSelfSignedCert_VerifySerialNumber(t *testing.T) {
 
 	// Verify serial number is set
 	assert.NotNil(t, x509Cert.SerialNumber)
-	assert.Equal(t, int64(1), x509Cert.SerialNumber.Int64())
+	assert.Positive(t, x509Cert.SerialNumber.Sign())
+	assert.LessOrEqual(t, x509Cert.SerialNumber.BitLen(), 129)
 }
