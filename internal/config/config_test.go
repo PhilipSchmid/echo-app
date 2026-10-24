@@ -368,3 +368,44 @@ func TestLoad_ExternalReadinessProbeConfiguration(t *testing.T) {
 	assert.Equal(t, "HEAD", cfg.ExternalReadinessProbe.HTTPMethod)
 	assert.Equal(t, 204, cfg.ExternalReadinessProbe.HTTPExpectedStatus)
 }
+
+func TestLoadRejectsInvalidConfiguration(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		env  map[string]string
+	}{
+		{"zero body limit", map[string]string{"MAX_REQUEST_SIZE": "0"}},
+		{"negative body limit", map[string]string{"MAX_REQUEST_SIZE": "-1"}},
+		{"invalid port", map[string]string{"HTTP_PORT": "65536"}},
+		{"conflicting TCP ports", map[string]string{"TLS": "true", "TLS_PORT": "8080"}},
+		{"missing probe target", map[string]string{"EXTERNAL_READINESS_PROBE_TYPE": "tcp"}},
+		{"missing probe type", map[string]string{"EXTERNAL_READINESS_PROBE_TARGET": "localhost:80"}},
+		{"invalid probe type", map[string]string{"EXTERNAL_READINESS_PROBE_TYPE": "other", "EXTERNAL_READINESS_PROBE_TARGET": "localhost"}},
+		{"invalid HTTP target", map[string]string{"EXTERNAL_READINESS_PROBE_TYPE": "http", "EXTERNAL_READINESS_PROBE_TARGET": "file:///etc/passwd"}},
+		{"invalid TCP target", map[string]string{"EXTERNAL_READINESS_PROBE_TYPE": "tcp", "EXTERNAL_READINESS_PROBE_TARGET": "localhost"}},
+		{"invalid probe interval", map[string]string{"EXTERNAL_READINESS_PROBE_TYPE": "http", "EXTERNAL_READINESS_PROBE_TARGET": "https://example.com", "EXTERNAL_READINESS_PROBE_INTERVAL": "0s"}},
+		{"invalid HTTP method", map[string]string{"EXTERNAL_READINESS_PROBE_TYPE": "http", "EXTERNAL_READINESS_PROBE_TARGET": "https://example.com", "EXTERNAL_READINESS_HTTP_METHOD": "BAD METHOD"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			for name, value := range tc.env {
+				t.Setenv("ECHO_APP_"+name, value)
+			}
+			cfg, err := Load()
+			require.Error(t, err)
+			assert.Nil(t, cfg)
+		})
+	}
+}
+
+func TestLoadAllowsSharedUDPPort(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	t.Setenv("ECHO_APP_QUIC", "true")
+	t.Setenv("ECHO_APP_QUIC_PORT", "8080")
+	t.Setenv("ECHO_APP_UNSAFE_HEADERS", "true")
+	cfg, err := Load()
+	require.NoError(t, err)
+	assert.True(t, cfg.UnsafeHeaders)
+}

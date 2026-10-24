@@ -2,8 +2,13 @@ package config
 
 import (
 	"fmt"
+	"net"
+	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 
+	"github.com/PhilipSchmid/echo-app/internal/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -17,6 +22,7 @@ type Config struct {
 	Message                string
 	Node                   string
 	PrintHeaders           bool
+	UnsafeHeaders          bool
 	TLS                    bool
 	H2C                    bool
 	TCP                    bool
@@ -43,6 +49,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("message", "")
 	viper.SetDefault("node", "")
 	viper.SetDefault("print-http-request-headers", false)
+	viper.SetDefault("unsafe-headers", false)
 	viper.SetDefault("tls", false)
 	viper.SetDefault("h2c", false)
 	viper.SetDefault("tcp", false)
@@ -69,6 +76,7 @@ func Load() (*Config, error) {
 		Message:        viper.GetString("message"),
 		Node:           viper.GetString("node"),
 		PrintHeaders:   viper.GetBool("print-http-request-headers"),
+		UnsafeHeaders:  viper.GetBool("unsafe-headers"),
 		TLS:            viper.GetBool("tls"),
 		H2C:            viper.GetBool("h2c"),
 		TCP:            viper.GetBool("tcp"),
@@ -100,23 +108,86 @@ func Load() (*Config, error) {
 	cfg.LogLevel = lvl
 	logrus.SetLevel(cfg.LogLevel)
 
-	// Validate external readiness settings
-	if cfg.ExternalReadinessProbe.Enabled() {
-		if cfg.ExternalReadinessProbe.Interval <= 0 {
-			return nil, fmt.Errorf("external readiness probe interval must be greater than zero")
-		}
-		if cfg.ExternalReadinessProbe.Timeout <= 0 {
-			return nil, fmt.Errorf("external readiness probe timeout must be greater than zero")
-		}
-		if cfg.ExternalReadinessProbe.HTTPExpectedStatus < 100 || cfg.ExternalReadinessProbe.HTTPExpectedStatus > 599 {
-			return nil, fmt.Errorf("external readiness HTTP expected status must be between 100 and 599")
-		}
-	}
-
-	// Validate message length
-	if len(cfg.Message) > MaxMessageLength {
-		return nil, fmt.Errorf("message length (%d) exceeds maximum allowed length (%d)", len(cfg.Message), MaxMessageLength)
+	if err := cfg.Validate(); err != nil {
+		return nil, err
 	}
 
 	return cfg, nil
+}
+
+// Validate rejects incomplete settings before any listeners are opened.
+func (c *Config) Validate() error {
+	if len(c.Message) > MaxMessageLength {
+		return fmt.Errorf("message length (%d) exceeds maximum allowed length (%d)", len(c.Message), MaxMessageLength)
+	}
+	if c.MaxRequestSize <= 0 {
+		return fmt.Errorf("maximum request size must be greater than zero")
+	}
+	ports := []struct {
+		name, port string
+		enabled    bool
+	}{
+		{"HTTP", c.HTTPPort, true},
+		{"TLS", c.TLSPort, c.TLS},
+		{"TCP", c.TCPPort, c.TCP},
+		{"gRPC", c.GRPCPort, c.GRPC},
+		{"metrics", c.MetricsPort, c.Metrics},
+	}
+	used := make(map[int]string)
+	for _, p := range ports {
+		if !p.enabled {
+			continue
+		}
+		if !utils.IsValidPort(p.port) {
+			return fmt.Errorf("invalid %s port: %s", p.name, p.port)
+		}
+		number, _ := strconv.Atoi(p.port)
+		if other, exists := used[number]; exists {
+			return fmt.Errorf("%s and %s use the same TCP port %s", other, p.name, p.port)
+		}
+		used[number] = p.name
+	}
+	if c.QUIC && !utils.IsValidPort(c.QUICPort) {
+		return fmt.Errorf("invalid QUIC port: %s", c.QUICPort)
+	}
+	p := c.ExternalReadinessProbe
+	switch p.Type {
+	case "", "none":
+		if p.Target != "" {
+			return fmt.Errorf("external readiness probe target requires a probe type")
+		}
+		return nil
+	case "http", "https", "tcp", "ping", "icmp":
+	default:
+		return fmt.Errorf("invalid external readiness probe type: %s", p.Type)
+	}
+	if strings.TrimSpace(p.Target) == "" {
+		return fmt.Errorf("external readiness probe target is required")
+	}
+	if p.Interval <= 0 || p.Timeout <= 0 {
+		return fmt.Errorf("external readiness probe interval and timeout must be greater than zero")
+	}
+	switch p.Type {
+	case "http", "https":
+		u, err := url.Parse(p.Target)
+		if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+			return fmt.Errorf("external readiness HTTP target must be an HTTP or HTTPS URL")
+		}
+		if _, err := http.NewRequest(p.HTTPMethod, p.Target, nil); err != nil {
+			return fmt.Errorf("invalid external readiness HTTP request: %w", err)
+		}
+		if p.HTTPExpectedStatus < 100 || p.HTTPExpectedStatus > 599 {
+			return fmt.Errorf("external readiness HTTP expected status must be between 100 and 599")
+		}
+	case "tcp":
+		host, port, err := net.SplitHostPort(p.Target)
+		if err != nil || host == "" || !utils.IsValidPort(port) {
+			return fmt.Errorf("external readiness TCP target must be host:port")
+		}
+	case "ping", "icmp":
+		if strings.ContainsAny(p.Target, "/ \t\r\n") {
+			return fmt.Errorf("external readiness ICMP target must be a hostname or IP address")
+		}
+	}
+	return nil
 }
