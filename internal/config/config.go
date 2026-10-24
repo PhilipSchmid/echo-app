@@ -23,6 +23,7 @@ type Config struct {
 	Node                   string
 	PrintHeaders           bool
 	UnsafeHeaders          bool
+	ResponseControls       bool
 	TLS                    bool
 	H2C                    bool
 	TCP                    bool
@@ -50,6 +51,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("node", "")
 	viper.SetDefault("print-http-request-headers", false)
 	viper.SetDefault("unsafe-headers", false)
+	viper.SetDefault("response-controls", false)
 	viper.SetDefault("tls", false)
 	viper.SetDefault("h2c", false)
 	viper.SetDefault("tcp", false)
@@ -73,23 +75,24 @@ func Load() (*Config, error) {
 
 	// Load configuration from viper
 	cfg := &Config{
-		Message:        viper.GetString("message"),
-		Node:           viper.GetString("node"),
-		PrintHeaders:   viper.GetBool("print-http-request-headers"),
-		UnsafeHeaders:  viper.GetBool("unsafe-headers"),
-		TLS:            viper.GetBool("tls"),
-		H2C:            viper.GetBool("h2c"),
-		TCP:            viper.GetBool("tcp"),
-		GRPC:           viper.GetBool("grpc"),
-		QUIC:           viper.GetBool("quic"),
-		Metrics:        viper.GetBool("metrics"),
-		HTTPPort:       viper.GetString("http-port"),
-		TLSPort:        viper.GetString("tls-port"),
-		TCPPort:        viper.GetString("tcp-port"),
-		GRPCPort:       viper.GetString("grpc-port"),
-		QUICPort:       viper.GetString("quic-port"),
-		MetricsPort:    viper.GetString("metrics-port"),
-		MaxRequestSize: viper.GetInt64("max-request-size"),
+		Message:          viper.GetString("message"),
+		Node:             viper.GetString("node"),
+		PrintHeaders:     viper.GetBool("print-http-request-headers"),
+		UnsafeHeaders:    viper.GetBool("unsafe-headers"),
+		ResponseControls: viper.GetBool("response-controls"),
+		TLS:              viper.GetBool("tls"),
+		H2C:              viper.GetBool("h2c"),
+		TCP:              viper.GetBool("tcp"),
+		GRPC:             viper.GetBool("grpc"),
+		QUIC:             viper.GetBool("quic"),
+		Metrics:          viper.GetBool("metrics"),
+		HTTPPort:         viper.GetString("http-port"),
+		TLSPort:          viper.GetString("tls-port"),
+		TCPPort:          viper.GetString("tcp-port"),
+		GRPCPort:         viper.GetString("grpc-port"),
+		QUICPort:         viper.GetString("quic-port"),
+		MetricsPort:      viper.GetString("metrics-port"),
+		MaxRequestSize:   viper.GetInt64("max-request-size"),
 		ExternalReadinessProbe: ExternalReadinessProbe{
 			Type:               strings.ToLower(viper.GetString("external-readiness-probe-type")),
 			Target:             viper.GetString("external-readiness-probe-target"),

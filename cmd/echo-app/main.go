@@ -16,6 +16,7 @@ import (
 )
 
 func main() {
+	pflag.Bool("response-controls", false, "Enable bounded status, delay and size query controls")
 	// Define command-line flags
 	pflag.String("message", "", "Custom message")
 	pflag.String("node", "", "Node name")

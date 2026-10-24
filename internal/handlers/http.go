@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/PhilipSchmid/echo-app/internal/config"
@@ -15,10 +18,18 @@ import (
 // HTTPResponse defines the structure of the HTTP echo response
 type HTTPResponse struct {
 	BaseResponse
-	HTTPVersion  string              `json:"http_version,omitempty"`
-	HTTPMethod   string              `json:"http_method,omitempty"`
-	HTTPEndpoint string              `json:"http_endpoint,omitempty"`
-	Headers      map[string][]string `json:"headers,omitempty"`
+	HTTPVersion           string              `json:"http_version,omitempty"`
+	HTTPMethod            string              `json:"http_method,omitempty"`
+	HTTPEndpoint          string              `json:"http_endpoint,omitempty"`
+	HTTPHost              string              `json:"http_host,omitempty"`
+	HTTPRequestURI        string              `json:"http_request_uri,omitempty"`
+	RemoteAddr            string              `json:"remote_addr,omitempty"`
+	LocalAddr             string              `json:"local_addr,omitempty"`
+	TLSVersion            string              `json:"tls_version,omitempty"`
+	TLSCipherSuite        string              `json:"tls_cipher_suite,omitempty"`
+	TLSServerName         string              `json:"tls_server_name,omitempty"`
+	TLSNegotiatedProtocol string              `json:"tls_negotiated_protocol,omitempty"`
+	Headers               map[string][]string `json:"headers,omitempty"`
 }
 
 // HTTPHandler returns an HTTP handler function
@@ -97,21 +108,60 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 			logrus.Debugf("[%s] Request headers: %+v", listener, diagnosticHeaders(r.Header, cfg.UnsafeHeaders))
 		}
 
-		response := buildHTTPResponse(r, cfg, listener)
-		data, err := json.Marshal(response)
-		if err != nil {
-			logrus.Errorf("Failed to marshal JSON: %v", err)
-			metrics.RecordError(listener, "marshal_error")
-			w.WriteHeader(http.StatusInternalServerError)
-			if _, writeErr := w.Write([]byte("Internal Server Error")); writeErr != nil {
-				logrus.Errorf("Failed to write error response: %v", writeErr)
+		controls := responseControls{status: http.StatusOK, size: -1}
+		if cfg.ResponseControls {
+			var err error
+			controls, err = parseResponseControls(r.URL.RawQuery)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
 			}
-			return
+			if controls.delay > 0 {
+				timer := time.NewTimer(controls.delay)
+				defer timer.Stop()
+				select {
+				case <-timer.C:
+				case <-r.Context().Done():
+					return
+				}
+			}
 		}
+
+		allowsBody := controls.status != http.StatusNoContent && controls.status != http.StatusResetContent && controls.status != http.StatusNotModified
+		var data []byte
 		w.Header().Set("Content-Type", "application/json")
-		if _, writeErr := w.Write(data); writeErr != nil {
-			logrus.Errorf("Failed to write response: %v", writeErr)
-			metrics.RecordError(listener, "write_error")
+		if controls.size >= 0 {
+			w.Header().Set("Content-Type", "application/octet-stream")
+		}
+		if allowsBody {
+			if controls.size >= 0 {
+				w.Header().Set("Content-Length", strconv.Itoa(controls.size))
+			} else {
+				var err error
+				data, err = json.Marshal(buildHTTPResponse(r, cfg, listener))
+				if err != nil {
+					metrics.RecordError(listener, "marshal_error")
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+			}
+		}
+		w.WriteHeader(controls.status)
+		var written int64
+		if allowsBody && r.Method != http.MethodHead {
+			var writeErr error
+			if controls.size >= 0 {
+				written, writeErr = io.CopyN(w, zeroReader{}, int64(controls.size))
+			} else {
+				var n int
+				n, writeErr = w.Write(data)
+				written = int64(n)
+			}
+			if writeErr != nil {
+				logrus.Errorf("Failed to write response: %v", writeErr)
+				metrics.RecordError(listener, "write_error")
+			}
 		}
 		duration := time.Since(start).Seconds()
 		// Normalize endpoint to prevent high cardinality in metrics
@@ -119,7 +169,7 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 		metrics.RecordRequest(listener, r.Method, normalizedPath, duration)
 
 		// Debug logging for response
-		logrus.Debugf("[%s] Response sent: %d bytes in %.3fms", listener, len(data), duration*1000)
+		logrus.Debugf("[%s] Response sent: %d bytes in %.3fms", listener, written, duration*1000)
 	}
 }
 
@@ -133,10 +183,25 @@ func buildHTTPResponse(r *http.Request, cfg *config.Config, listener string) HTT
 		effectiveListener = "HTTP"
 	}
 	response := HTTPResponse{
-		BaseResponse: NewBaseResponse(cfg, effectiveListener, r.RemoteAddr),
-		HTTPVersion:  r.Proto,
-		HTTPMethod:   r.Method,
-		HTTPEndpoint: r.URL.Path,
+		BaseResponse:   NewBaseResponse(cfg, effectiveListener, r.RemoteAddr),
+		HTTPVersion:    r.Proto,
+		HTTPMethod:     r.Method,
+		HTTPEndpoint:   r.URL.Path,
+		HTTPHost:       r.Host,
+		HTTPRequestURI: r.RequestURI,
+		RemoteAddr:     r.RemoteAddr,
+	}
+	if response.HTTPRequestURI == "" {
+		response.HTTPRequestURI = r.URL.RequestURI()
+	}
+	if local, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr); ok {
+		response.LocalAddr = local.String()
+	}
+	if r.TLS != nil {
+		response.TLSVersion = tls.VersionName(r.TLS.Version)
+		response.TLSCipherSuite = tls.CipherSuiteName(r.TLS.CipherSuite)
+		response.TLSServerName = r.TLS.ServerName
+		response.TLSNegotiatedProtocol = r.TLS.NegotiatedProtocol
 	}
 	if cfg.PrintHeaders {
 		response.Headers = diagnosticHeaders(r.Header, cfg.UnsafeHeaders)
