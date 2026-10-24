@@ -4,11 +4,13 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/PhilipSchmid/echo-app/internal/config"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -171,39 +173,29 @@ func TestMetricsServer_MetricsEndpoint(t *testing.T) {
 	_ = server.Shutdown(shutdownCtx)
 }
 
+type blockingCollector struct{ release <-chan struct{} }
+
+func (c blockingCollector) Describe(chan<- *prometheus.Desc) {}
+func (c blockingCollector) Collect(chan<- prometheus.Metric) { <-c.release }
+
 func TestMetricsServer_MetricsTimeout(t *testing.T) {
-	cfg := &config.Config{
-		MetricsPort: "13006",
-	}
-
-	server := NewMetricsServer(cfg, nil)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Start server
-	go func() { _ = server.Start(ctx) }()
-	time.Sleep(100 * time.Millisecond)
-
-	// Test metrics endpoint with very slow client
-	// The timeout is set to 10 seconds in the server, so this should succeed
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-	}
-
-	resp, err := client.Get("http://localhost:13006/metrics")
+	release := make(chan struct{})
+	defer close(release)
+	registry := prometheus.NewRegistry()
+	require.NoError(t, registry.Register(blockingCollector{release: release}))
+	previous := prometheus.DefaultGatherer
+	prometheus.DefaultGatherer = registry
+	defer func() { prometheus.DefaultGatherer = previous }()
+	srv := httptest.NewServer(metricsHandler(20 * time.Millisecond))
+	defer srv.Close()
+	client := &http.Client{Timeout: time.Second}
+	resp, err := client.Get(srv.URL)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
-
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	// Read response
-	_, err = io.ReadAll(resp.Body)
+	require.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
+	data, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-
-	// Shutdown
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer shutdownCancel()
-	_ = server.Shutdown(shutdownCtx)
+	require.Contains(t, string(data), "Metrics collection timeout")
 }
 
 func TestMetricsServer_ShutdownWithoutStart(t *testing.T) {

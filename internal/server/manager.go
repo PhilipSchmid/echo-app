@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -9,118 +10,160 @@ import (
 
 	"github.com/PhilipSchmid/echo-app/internal/config"
 	"github.com/PhilipSchmid/echo-app/internal/health"
-	"github.com/sirupsen/logrus"
 )
 
-// Manager manages all servers and handles graceful shutdown
 type Manager struct {
-	cfg      *config.Config
-	health   *health.Checker
-	servers  []Server
-	wg       sync.WaitGroup
-	shutdown chan struct{}
+	cfg          *config.Config
+	health       *health.Checker
+	servers      []Server
+	wg           sync.WaitGroup
+	mu           sync.Mutex
+	shutdown     chan struct{}
+	shutdownOnce sync.Once
+	errors       chan error
+	failed       error
+	started      bool
 }
 
-// Server interface for all server types
 type Server interface {
-	Start(ctx context.Context) error
-	Shutdown(ctx context.Context) error
+	Start(context.Context) error
+	Shutdown(context.Context) error
+	Ready() <-chan struct{}
 	Name() string
 }
 
-// NewManager creates a new server manager
-func NewManager(cfg *config.Config, healthChecker *health.Checker) *Manager {
-	return &Manager{
-		cfg:      cfg,
-		health:   healthChecker,
-		servers:  make([]Server, 0),
-		shutdown: make(chan struct{}),
+func NewManager(cfg *config.Config, checker *health.Checker) *Manager {
+	if checker != nil {
+		checker.SetReady(false, "starting listeners")
 	}
+	return &Manager{cfg: cfg, health: checker, servers: make([]Server, 0), shutdown: make(chan struct{}), errors: make(chan error, 1)}
 }
 
-// RegisterServer adds a server to be managed
-func (m *Manager) RegisterServer(s Server) {
-	m.servers = append(m.servers, s)
-}
+func (m *Manager) RegisterServer(s Server) { m.servers = append(m.servers, s) }
 
-// Start starts all registered servers
-func (m *Manager) Start(ctx context.Context) error {
+// Errors reports the first unexpected listener failure after startup.
+func (m *Manager) Errors() <-chan error { return m.errors }
+
+func (m *Manager) Start(ctx context.Context) (err error) {
+	m.mu.Lock()
+	select {
+	case <-m.shutdown:
+		m.mu.Unlock()
+		return http.ErrServerClosed
+	default:
+	}
+	if m.started {
+		m.mu.Unlock()
+		return fmt.Errorf("servers already started")
+	}
+	m.started = true
+	m.mu.Unlock()
+	defer func() {
+		if err != nil {
+			_ = m.Shutdown(30 * time.Second)
+		}
+	}()
+
 	for _, srv := range m.servers {
-		srv := srv // capture loop variable
+		result := make(chan error, 1)
+		m.mu.Lock()
+		select {
+		case <-m.shutdown:
+			m.mu.Unlock()
+			return http.ErrServerClosed
+		default:
+		}
 		m.wg.Add(1)
-		go func() {
+		m.mu.Unlock()
+		go func(srv Server) {
 			defer m.wg.Done()
-			logrus.Infof("Starting %s server...", srv.Name())
-			if err := srv.Start(ctx); err != nil && err != http.ErrServerClosed {
-				logrus.Errorf("%s server error: %v", srv.Name(), err)
+			err := srv.Start(ctx)
+			if err == nil {
+				err = fmt.Errorf("listener stopped unexpectedly")
 			}
-		}()
+			result <- err
+			if errors.Is(err, http.ErrServerClosed) || errors.Is(err, context.Canceled) {
+				return
+			}
+			m.mu.Lock()
+			defer m.mu.Unlock()
+			select {
+			case <-m.shutdown:
+				return
+			default:
+			}
+			if m.failed == nil {
+				m.failed = fmt.Errorf("%s server: %w", srv.Name(), err)
+			}
+			if m.health != nil {
+				m.health.SetReady(false, srv.Name()+" listener failed")
+			}
+			select {
+			case m.errors <- m.failed:
+			default:
+			}
+		}(srv)
+		select {
+		case <-srv.Ready():
+		case err := <-result:
+			return fmt.Errorf("start %s server: %w", srv.Name(), err)
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-m.shutdown:
+			return http.ErrServerClosed
+		}
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.failed != nil {
+		return m.failed
+	}
+	select {
+	case <-m.shutdown:
+		return http.ErrServerClosed
+	default:
+	}
+	if m.health != nil {
+		m.health.SetReady(true, "")
 	}
 	return nil
 }
 
-// Shutdown gracefully shuts down all servers
 func (m *Manager) Shutdown(timeout time.Duration) error {
+	m.mu.Lock()
+	m.shutdownOnce.Do(func() { close(m.shutdown) })
 	if m.health != nil {
 		m.health.SetReady(false, "shutting down")
 	}
-	close(m.shutdown)
-
+	m.mu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-
-	logrus.Info("Shutting down all servers...")
-
-	var shutdownWg sync.WaitGroup
-	errors := make(chan error, len(m.servers))
-
+	result := make(chan error, len(m.servers))
 	for _, srv := range m.servers {
-		srv := srv // capture loop variable
-		shutdownWg.Add(1)
-		go func() {
-			defer shutdownWg.Done()
-			if err := srv.Shutdown(ctx); err != nil {
-				errors <- fmt.Errorf("%s shutdown error: %w", srv.Name(), err)
-			}
-		}()
+		go func(srv Server) { result <- srv.Shutdown(ctx) }(srv)
 	}
-
-	// Wait for all shutdowns to complete
-	shutdownWg.Wait()
-	close(errors)
-
-	// Collect any errors
 	var errs []error
-	for err := range errors {
-		errs = append(errs, err)
+	for range m.servers {
+		select {
+		case err := <-result:
+			if err != nil {
+				errs = append(errs, err)
+			}
+		case <-ctx.Done():
+			return fmt.Errorf("shutdown timeout exceeded: %w", ctx.Err())
+		}
 	}
-
-	// Wait for all server goroutines to finish
 	done := make(chan struct{})
-	go func() {
-		m.wg.Wait()
-		close(done)
-	}()
-
+	go func() { m.wg.Wait(); close(done) }()
 	select {
 	case <-done:
-		// Check if we exceeded the timeout even though shutdown completed
-		if ctx.Err() != nil {
-			return fmt.Errorf("shutdown timeout exceeded")
+		if len(errs) > 0 {
+			return fmt.Errorf("shutdown errors: %w", errors.Join(errs...))
 		}
-		logrus.Info("All servers shut down successfully")
+		return nil
 	case <-ctx.Done():
-		return fmt.Errorf("shutdown timeout exceeded")
+		return fmt.Errorf("shutdown timeout exceeded: %w", ctx.Err())
 	}
-
-	if len(errs) > 0 {
-		return fmt.Errorf("shutdown errors: %v", errs)
-	}
-
-	return nil
 }
 
-// Wait blocks until all servers have stopped
-func (m *Manager) Wait() {
-	m.wg.Wait()
-}
+func (m *Manager) Wait() { m.wg.Wait() }

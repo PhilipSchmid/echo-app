@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"sync/atomic"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/PhilipSchmid/echo-app/internal/config"
 	"github.com/PhilipSchmid/echo-app/internal/handlers"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/netutil"
 )
 
 const (
@@ -19,8 +21,10 @@ const (
 
 // HTTPServer represents an HTTP server
 type HTTPServer struct {
+	lifecycle
 	cfg         *config.Config
 	server      *http.Server
+	netListener net.Listener
 	listenAddr  string
 	listener    string
 	activeConns int32
@@ -38,11 +42,22 @@ func NewHTTPServer(cfg *config.Config, useTLS bool) *HTTPServer {
 		listener = "H2C"
 	}
 
-	return &HTTPServer{
+	s := &HTTPServer{
+		lifecycle:  newLifecycle(),
 		cfg:        cfg,
 		listenAddr: ":" + port,
 		listener:   listener,
 	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", handlers.HTTPHandler(cfg, listener))
+	s.server = &http.Server{
+		Addr:         s.listenAddr,
+		Handler:      s.connectionLimitMiddleware(mux),
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+	return s
 }
 
 // Name returns the server name
@@ -52,17 +67,18 @@ func (s *HTTPServer) Name() string {
 
 // connectionLimitMiddleware limits concurrent connections
 func (s *HTTPServer) connectionLimitMiddleware(next http.Handler) http.Handler {
+	return requestLimitMiddleware(&s.activeConns, next)
+}
+
+func requestLimitMiddleware(active *int32, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		currentConns := atomic.LoadInt32(&s.activeConns)
-		if currentConns >= maxHTTPConnections {
-			logrus.Warnf("[%s] Connection limit reached (%d), rejecting request from %s",
-				s.listener, maxHTTPConnections, r.RemoteAddr)
+		if atomic.AddInt32(active, 1) > maxHTTPConnections {
+			atomic.AddInt32(active, -1)
 			http.Error(w, "Service Unavailable: Connection limit reached", http.StatusServiceUnavailable)
 			return
 		}
 
-		atomic.AddInt32(&s.activeConns, 1)
-		defer atomic.AddInt32(&s.activeConns, -1)
+		defer atomic.AddInt32(active, -1)
 
 		next.ServeHTTP(w, r)
 	})
@@ -70,29 +86,19 @@ func (s *HTTPServer) connectionLimitMiddleware(next http.Handler) http.Handler {
 
 // Start starts the HTTP server
 func (s *HTTPServer) Start(ctx context.Context) error {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", handlers.HTTPHandler(s.cfg, s.listener))
-
-	// Apply connection limit middleware
-	handler := s.connectionLimitMiddleware(mux)
-
-	s.server = &http.Server{
-		Addr:         s.listenAddr,
-		Handler:      handler,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  120 * time.Second,
+	s.mu.Lock()
+	if err := s.checkStart(ctx); err != nil {
+		s.mu.Unlock()
+		return err
 	}
-
-	logrus.Infof("%s server listening on %s", s.listener, s.listenAddr)
 
 	if s.listener == "TLS" {
 		tlsConfig, err := handlers.GetTLSConfig()
 		if err != nil {
+			s.mu.Unlock()
 			return fmt.Errorf("failed to get TLS config: %w", err)
 		}
 		s.server.TLSConfig = tlsConfig
-		return s.server.ListenAndServeTLS("", "")
 	}
 
 	if s.listener == "H2C" {
@@ -102,13 +108,36 @@ func (s *HTTPServer) Start(ctx context.Context) error {
 		s.server.Protocols = protocols
 	}
 
-	return s.server.ListenAndServe()
+	ln, err := net.Listen("tcp", s.listenAddr)
+	if err != nil {
+		s.mu.Unlock()
+		return err
+	}
+	ln = netutil.LimitListener(ln, maxHTTPConnections)
+	s.netListener = ln
+	close(s.ready)
+	s.mu.Unlock()
+	logrus.Infof("%s server listening on %s", s.listener, ln.Addr())
+	return serveWithContext(ctx, func() error {
+		if s.listener == "TLS" {
+			return s.server.ServeTLS(ln, "", "")
+		}
+		return s.server.Serve(ln)
+	}, s.Shutdown)
 }
 
 // Shutdown gracefully shuts down the HTTP server
 func (s *HTTPServer) Shutdown(ctx context.Context) error {
-	if s.server == nil {
+	s.mu.Lock()
+	s.stopped = true
+	srv := s.server
+	s.mu.Unlock()
+	if srv == nil {
 		return nil
 	}
-	return s.server.Shutdown(ctx)
+	if err := srv.Shutdown(ctx); err != nil {
+		_ = srv.Close()
+		return err
+	}
+	return nil
 }

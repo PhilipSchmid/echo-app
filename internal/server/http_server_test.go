@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -129,62 +130,40 @@ func TestTLSServer_StartAndStop(t *testing.T) {
 }
 
 func TestHTTPServer_ConnectionLimit(t *testing.T) {
-	cfg := &config.Config{
-		HTTPPort: "18081",
-		Message:  "test",
-	}
-
-	server := NewHTTPServer(cfg, false)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Start server
-	go func() { _ = server.Start(ctx) }()
-	time.Sleep(100 * time.Millisecond)
-
-	// Create a handler that blocks to keep connections open
-	attempts := maxHTTPConnections + 10
-	var successCount int32
-	var serviceUnavailableCount int32
+	srv := NewHTTPServer(&config.Config{}, false)
+	atomic.StoreInt32(&srv.activeConns, maxHTTPConnections-1)
+	entered := make(chan struct{}, 100)
+	release := make(chan struct{})
+	handler := srv.connectionLimitMiddleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { entered <- struct{}{}; <-release }))
+	results := make(chan int, 100)
 	var wg sync.WaitGroup
-
-	for i := 0; i < attempts; i++ {
+	for range 100 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			resp, err := http.Get("http://localhost:18081/")
-			if err != nil {
-				return
-			}
-			defer func() { _ = resp.Body.Close() }()
-
-			switch resp.StatusCode {
-			case http.StatusOK:
-				atomic.AddInt32(&successCount, 1)
-			case http.StatusServiceUnavailable:
-				atomic.AddInt32(&serviceUnavailableCount, 1)
-			}
-
-			// Read and discard body
-			_, _ = io.Copy(io.Discard, resp.Body)
+			recorder := httptest.NewRecorder()
+			handler.ServeHTTP(recorder, httptest.NewRequest("GET", "/", nil))
+			results <- recorder.Code
 		}()
 	}
-
+	<-entered
+	require.Eventually(t, func() bool { return len(results) == 99 }, time.Second, time.Millisecond)
+	require.Equal(t, 0, len(entered), "only one request may acquire the remaining slot")
+	close(release)
 	wg.Wait()
-
-	successfulConns := atomic.LoadInt32(&successCount)
-	rejectedConns := atomic.LoadInt32(&serviceUnavailableCount)
-
-	t.Logf("Successful connections: %d, Rejected: %d", successfulConns, rejectedConns)
-
-	// We should have some successful connections
-	assert.Greater(t, int(successfulConns), 0)
-
-	// Shutdown
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer shutdownCancel()
-	_ = server.Shutdown(shutdownCtx)
-	cancel()
+	close(results)
+	accepted, rejected := 0, 0
+	for code := range results {
+		switch code {
+		case http.StatusOK:
+			accepted++
+		case http.StatusServiceUnavailable:
+			rejected++
+		}
+	}
+	require.Equal(t, 1, accepted)
+	require.Equal(t, 99, rejected)
+	require.Equal(t, int32(maxHTTPConnections-1), atomic.LoadInt32(&srv.activeConns))
 }
 
 func TestHTTPServer_Name(t *testing.T) {
