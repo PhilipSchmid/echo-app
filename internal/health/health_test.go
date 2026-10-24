@@ -269,3 +269,16 @@ func captureLogEntries(t *testing.T) *testLogHook {
 	})
 	return hook
 }
+
+func TestReadinessObserverTracksDependenciesAndUnsubscribes(t *testing.T) {
+	checker := NewChecker(config.ExternalReadinessProbe{Type: "tcp", Target: "localhost:80"})
+	var states []bool
+	unsubscribe := checker.OnReadyChange(func(ready bool) { states = append(states, ready) })
+	checker.setExternalReady(true, "")
+	checker.SetReady(false, "draining")
+	require.Equal(t, []bool{false, true, false}, states)
+	unsubscribe()
+	checker.SetReady(true, "")
+	checker.setExternalReady(false, "dependency failed")
+	require.Equal(t, []bool{false, true, false}, states)
+}

@@ -22,6 +22,10 @@ func main() {
 	pflag.String("node", "", "Node name")
 	pflag.Bool("print-http-request-headers", false, "Print HTTP request headers")
 	pflag.Bool("unsafe-headers", false, "Include sensitive values in diagnostic headers")
+	pflag.String("tls-cert-file", "", "PEM server certificate for HTTPS, QUIC and TLS-enabled gRPC")
+	pflag.String("tls-key-file", "", "PEM private key for the server certificate")
+	pflag.String("tls-client-ca-file", "", "PEM client CA bundle; require and verify client certificates")
+	pflag.Bool("grpc-tls", false, "Enable TLS on the gRPC listener")
 	pflag.Bool("tls", false, "Enable TLS server")
 	pflag.Bool("h2c", false, "Enable HTTP/2 cleartext (h2c) on the HTTP listener")
 	pflag.Bool("tcp", false, "Enable TCP server")
@@ -74,7 +78,7 @@ func main() {
 		manager.RegisterServer(server.NewTCPServer(cfg))
 	}
 	if cfg.GRPC {
-		manager.RegisterServer(server.NewGRPCServer(cfg))
+		manager.RegisterServer(server.NewGRPCServer(cfg, healthChecker))
 	}
 	if cfg.QUIC {
 		manager.RegisterServer(server.NewQUICServer(cfg))

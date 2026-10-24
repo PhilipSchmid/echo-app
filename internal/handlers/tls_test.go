@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"crypto/tls"
+	"github.com/PhilipSchmid/echo-app/internal/config"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,5 +67,21 @@ func TestGetTLSConfig_CertificateProperties(t *testing.T) {
 	if cert.Leaf != nil {
 		assert.NotEmpty(t, cert.Leaf.Subject.Organization)
 		assert.Contains(t, cert.Leaf.DNSNames, "localhost")
+	}
+}
+
+func TestGetTLSConfigRejectsInvalidFiles(t *testing.T) {
+	invalid := filepath.Join(t.TempDir(), "invalid.pem")
+	require.NoError(t, os.WriteFile(invalid, []byte("not a certificate"), 0600))
+	for _, cfg := range []config.Config{
+		{TLSCertFile: invalid},
+		{TLSKeyFile: invalid},
+		{TLSCertFile: invalid, TLSKeyFile: invalid},
+		{TLSCertFile: "missing.pem", TLSKeyFile: "missing.key"},
+		{TLSClientCAFile: invalid},
+		{TLSClientCAFile: "missing-ca.pem"},
+	} {
+		_, err := GetTLSConfig(&cfg)
+		require.Error(t, err)
 	}
 }

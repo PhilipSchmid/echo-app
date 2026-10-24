@@ -34,6 +34,8 @@ type Checker struct {
 	probe                config.ExternalReadinessProbe
 	client               *http.Client
 	icmpProbe            icmpProbeFunc
+	readyObservers       map[uint64]func(bool)
+	nextObserver         uint64
 }
 
 type icmpProbeFunc func(context.Context, string, time.Duration) error
@@ -195,6 +197,7 @@ func (c *Checker) SetHealthy(healthy bool, reason string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.healthy = healthy
+	defer c.notifyReadyLocked()
 	c.lastError = reason
 	c.lastChecked = time.Now()
 }
@@ -204,6 +207,7 @@ func (c *Checker) SetReady(ready bool, reason string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.ready = ready
+	defer c.notifyReadyLocked()
 	c.lastError = reason
 	c.lastChecked = time.Now()
 }
@@ -216,6 +220,7 @@ func (c *Checker) setExternalReady(ready bool, reason string) bool {
 	changed := !c.externalProbeChecked || c.externalProbeReady != ready
 	c.externalProbeChecked = true
 	c.externalProbeReady = ready
+	defer c.notifyReadyLocked()
 	c.externalError = reason
 	c.lastChecked = time.Now()
 	return changed
@@ -255,4 +260,26 @@ func (c *Checker) ReadyHandler(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	_, _ = w.Write([]byte(StatusReady))
+}
+
+// OnReadyChange immediately reports readiness and subsequent changes. Callbacks
+// must not call Checker methods; they run while the state is locked.
+func (c *Checker) OnReadyChange(fn func(bool)) func() {
+	c.mu.Lock()
+	if c.readyObservers == nil {
+		c.readyObservers = make(map[uint64]func(bool))
+	}
+	id := c.nextObserver
+	c.nextObserver++
+	c.readyObservers[id] = fn
+	fn(c.ready && c.healthy && c.externalProbeReady)
+	c.mu.Unlock()
+	return func() { c.mu.Lock(); delete(c.readyObservers, id); c.mu.Unlock() }
+}
+
+func (c *Checker) notifyReadyLocked() {
+	ready := c.ready && c.healthy && c.externalProbeReady
+	for _, fn := range c.readyObservers {
+		fn(ready)
+	}
 }

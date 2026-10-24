@@ -3,6 +3,7 @@ module github.com/PhilipSchmid/echo-app
 go 1.26.0
 
 require (
+	github.com/coder/websocket v1.8.15
 	github.com/prometheus-community/pro-bing v0.9.1
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
