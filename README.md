@@ -1,574 +1,134 @@
-# echo-app
+# echo-app — Multi-protocol network diagnostics
 
-![CI](https://github.com/philipschmid/echo-app/actions/workflows/ci.yaml/badge.svg) ![Docker Build](https://github.com/philipschmid/echo-app/actions/workflows/docker.yaml/badge.svg) ![Release](https://github.com/philipschmid/echo-app/actions/workflows/release.yaml/badge.svg)
+[![CI](https://github.com/philipschmid/echo-app/actions/workflows/ci.yaml/badge.svg)](https://github.com/philipschmid/echo-app/actions/workflows/ci.yaml) [![Docker](https://github.com/philipschmid/echo-app/actions/workflows/docker.yaml/badge.svg)](https://github.com/philipschmid/echo-app/actions/workflows/docker.yaml) [![Release](https://github.com/philipschmid/echo-app/actions/workflows/release.yaml/badge.svg)](https://github.com/philipschmid/echo-app/actions/workflows/release.yaml)
 
-The `echo-app` is a versatile Go application designed to echo back a JSON payload containing detailed information about incoming requests. It's an invaluable tool for testing, debugging, and understanding network interactions across multiple protocols. The JSON response includes:
+A Go service for testing network paths, proxies, and load balancers. Connect over
+HTTP, HTTPS, HTTP/3, TCP, or gRPC to inspect the receiving server and request.
+WebSocket connections echo text and binary messages.
 
-- **Timestamp**: When the request was received.
-- **Source IP**: The IP address of the client making the request.
-- **Hostname**: The name of the host running the application.
-- **Listener Name**: The type of listener handling the request (e.g., HTTP, TLS, TCP, gRPC, QUIC).
-- **HTTP Details** (for HTTP, TLS, QUIC listeners): HTTP version, method, endpoint, and optionally request headers.
-- **gRPC Method** (for gRPC listener): The invoked gRPC method name.
-- **Customizable Message**: An optional message to identify specific environments or configurations.
-- **Node Name**: Useful in Kubernetes to identify the node hosting the pod.
+## Connect to echo-app
 
-## Key Features
+```mermaid
+%%{init: {"themeVariables": {"fontFamily": "Arial", "edgeLabelBackground": "#f5f8fe"}, "flowchart": {"nodeSpacing": 24, "rankSpacing": 48, "padding": 18}}}%%
+flowchart TB
+    accTitle: echo-app connection map
+    accDescr: HTTP/1.1 and HTTP/2.0 clients use HTTP port 8080 or HTTPS port 8443. Plain HTTP/2.0 requires --h2c. WebSocket uses HTTP/1.1 on either port. HTTP/3 uses UDP 4433, TCP clients use 9090, gRPC clients use 50051, and Prometheus and Kubernetes probes use the admin listener on 3000.
 
-- **HTTP Listener**: Serves the JSON payload over HTTP.
-- **TLS (HTTPS) Listener**: Uses an in-memory self-signed certificate for secure HTTPS communication.
-- **QUIC Listener**: Supports HTTP/3 over QUIC with TLS encryption.
-- **TCP Listener**: Sends one JSON metadata response and closes the connection.
-- **gRPC Listener**: Delivers the same details via a gRPC service with reflection support.
-- **Prometheus Metrics**: Exposes unified request metrics for monitoring.
+    web("<b>HTTP / WebSocket</b><br/>curl · browser · proxy")
+    socket("<b>TCP</b><br/>nc · socket clients")
+    rpc("<b>gRPC</b><br/>grpcurl · SDKs")
+    ops("<b>Operations</b><br/>Prometheus · Kubernetes")
 
-## Configuration Options
+    subgraph app["echo-app"]
+        http("<b>HTTP</b><br/>8080 / TCP<br/>HTTP/1.1 · HTTP/2.0<br/>/ · /ws<br/>HTTP/2.0 needs --h2c")
+        https("<b>HTTPS</b><br/>8443 / TCP<br/>HTTP/1.1 · HTTP/2.0<br/>/ · /ws<br/>Optional")
+        quic("<b>HTTP/3</b><br/>4433 / UDP<br/>HTTP/3 · QUIC<br/>HTTP requests only<br/>Optional")
+        tcp("<b>TCP</b><br/>9090 / TCP<br/>JSON metadata<br/>Close after response<br/>Optional")
+        grpc("<b>gRPC</b><br/>50051 / TCP<br/>Echo · reflection<br/>Health Check · Watch<br/>Optional")
+        admin("<b>Admin</b><br/>3000 / TCP<br/>/metrics<br/>/health · /ready<br/>Enabled by default")
+    end
 
-### Environment Variables
-Configure the application using these environment variables:
+    web --> http
+    web --> https
+    web -->|"HTTP/3 only"| quic
+    socket --> tcp
+    rpc --> grpc
+    ops --> admin
 
-- `ECHO_APP_MESSAGE`: A customizable message included in the response. If unset, no message is included.
-- `ECHO_APP_NODE`: The name of the node where the app is running (e.g., for Kubernetes).
-- `ECHO_APP_HTTP_PORT`: Port for the HTTP server (default: `8080` TCP).
-- `ECHO_APP_PRINT_HTTP_REQUEST_HEADERS`: Set to `true` to include HTTP request headers in the response.
-- `ECHO_APP_UNSAFE_HEADERS`: Set to `true` to include sensitive header and gRPC metadata values in diagnostics (default: `false`).
-- `ECHO_APP_RESPONSE_CONTROLS`: Enable bounded HTTP `status`, `delay`, and `size` query controls (default: `false`).
-- `ECHO_APP_H2C`: Set to `true` to enable HTTP/2 cleartext (h2c) on the HTTP listener.
-- `ECHO_APP_TLS`: Set to `true` to enable the TLS (HTTPS) listener.
-- `ECHO_APP_TLS_PORT`: Port for the TLS server (default: `8443` TCP).
-- `ECHO_APP_TLS_CERT_FILE` and `ECHO_APP_TLS_KEY_FILE`: Optional PEM server certificate chain and private key. Configure both together.
-- `ECHO_APP_TLS_CLIENT_CA_FILE`: Optional PEM client CA bundle. Encrypted listeners require and verify client certificates when configured.
-- `ECHO_APP_TCP`: Set to `true` to enable the TCP listener.
-- `ECHO_APP_TCP_PORT`: Port for the TCP server (default: `9090` TCP).
-- `ECHO_APP_GRPC`: Set to `true` to enable the gRPC listener.
-- `ECHO_APP_GRPC_PORT`: Port for the gRPC server (default: `50051` TCP).
-- `ECHO_APP_GRPC_TLS`: Enable TLS on the gRPC listener using the same certificate settings (default: `false`).
-- `ECHO_APP_QUIC`: Set to `true` to enable the QUIC listener.
-- `ECHO_APP_QUIC_PORT`: Port for the QUIC server (default: `4433` UDP).
-- `ECHO_APP_METRICS`: Set to `true` to enable the Prometheus metrics endpoint (default: `true`).
-- `ECHO_APP_METRICS_PORT`: Port for the metrics server (default: `3000` TCP).
-- `ECHO_APP_LOG_LEVEL`: Logging level (`debug`, `info`, `warn`, `error`; default: `info`).
-- `ECHO_APP_MAX_REQUEST_SIZE`: Maximum request body size in bytes (default: `10485760` - 10MB).
-- `ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE`: Optional external readiness probe type: `none`, `http`, `tcp`, or `icmp` (default: `none`).
-- `ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET`: External readiness target, such as `https://api.example.com/ready`, `db.example.com:5432`, or `10.0.0.10`.
-- `ECHO_APP_EXTERNAL_READINESS_PROBE_INTERVAL`: How often the background readiness controller checks the target (default: `10s`).
-- `ECHO_APP_EXTERNAL_READINESS_PROBE_TIMEOUT`: Per-check timeout before the app marks itself not ready (default: `2s`).
-- `ECHO_APP_EXTERNAL_READINESS_HTTP_METHOD`: HTTP method for external HTTP readiness probes (default: `GET`).
-- `ECHO_APP_EXTERNAL_READINESS_HTTP_EXPECTED_STATUS`: Expected HTTP status code for external HTTP readiness probes (default: `200`).
-
-### Command-Line Flags
-Run `./echo-app --help` to see all available flags:
-
-```bash
-Usage of ./echo-app:
-      --external-readiness-http-expected-status int
-                                     Expected HTTP status for external readiness HTTP probes (default 200)
-      --external-readiness-http-method string
-                                     HTTP method for external readiness HTTP probes (default "GET")
-      --external-readiness-probe-interval duration
-                                     External readiness probe interval (default 10s)
-      --external-readiness-probe-target string
-                                     External readiness probe target URL, host:port, or host/IP
-      --external-readiness-probe-timeout duration
-                                     External readiness probe timeout (default 2s)
-      --external-readiness-probe-type string
-                                     External readiness probe type: none, http, tcp, or icmp (default "none")
-      --grpc                         Enable gRPC server
-      --grpc-port string             gRPC server port (default "50051")
-      --grpc-tls                     Enable TLS on the gRPC listener
-      --http-port string             HTTP server port (default "8080")
-      --log-level string             Log level (debug, info, warn, error) (default "info")
-      --max-request-size int         Maximum request body size in bytes (default 10485760)
-      --message string               Custom message
-      --metrics                      Enable metrics server (default true)
-      --metrics-port string          Metrics server port (default "3000")
-      --node string                  Node name
-      --print-http-request-headers   Print HTTP request headers
-      --unsafe-headers               Include sensitive values in diagnostic headers
-      --response-controls            Enable bounded status, delay and size query controls
-      --quic                         Enable QUIC server
-      --quic-port string             QUIC server port (default "4433")
-      --tcp                          Enable TCP server
-      --tcp-port string              TCP server port (default "9090")
-      --h2c                          Enable HTTP/2 cleartext (h2c) on the HTTP listener
-      --tls                          Enable TLS server
-      --tls-port string              TLS server port (default "8443")
-      --tls-cert-file string         PEM server certificate chain
-      --tls-key-file string          PEM server private key
-      --tls-client-ca-file string    PEM client CA bundle for verified mutual TLS
+    classDef client fill:#f5f8fe,stroke:#9fb5d5,color:#344e73,stroke-width:1.5px,rx:12px,ry:12px;
+    classDef listener fill:#edf3ff,stroke:#8aa7d6,color:#243e69,stroke-width:1.5px,rx:12px,ry:12px;
+    class web,socket,rpc,ops client;
+    class http,https,quic,tcp,grpc,admin listener;
+    style app fill:#fafcff,stroke:#d5e1f2,color:#263f66,stroke-width:1px,rx:16px,ry:16px;
+    linkStyle default stroke:#819bc1,stroke-width:1.5px;
 ```
 
-## Quick Start
+HTTP and admin listeners are enabled by default; the others are opt-in.
+WebSocket upgrades use HTTP/1.1 on `/ws`. Ports are configurable.
 
-### Using Make
+## Quick start
+
+Run the default HTTP and admin listeners, published only on localhost:
+
 ```bash
-# Show all available commands
-make help
-
-# Quick build and run
-make build-quick && make run
-
-# Run with all protocols enabled
-make run-all
-
-# Run integration tests
-make test-integration
-```
-
-### Using Docker
-```bash
-# Run with all protocols enabled
-docker run -it --rm \
-  -p 8080:8080 -p 8443:8443 -p 9090:9090 \
-  -p 50051:50051 -p 4433:4433/udp -p 3000:3000 \
-  -e ECHO_APP_TLS=true \
-  -e ECHO_APP_TCP=true \
-  -e ECHO_APP_GRPC=true \
-  -e ECHO_APP_QUIC=true \
+docker run --rm --read-only --cap-drop=ALL --security-opt=no-new-privileges \
+  -p 127.0.0.1:8080:8080 -p 127.0.0.1:3000:3000 \
   ghcr.io/philipschmid/echo-app:main
 ```
 
-## Makefile Targets
+In another terminal:
 
-The Makefile has been significantly enhanced with categorized targets and color-coded output:
-
-### Development
-- `make dev` - Run with file watching (requires entr)
-- `make proto` - Generate protobuf files
-- `make deps` - Download and verify dependencies
-- `make tidy` - Tidy and vendor dependencies
-
-### Building
-- `make build` - Build with all checks (lint, vet, test)
-- `make build-quick` - Quick build without checks
-- `make build-all` - Build for all platforms (Linux, macOS, Windows)
-
-### Testing
-- `make test` - Run unit tests with coverage
-- `make test-coverage` - Generate detailed HTML coverage report
-- `make test-short` - Run only short tests
-- `make test-integration` - Run real protocol integration tests, including HTTP/3
-- `make benchmark` - Run performance benchmarks
-- `make lint` - Run golangci-lint
-- `make lint-fix` - Run golangci-lint with auto-fix
-- `make check` - Run all checks (lint, vet, test)
-
-### Running
-- `make run` - Run with default settings
-- `make run-all` - Run with all protocol listeners
-- `make run-debug` - Run with debug logging
-- `make run-docker` - Run in Docker container
-
-### Docker
-- `make docker` - Build Docker image for current platform
-- `make docker-multi` - Build multi-platform Docker image
-- `make docker-push` - Push Docker image to registry
-
-### Maintenance
-- `make clean` - Clean build artifacts and test cache
-- `make install` - Install to GOPATH/bin
-- `make info` - Show project information and statistics
-- `make tools` - Install required development tools
-- `make pre-commit` - Run pre-commit checks
-
-## Building the Application
-
-### Local Build
 ```bash
-# Full build with all checks
-make build
+curl -sS http://localhost:8080/
+curl -fsS http://localhost:3000/ready
+```
 
-# Quick build for development
+The image runs as UID/GID `65532`. The `main` tag follows the main branch; pin a
+version or digest for repeatable deployments.
+
+To build locally with Go 1.26 or newer:
+
+```bash
 make build-quick
-
-# Cross-platform builds
-make build-all
+./echo-app --tls --tcp --grpc --quic
 ```
 
-### Container Image
-```bash
-# Build for current platform
-make docker
+## Example response
 
-# Build multi-architecture image (amd64 and arm64)
-make docker-multi
-```
+With `--tls --print-http-request-headers`, a locally tested request through a
+reverse proxy returned this HTTPS response (abridged):
 
-## Running the Application
-
-### Local Execution
-```bash
-# Start only the HTTP listener
-make run
-
-# Start all listeners
-make run-all
-
-# Start with debug logging
-make run-debug
-
-# Or run directly with specific flags
-./echo-app --tls --tcp --grpc --quic --log-level debug
-```
-
-### Development Mode
-```bash
-# Run with file watching (auto-restart on changes)
-make dev
-```
-
-## Testing
-
-### Unit Tests
-```bash
-# Run all tests
-make test
-
-# Generate coverage report
-make test-coverage
-
-# Run benchmarks
-make benchmark
-```
-
-### Integration Tests
-```bash
-# Run comprehensive integration tests
-make test-integration
-```
-
-This will test:
-- HTTP endpoint with various paths
-- TLS/HTTPS endpoint
-- TCP raw connections
-- gRPC service calls
-- QUIC/HTTP3 using a native Go client
-- Prometheus metrics endpoint
-- Health and readiness checks
-- Graceful shutdown behavior
-
-### Manual Testing Examples
-
-#### HTTP Listener
-```bash
-curl -sS http://localhost:8080/ | jq
-```
-
-**Sample Output**:
 ```json
 {
-  "timestamp": "2024-08-06T12:09:46.174+02:00",
-  "source_ip": "192.168.65.1",
-  "hostname": "demo-host",
-  "listener": "HTTP",
-  "http_version": "HTTP/1.1",
+  "hostname": "echo-app-demo",
+  "listener": "TLS",
+  "source_ip": "172.21.0.3",
+  "http_version": "HTTP/2.0",
   "http_method": "GET",
-  "http_endpoint": "/"
+  "http_host": "echo.example.test",
+  "http_request_uri": "/checkout?test=42",
+  "remote_addr": "172.21.0.3:46186",
+  "local_addr": "172.21.0.2:8443",
+  "tls_version": "TLS 1.3",
+  "tls_server_name": "echo-app-demo",
+  "tls_negotiated_protocol": "h2",
+  "headers": {
+    "Authorization": ["[REDACTED]"],
+    "X-Forwarded-For": ["172.21.0.1"]
+  }
 }
 ```
 
-#### TLS (HTTPS) Listener
-```bash
-curl -sSk https://localhost:8443/ | jq
-```
+See which backend answered, the request it received, and the protocol negotiated
+on that connection. `source_ip` remains the socket peer (here, the proxy), while
+the forwarded client address stays in a header and `Authorization` is redacted.
 
-#### TCP Listener
-```bash
-echo "test" | nc localhost 9090 | jq
-```
+## Endpoints at a glance
 
-#### gRPC Listener
-```bash
-grpcurl -plaintext -emit-defaults localhost:50051 echo.EchoService.Echo
-```
+| Listener | Default port | Connect to | Enable |
+| --- | --- | --- | --- |
+| HTTP | `8080/TCP` | JSON metadata; `/ws` for WebSocket echo | Always on; optional `--h2c` |
+| HTTPS | `8443/TCP` | JSON metadata; `/ws` for WSS | `--tls` |
+| HTTP/3 | `4433/UDP` | Any path except `/ws` | `--quic` |
+| TCP | `9090/TCP` | One JSON metadata response followed by EOF | `--tcp` |
+| gRPC | `50051/TCP` | `echo.EchoService/Echo`, standard Health, reflection | `--grpc`; optional `--grpc-tls` |
+| Admin | `3000/TCP` | `/metrics`, `/health`, `/ready` | On by default; `--metrics=false` disables it |
 
-#### Health Checks
-```bash
-# Health endpoint (liveness): returns 200 only when the echo app process is healthy
-curl -s http://localhost:3000/health
-# Returns: healthy
+## Version plan
 
-# Readiness endpoint: returns 200 only when the echo app is ready and any configured external readiness probe is passing
-curl -s http://localhost:3000/ready
-# Returns: ready
+Version 1.3.0 is the final planned 1.x release. The browser UI, automatic
+certificate management, and related major changes are planned for 2.0.0+.
 
-# Kubernetes probes should use the dedicated metrics/admin listener (default port 3000), not the echo traffic listeners.
+## Guides
 
-# Prometheus metrics
-curl -s http://localhost:3000/metrics | grep echo_app
-```
+- [Usage](docs/usage.md): connection examples, response controls,
+  certificates, WebSocket, health checks, and metrics.
+- [Configuration](docs/configuration.md): flags, environment variables, defaults,
+  and validation.
+- [Kubernetes](docs/kubernetes.md): deployment, services, probes, and pod security.
+- [Development](docs/development.md): builds, tests, integration checks, and images.
 
-#### External Readiness Probe Examples
-The external readiness probe is optional. When enabled, the app keeps checking the configured target in the background and `/ready` returns `503` until the target succeeds within the configured timeout.
+Keep the admin listener private. Common credential headers are redacted by default;
+`--unsafe-headers` disables that protection.
 
-```bash
-# HTTP readiness dependency: expect a 200 from the upstream readiness URL
-ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE=http \
-ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET=https://upstream.example.com/ready \
-ECHO_APP_EXTERNAL_READINESS_PROBE_TIMEOUT=2s \
-ECHO_APP_EXTERNAL_READINESS_PROBE_INTERVAL=10s \
-./echo-app
-
-# TCP readiness dependency: require a connectable host:port
-ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE=tcp \
-ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET=db.example.com:5432 \
-./echo-app
-
-# ICMP readiness dependency: require one successful echo reply within the timeout
-ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE=icmp \
-ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET=10.0.0.10 \
-./echo-app
-```
-
-The ICMP probe runs in-process and does not require a `ping` binary. Ordinary
-operation runs as user 65532 without capabilities. Raw ICMP is an explicit
-exception: on Docker, adding `NET_RAW` alone does not give this non-root user
-access to raw sockets. The following mode was verified with a UID 0 override
-while retaining a read-only filesystem and only the required capability:
-
-```bash
-docker run --rm --user 0:0 --read-only \
-  --cap-drop=ALL --cap-add=NET_RAW --security-opt=no-new-privileges \
-  -p 127.0.0.1:3000:3000 \
-  -e ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE=icmp \
-  -e ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET=127.0.0.1 \
-  ghcr.io/philipschmid/echo-app:main
-```
-
-Use HTTP or TCP readiness probes to retain the non-root defaults. The Kubernetes
-example below deliberately drops all capabilities; raw ICMP requires an
-explicitly adjusted security context instead.
-
-### Request diagnostics and response controls
-
-HTTP responses retain the existing fields and add the requested host/authority,
-original request URI (including escaped path and query), and local and remote
-socket addresses. HTTPS and HTTP/3 also report TLS version, cipher suite, SNI, and
-the negotiated application protocol. `source_ip` always describes the actual
-socket peer; forwarded headers are reported as headers when enabled and are
-never treated as a trusted client identity.
-
-Enable response controls explicitly:
-
-```bash
-./echo-app --response-controls
-curl 'http://localhost:8080/example?status=503&delay=200ms'
-curl 'http://localhost:8080/example?size=1024' # exactly 1024 generated bytes
-```
-
-`status` accepts 200–599, `delay` accepts Go durations from zero to 10 seconds,
-and `size` accepts zero to 1 MiB. Invalid, repeated, or out-of-range control
-values return `400`. A supplied size produces `application/octet-stream`;
-otherwise the response remains JSON. HEAD and statuses without bodies retain
-their normal HTTP semantics. Delays stop when the request is canceled. Without
-`--response-controls`, these query parameters have no special effect.
-
-### Certificates and mutual TLS
-
-Self-signed certificates remain the default for demos. To test a real trust chain:
-
-```bash
-./echo-app --tls --quic --grpc --grpc-tls \
-  --tls-cert-file=server-chain.pem --tls-key-file=server-key.pem
-curl --cacert=server-ca.pem https://localhost:8443/
-```
-
-Add `--tls-client-ca-file=client-ca.pem` to require a client certificate signed
-by that CA. For example:
-
-```bash
-curl --cacert=server-ca.pem --cert=client.pem --key=client-key.pem \
-  https://localhost:8443/
-```
-
-Mutual TLS applies to HTTPS, HTTP/3, and gRPC when `--grpc-tls` is enabled. Plain
-HTTP, TCP, and the admin listener remain unencrypted; restrict access to those
-ports separately. Certificate changes take effect after restarting the app.
-
-### WebSocket echo and gRPC health
-
-`/ws` on the HTTP and HTTPS listeners echoes text and binary WebSocket messages.
-It preserves complete messages, including fragmented messages, and limits each
-message to the smaller of the request-size limit and 1 MiB. Reads and writes have
-30-second deadlines. Browser Origin headers must use HTTP or HTTPS and match the
-request host and port; clients without an Origin header are accepted. This also
-supports HTTPS ingress terminating TLS before the backend HTTP connection.
-WebSocket connections close during server shutdown. The endpoint uses the
-HTTP/1.1 upgrade protocol; HTTP/2 and HTTP/3 upgrades return `426`.
-
-The gRPC listener also implements the standard `grpc.health.v1.Health` service.
-Use `Check` or `Watch` with an empty service name or `echo.EchoService` to observe
-the shared readiness state.
-
-```bash
-grpcurl -plaintext -d '{"service":"echo.EchoService"}' \
-  localhost:50051 grpc.health.v1.Health/Check
-```
-
-### Safety and protocol behavior
-
-The default response describes the request and the receiving server. Request
-bodies are consumed within `ECHO_APP_MAX_REQUEST_SIZE` and discarded; oversized
-bodies return `413`. TCP sends a single JSON document followed by EOF, and gRPC
-accepts an empty request. Neither currently echoes application payloads.
-
-Header diagnostics redact credentials, cookies, and secret/token/key fields by
-default. `--unsafe-headers` deliberately disables this redaction for response
-headers and debug metadata logs; use it only with synthetic credentials.
-Diagnostic HTTP responses use `Cache-Control: no-store`.
-
-Readiness requires every configured listener to bind and any configured external
-probe to pass. A listener failure terminates the process. Liveness does not depend
-on an external service. Invalid or incomplete probe settings fail at startup.
-
-Keep the metrics/admin listener private and apply network policies to diagnostic
-listeners. Pin an image version or digest for repeatable deployments.
-
-### Unified Metrics
-
-The application now exposes unified Prometheus metrics:
-
-```
-# Request metrics
-echo_app_requests_total{listener="HTTP",method="GET",endpoint="/"}
-echo_app_request_duration_seconds{listener="HTTP",method="GET",endpoint="/"}
-
-# Error metrics
-echo_app_errors_total{listener="HTTP",error_type="marshal_error"}
-
-# Connection metrics (for TCP)
-echo_app_active_connections{listener="TCP"}
-```
-
-## Kubernetes Deployment
-
-Deploy `echo-app` in Kubernetes with all listeners enabled:
-
-```yaml
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: echo-app-config
-data:
-  ECHO_APP_MESSAGE: "demo-env"
-  ECHO_APP_PRINT_HTTP_REQUEST_HEADERS: "true"
-  ECHO_APP_TLS: "true"
-  ECHO_APP_QUIC: "true"
-  ECHO_APP_GRPC: "true"
-  ECHO_APP_TCP: "true"
-  ECHO_APP_METRICS: "true"
-  # Optional: mark this pod not-ready when a required upstream stops responding.
-  # ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE: "http"
-  # ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET: "https://upstream.example.com/ready"
-  # ECHO_APP_EXTERNAL_READINESS_HTTP_METHOD: "GET"
-  # ECHO_APP_EXTERNAL_READINESS_HTTP_EXPECTED_STATUS: "200"
-  # ECHO_APP_EXTERNAL_READINESS_PROBE_TIMEOUT: "2s"
-  # ECHO_APP_EXTERNAL_READINESS_PROBE_INTERVAL: "10s"
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: echo-app-deployment
-  labels:
-    app: echo-app
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: echo-app
-  template:
-    metadata:
-      labels:
-        app: echo-app
-    spec:
-      automountServiceAccountToken: false
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65532
-        runAsGroup: 65532
-        seccompProfile:
-          type: RuntimeDefault
-      containers:
-      - name: echo-app
-        image: ghcr.io/philipschmid/echo-app:main
-        securityContext:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop: ["ALL"]
-        ports:
-        - name: http
-          containerPort: 8080
-        - name: tls
-          containerPort: 8443
-        - name: quic
-          containerPort: 4433
-          protocol: UDP
-        - name: tcp
-          containerPort: 9090
-        - name: grpc
-          containerPort: 50051
-        - name: metrics
-          containerPort: 3000
-        envFrom:
-        - configMapRef:
-            name: echo-app-config
-        env:
-        - name: ECHO_APP_NODE
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: metrics
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: metrics
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        resources:
-          requests:
-            memory: "64Mi"
-            cpu: "100m"
-          limits:
-            memory: "128Mi"
-            cpu: "500m"
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: echo-app-service
-spec:
-  selector:
-    app: echo-app
-  ports:
-  - name: http
-    port: 8080
-    targetPort: 8080
-  - name: tls
-    port: 8443
-    targetPort: 8443
-  - name: quic
-    port: 4433
-    targetPort: 4433
-    protocol: UDP
-  - name: tcp
-    port: 9090
-    targetPort: 9090
-  - name: grpc
-    port: 50051
-    targetPort: 50051
-  - name: metrics
-    port: 3000
-    targetPort: 3000
-  type: ClusterIP
-```
-
-## License
-
-This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
+[Apache 2.0 license](LICENSE).

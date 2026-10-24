@@ -80,7 +80,7 @@ deps: ## DEV: Download and verify dependencies
 	@printf "$(GREEN)✓ Dependencies downloaded and verified$(NC)\n"
 
 .PHONY: tidy
-tidy: ## DEV: Tidy and vendor dependencies
+tidy: ## DEV: Tidy dependencies
 	@printf "$(BLUE)Tidying dependencies...$(NC)\n"
 	@go mod tidy
 	@printf "$(GREEN)✓ Dependencies tidied$(NC)\n"
