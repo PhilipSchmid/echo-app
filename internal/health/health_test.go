@@ -69,6 +69,25 @@ func TestICMPDNSRespectsDeadlineAndCancellation(t *testing.T) {
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
+func TestICMPAddressFamilyCompatibility(t *testing.T) {
+	v4 := net.IPAddr{IP: net.ParseIP("192.0.2.1")}
+	v6 := net.IPAddr{IP: net.ParseIP("fe80::1"), Zone: "eth0"}
+	for _, tc := range []struct {
+		name      string
+		addresses []net.IPAddr
+		want      *net.IPAddr
+	}{
+		{"dual stack prefers IPv4", []net.IPAddr{v6, v4}, &v4},
+		{"IPv4 only", []net.IPAddr{v4}, &v4},
+		{"IPv6 preserves zone", []net.IPAddr{v6}, &v6},
+		{"no addresses", nil, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, preferredICMPAddress(tc.addresses))
+		})
+	}
+}
+
 func TestCheckerReadinessTracksHTTPProbe(t *testing.T) {
 	upstreamReady := make(chan struct{})
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

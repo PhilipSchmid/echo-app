@@ -310,10 +310,24 @@ ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET=10.0.0.10 \
 ./echo-app
 ```
 
-The ICMP probe runs in-process and does not require a `ping` binary. The image
-runs as user 65532 without requiring capabilities for ordinary operation.
-ICMP probes use raw sockets and require `CAP_NET_RAW`; enable that capability
-explicitly only in deployments that need ICMP readiness.
+The ICMP probe runs in-process and does not require a `ping` binary. Ordinary
+operation runs as user 65532 without capabilities. Raw ICMP is an explicit
+exception: on Docker, adding `NET_RAW` alone does not give this non-root user
+access to raw sockets. The following mode was verified with a UID 0 override
+while retaining a read-only filesystem and only the required capability:
+
+```bash
+docker run --rm --user 0:0 --read-only \
+  --cap-drop=ALL --cap-add=NET_RAW --security-opt=no-new-privileges \
+  -p 127.0.0.1:3000:3000 \
+  -e ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE=icmp \
+  -e ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET=127.0.0.1 \
+  ghcr.io/philipschmid/echo-app:main
+```
+
+Use HTTP or TCP readiness probes to retain the non-root defaults. The Kubernetes
+example below deliberately drops all capabilities; raw ICMP requires an
+explicitly adjusted security context instead.
 
 ### Safety and protocol behavior
 

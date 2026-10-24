@@ -156,11 +156,12 @@ func runICMPProbe(ctx context.Context, target string, timeout time.Duration) err
 	if err != nil {
 		return fmt.Errorf("resolve ICMP readiness target %s: %w", target, err)
 	}
-	if len(addresses) == 0 {
+	address := preferredICMPAddress(addresses)
+	if address == nil {
 		return fmt.Errorf("resolve ICMP readiness target %s: no addresses", target)
 	}
 	pinger := probing.New(target)
-	pinger.SetIPAddr(&addresses[0])
+	pinger.SetIPAddr(address)
 	pinger.Count = 1
 	pinger.Timeout = timeout
 	pinger.ResolveTimeout = timeout
@@ -174,6 +175,19 @@ func runICMPProbe(ctx context.Context, target string, timeout time.Duration) err
 		return fmt.Errorf("ICMP readiness probe for %s failed: no packets received", target)
 	}
 	return nil
+}
+
+func preferredICMPAddress(addresses []net.IPAddr) *net.IPAddr {
+	// Preserve net.ResolveIPAddr("ip", target)'s IPv4 preference.
+	for i := range addresses {
+		if addresses[i].IP.To4() != nil {
+			return &addresses[i]
+		}
+	}
+	if len(addresses) == 0 {
+		return nil
+	}
+	return &addresses[0]
 }
 
 // SetHealthy updates the liveness state.
