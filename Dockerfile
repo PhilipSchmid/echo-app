@@ -14,8 +14,8 @@ WORKDIR /app
 
 RUN apk add --no-cache ca-certificates
 
-# Copy go.mod to download dependencies
-COPY go.mod ./
+# Copy the module checksums before downloading dependencies
+COPY go.mod go.sum ./
 # Download dependencies
 RUN go mod download
 
@@ -45,6 +45,8 @@ LABEL org.opencontainers.image.title="echo-app" \
 # Copy the compiled binary from the builder stage
 COPY --from=builder /main /main
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+
+USER 65532:65532
 
 # Set the binary as the entrypoint of the container
 ENTRYPOINT ["/main"]
