@@ -10,6 +10,10 @@ permissions:
   actions: read
   packages: write
 
+env:
+  # Keep published image references stable across repository renames.
+  IMAGE_NAME: philipschmid/echo-app
+
 jobs:
   checks:
     uses: ./.github/workflows/ci.yaml
@@ -70,8 +74,8 @@ jobs:
           ## Docker Images
           
           \`\`\`bash
-          docker pull ghcr.io/${{ github.repository }}:${IMAGE_TAG}
-          docker pull ghcr.io/${{ github.repository }}:latest
+          docker pull ghcr.io/${{ env.IMAGE_NAME }}:${IMAGE_TAG}
+          docker pull ghcr.io/${{ env.IMAGE_NAME }}:latest
           \`\`\`
           
           ## Full Changelog
@@ -134,7 +138,7 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: |
-            ghcr.io/${{ github.repository }}
+            ghcr.io/${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}

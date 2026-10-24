@@ -15,7 +15,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  # Keep published image references stable across repository renames.
+  IMAGE_NAME: philipschmid/echo-app
 
 jobs:
   checks:
