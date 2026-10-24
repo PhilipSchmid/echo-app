@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
   packages: write
 
 jobs:
@@ -50,6 +51,7 @@ jobs:
           # Get the previous tag
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           CURRENT_TAG=${GITHUB_REF#refs/tags/}
+          IMAGE_TAG=${CURRENT_TAG#v}
           
           if [ -z "$PREV_TAG" ]; then
             echo "First release"
@@ -68,7 +70,7 @@ jobs:
           ## Docker Images
           
           \`\`\`bash
-          docker pull ghcr.io/${{ github.repository }}:${CURRENT_TAG}
+          docker pull ghcr.io/${{ github.repository }}:${IMAGE_TAG}
           docker pull ghcr.io/${{ github.repository }}:latest
           \`\`\`
           
