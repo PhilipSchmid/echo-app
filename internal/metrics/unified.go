@@ -46,6 +46,12 @@ var (
 
 // RecordRequest records a successful request
 func RecordRequest(listener, method, endpoint string, duration float64) {
+	switch method {
+	case "GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH",
+		"connection", "/echo.EchoService/Echo", "unknown":
+	default:
+		method = "other"
+	}
 	RequestsTotal.WithLabelValues(listener, method, endpoint).Inc()
 	RequestDuration.WithLabelValues(listener, method, endpoint).Observe(duration)
 }

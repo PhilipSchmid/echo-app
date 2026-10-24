@@ -27,7 +27,7 @@ func NewEchoServer(cfg *config.Config) *EchoServer {
 }
 
 // Echo handles the Echo request
-func (s *EchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (*proto.EchoResponse, error) {
+func (s *EchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (response *proto.EchoResponse, err error) {
 	start := time.Now()
 	method, ok := grpc.Method(ctx)
 	if !ok {
@@ -39,6 +39,8 @@ func (s *EchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (*proto.E
 		if rec := recover(); rec != nil {
 			logrus.Errorf("[gRPC] Recovered from panic: %v", rec)
 			metrics.RecordError("gRPC", "panic")
+			response = nil
+			err = status.Error(codes.Internal, "internal server error")
 		}
 	}()
 
@@ -70,7 +72,7 @@ func (s *EchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (*proto.E
 	// Debug logging (keep existing for detailed debugging)
 	logrus.Debugf("[gRPC] Incoming request: %s from %s", method, remoteAddr)
 	if md, ok := metadata.FromIncomingContext(ctx); ok && logrus.GetLevel() >= logrus.DebugLevel {
-		logrus.Debugf("[gRPC] Request metadata: %+v", md)
+		logrus.Debugf("[gRPC] Request metadata: %+v", diagnosticHeaders(md, s.cfg != nil && s.cfg.UnsafeHeaders))
 	}
 
 	defer func() {
@@ -84,7 +86,7 @@ func (s *EchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (*proto.E
 		logrus.Debugf("[gRPC] Nil request from %s", remoteAddr)
 		return nil, status.Error(codes.InvalidArgument, "request is nil")
 	}
-	response := buildGRPCResponse(ctx, s.cfg, method)
+	response = buildGRPCResponse(ctx, s.cfg, method)
 	return response, nil
 }
 

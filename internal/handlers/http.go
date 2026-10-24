@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"time"
 
@@ -23,6 +25,7 @@ type HTTPResponse struct {
 func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+		w.Header().Set("Cache-Control", "no-store")
 
 		// Panic recovery to prevent handler crashes
 		defer func() {
@@ -36,6 +39,17 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 			}
 		}()
 
+		if r.ProtoMajor == 3 {
+			controller := http.NewResponseController(w)
+			for _, setDeadline := range []func(time.Time) error{controller.SetReadDeadline, controller.SetWriteDeadline} {
+				if err := setDeadline(start.Add(30 * time.Second)); err != nil && !errors.Is(err, http.ErrNotSupported) {
+					metrics.RecordError(listener, "deadline_error")
+					http.Error(w, "Failed to set stream deadline", http.StatusInternalServerError)
+					return
+				}
+			}
+		}
+
 		// Enhanced request logging at INFO level for troubleshooting
 		sourceIP := extractIP(r.RemoteAddr)
 		userAgent := r.Header.Get("User-Agent")
@@ -46,14 +60,33 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 		logrus.Infof("[%s] Request: %s %s from %s (User-Agent: %s)",
 			listener, r.Method, r.URL.Path, sourceIP, userAgent)
 
-		// Limit request body size to prevent resource exhaustion
-		r.Body = http.MaxBytesReader(w, r.Body, cfg.MaxRequestSize)
+		// Read through the limit so oversized bodies are rejected without retaining them.
+		if r.Body != nil {
+			body := http.MaxBytesReader(w, r.Body, cfg.MaxRequestSize)
+			defer func() { _ = body.Close() }()
+			if r.ContentLength > cfg.MaxRequestSize {
+				metrics.RecordError(listener, "request_too_large")
+				http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
+			if _, err := io.Copy(io.Discard, body); err != nil {
+				var tooLarge *http.MaxBytesError
+				if errors.As(err, &tooLarge) {
+					metrics.RecordError(listener, "request_too_large")
+					http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+				} else {
+					metrics.RecordError(listener, "read_error")
+					http.Error(w, "Failed to read request body", http.StatusBadRequest)
+				}
+				return
+			}
+		}
 
 		// Additional header information if configured
 		if cfg.PrintHeaders {
 			logrus.Infof("[%s] Headers: Host=%s, Content-Type=%s, Accept=%s",
 				listener,
-				r.Header.Get("Host"),
+				r.Host,
 				r.Header.Get("Content-Type"),
 				r.Header.Get("Accept"))
 		}
@@ -61,7 +94,7 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 		// Debug logging (keep existing for detailed debugging)
 		logrus.Debugf("[%s] Incoming request: %s %s from %s", listener, r.Method, r.URL.Path, r.RemoteAddr)
 		if logrus.GetLevel() >= logrus.DebugLevel && cfg.PrintHeaders {
-			logrus.Debugf("[%s] Request headers: %+v", listener, r.Header)
+			logrus.Debugf("[%s] Request headers: %+v", listener, diagnosticHeaders(r.Header, cfg.UnsafeHeaders))
 		}
 
 		response := buildHTTPResponse(r, cfg, listener)
@@ -106,7 +139,7 @@ func buildHTTPResponse(r *http.Request, cfg *config.Config, listener string) HTT
 		HTTPEndpoint: r.URL.Path,
 	}
 	if cfg.PrintHeaders {
-		response.Headers = r.Header
+		response.Headers = diagnosticHeaders(r.Header, cfg.UnsafeHeaders)
 	}
 	return response
 }
