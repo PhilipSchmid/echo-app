@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/PhilipSchmid/echo-app/internal/config"
-	"github.com/PhilipSchmid/echo-app/internal/health"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/health"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/netutil"

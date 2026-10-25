@@ -5,8 +5,8 @@ import (
 	"net"
 	"testing"
 
-	"github.com/PhilipSchmid/echo-app/internal/config"
-	"github.com/PhilipSchmid/echo-app/proto"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/proto"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

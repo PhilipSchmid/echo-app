@@ -51,12 +51,12 @@ func TestLoad_EnvironmentVariables(t *testing.T) {
 	}{
 		{
 			name:     "response controls",
-			envVars:  map[string]string{"ECHO_APP_RESPONSE_CONTROLS": "true"},
+			envVars:  map[string]string{"ECHO_OBSERVATORY_RESPONSE_CONTROLS": "true"},
 			validate: func(t *testing.T, cfg *Config) { assert.True(t, cfg.ResponseControls) },
 		},
 		{
 			name:    "TLS files and gRPC TLS",
-			envVars: map[string]string{"ECHO_APP_GRPC": "true", "ECHO_APP_GRPC_TLS": "true", "ECHO_APP_TLS_CERT_FILE": "server.pem", "ECHO_APP_TLS_KEY_FILE": "server.key", "ECHO_APP_TLS_CLIENT_CA_FILE": "ca.pem"},
+			envVars: map[string]string{"ECHO_OBSERVATORY_GRPC": "true", "ECHO_OBSERVATORY_GRPC_TLS": "true", "ECHO_OBSERVATORY_TLS_CERT_FILE": "server.pem", "ECHO_OBSERVATORY_TLS_KEY_FILE": "server.key", "ECHO_OBSERVATORY_TLS_CLIENT_CA_FILE": "ca.pem"},
 			validate: func(t *testing.T, cfg *Config) {
 				assert.True(t, cfg.GRPCTLS)
 				assert.Equal(t, "server.pem", cfg.TLSCertFile)
@@ -67,7 +67,7 @@ func TestLoad_EnvironmentVariables(t *testing.T) {
 		{
 			name: "custom message",
 			envVars: map[string]string{
-				"ECHO_APP_MESSAGE": "test-message",
+				"ECHO_OBSERVATORY_MESSAGE": "test-message",
 			},
 			validate: func(t *testing.T, cfg *Config) {
 				assert.Equal(t, "test-message", cfg.Message)
@@ -76,7 +76,7 @@ func TestLoad_EnvironmentVariables(t *testing.T) {
 		{
 			name: "custom node",
 			envVars: map[string]string{
-				"ECHO_APP_NODE": "test-node",
+				"ECHO_OBSERVATORY_NODE": "test-node",
 			},
 			validate: func(t *testing.T, cfg *Config) {
 				assert.Equal(t, "test-node", cfg.Node)
@@ -85,7 +85,7 @@ func TestLoad_EnvironmentVariables(t *testing.T) {
 		{
 			name: "enable TLS",
 			envVars: map[string]string{
-				"ECHO_APP_TLS": "true",
+				"ECHO_OBSERVATORY_TLS": "true",
 			},
 			validate: func(t *testing.T, cfg *Config) {
 				assert.True(t, cfg.TLS)
@@ -94,7 +94,7 @@ func TestLoad_EnvironmentVariables(t *testing.T) {
 		{
 			name: "enable TCP",
 			envVars: map[string]string{
-				"ECHO_APP_TCP": "true",
+				"ECHO_OBSERVATORY_TCP": "true",
 			},
 			validate: func(t *testing.T, cfg *Config) {
 				assert.True(t, cfg.TCP)
@@ -103,7 +103,7 @@ func TestLoad_EnvironmentVariables(t *testing.T) {
 		{
 			name: "enable GRPC",
 			envVars: map[string]string{
-				"ECHO_APP_GRPC": "true",
+				"ECHO_OBSERVATORY_GRPC": "true",
 			},
 			validate: func(t *testing.T, cfg *Config) {
 				assert.True(t, cfg.GRPC)
@@ -112,7 +112,7 @@ func TestLoad_EnvironmentVariables(t *testing.T) {
 		{
 			name: "enable QUIC",
 			envVars: map[string]string{
-				"ECHO_APP_QUIC": "true",
+				"ECHO_OBSERVATORY_QUIC": "true",
 			},
 			validate: func(t *testing.T, cfg *Config) {
 				assert.True(t, cfg.QUIC)
@@ -121,7 +121,7 @@ func TestLoad_EnvironmentVariables(t *testing.T) {
 		{
 			name: "print headers",
 			envVars: map[string]string{
-				"ECHO_APP_PRINT_HTTP_REQUEST_HEADERS": "true",
+				"ECHO_OBSERVATORY_PRINT_HTTP_REQUEST_HEADERS": "true",
 			},
 			validate: func(t *testing.T, cfg *Config) {
 				assert.True(t, cfg.PrintHeaders)
@@ -130,12 +130,12 @@ func TestLoad_EnvironmentVariables(t *testing.T) {
 		{
 			name: "custom ports",
 			envVars: map[string]string{
-				"ECHO_APP_HTTP_PORT":    "9000",
-				"ECHO_APP_TLS_PORT":     "9443",
-				"ECHO_APP_TCP_PORT":     "9999",
-				"ECHO_APP_GRPC_PORT":    "50052",
-				"ECHO_APP_QUIC_PORT":    "4444",
-				"ECHO_APP_METRICS_PORT": "3001",
+				"ECHO_OBSERVATORY_HTTP_PORT":    "9000",
+				"ECHO_OBSERVATORY_TLS_PORT":     "9443",
+				"ECHO_OBSERVATORY_TCP_PORT":     "9999",
+				"ECHO_OBSERVATORY_GRPC_PORT":    "50052",
+				"ECHO_OBSERVATORY_QUIC_PORT":    "4444",
+				"ECHO_OBSERVATORY_METRICS_PORT": "3001",
 			},
 			validate: func(t *testing.T, cfg *Config) {
 				assert.Equal(t, "9000", cfg.HTTPPort)
@@ -149,7 +149,7 @@ func TestLoad_EnvironmentVariables(t *testing.T) {
 		{
 			name: "custom max request size",
 			envVars: map[string]string{
-				"ECHO_APP_MAX_REQUEST_SIZE": "5242880", // 5MB
+				"ECHO_OBSERVATORY_MAX_REQUEST_SIZE": "5242880", // 5MB
 			},
 			validate: func(t *testing.T, cfg *Config) {
 				assert.Equal(t, int64(5242880), cfg.MaxRequestSize)
@@ -224,8 +224,8 @@ func TestLoad_MessageLengthValidation(t *testing.T) {
 			// Reset viper before each test
 			viper.Reset()
 
-			_ = os.Setenv("ECHO_APP_MESSAGE", tt.message)
-			defer func() { _ = os.Unsetenv("ECHO_APP_MESSAGE") }()
+			_ = os.Setenv("ECHO_OBSERVATORY_MESSAGE", tt.message)
+			defer func() { _ = os.Unsetenv("ECHO_OBSERVATORY_MESSAGE") }()
 
 			cfg, err := Load()
 
@@ -293,8 +293,8 @@ func TestLoad_LogLevelParsing(t *testing.T) {
 			viper.Reset()
 
 			if tt.logLevel != "" {
-				_ = os.Setenv("ECHO_APP_LOG_LEVEL", tt.logLevel)
-				defer func() { _ = os.Unsetenv("ECHO_APP_LOG_LEVEL") }()
+				_ = os.Setenv("ECHO_OBSERVATORY_LOG_LEVEL", tt.logLevel)
+				defer func() { _ = os.Unsetenv("ECHO_OBSERVATORY_LOG_LEVEL") }()
 			}
 
 			cfg, err := Load()
@@ -323,26 +323,26 @@ func TestLoad_CombinedConfiguration(t *testing.T) {
 	viper.Reset()
 
 	// Set multiple environment variables
-	_ = os.Setenv("ECHO_APP_MESSAGE", "prod-env")
-	_ = os.Setenv("ECHO_APP_NODE", "k8s-node-1")
-	_ = os.Setenv("ECHO_APP_TLS", "true")
-	_ = os.Setenv("ECHO_APP_TCP", "true")
-	_ = os.Setenv("ECHO_APP_GRPC", "true")
-	_ = os.Setenv("ECHO_APP_QUIC", "true")
-	_ = os.Setenv("ECHO_APP_PRINT_HTTP_REQUEST_HEADERS", "true")
-	_ = os.Setenv("ECHO_APP_LOG_LEVEL", "debug")
-	_ = os.Setenv("ECHO_APP_MAX_REQUEST_SIZE", "20971520") // 20MB
+	_ = os.Setenv("ECHO_OBSERVATORY_MESSAGE", "prod-env")
+	_ = os.Setenv("ECHO_OBSERVATORY_NODE", "k8s-node-1")
+	_ = os.Setenv("ECHO_OBSERVATORY_TLS", "true")
+	_ = os.Setenv("ECHO_OBSERVATORY_TCP", "true")
+	_ = os.Setenv("ECHO_OBSERVATORY_GRPC", "true")
+	_ = os.Setenv("ECHO_OBSERVATORY_QUIC", "true")
+	_ = os.Setenv("ECHO_OBSERVATORY_PRINT_HTTP_REQUEST_HEADERS", "true")
+	_ = os.Setenv("ECHO_OBSERVATORY_LOG_LEVEL", "debug")
+	_ = os.Setenv("ECHO_OBSERVATORY_MAX_REQUEST_SIZE", "20971520") // 20MB
 
 	defer func() {
-		_ = os.Unsetenv("ECHO_APP_MESSAGE")
-		_ = os.Unsetenv("ECHO_APP_NODE")
-		_ = os.Unsetenv("ECHO_APP_TLS")
-		_ = os.Unsetenv("ECHO_APP_TCP")
-		_ = os.Unsetenv("ECHO_APP_GRPC")
-		_ = os.Unsetenv("ECHO_APP_QUIC")
-		_ = os.Unsetenv("ECHO_APP_PRINT_HTTP_REQUEST_HEADERS")
-		_ = os.Unsetenv("ECHO_APP_LOG_LEVEL")
-		_ = os.Unsetenv("ECHO_APP_MAX_REQUEST_SIZE")
+		_ = os.Unsetenv("ECHO_OBSERVATORY_MESSAGE")
+		_ = os.Unsetenv("ECHO_OBSERVATORY_NODE")
+		_ = os.Unsetenv("ECHO_OBSERVATORY_TLS")
+		_ = os.Unsetenv("ECHO_OBSERVATORY_TCP")
+		_ = os.Unsetenv("ECHO_OBSERVATORY_GRPC")
+		_ = os.Unsetenv("ECHO_OBSERVATORY_QUIC")
+		_ = os.Unsetenv("ECHO_OBSERVATORY_PRINT_HTTP_REQUEST_HEADERS")
+		_ = os.Unsetenv("ECHO_OBSERVATORY_LOG_LEVEL")
+		_ = os.Unsetenv("ECHO_OBSERVATORY_MAX_REQUEST_SIZE")
 	}()
 
 	cfg, err := Load()
@@ -363,19 +363,19 @@ func TestLoad_CombinedConfiguration(t *testing.T) {
 
 func TestLoad_ExternalReadinessProbeConfiguration(t *testing.T) {
 	viper.Reset()
-	_ = os.Setenv("ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE", "http")
-	_ = os.Setenv("ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET", "http://upstream/health")
-	_ = os.Setenv("ECHO_APP_EXTERNAL_READINESS_PROBE_INTERVAL", "5s")
-	_ = os.Setenv("ECHO_APP_EXTERNAL_READINESS_PROBE_TIMEOUT", "500ms")
-	_ = os.Setenv("ECHO_APP_EXTERNAL_READINESS_HTTP_METHOD", "HEAD")
-	_ = os.Setenv("ECHO_APP_EXTERNAL_READINESS_HTTP_EXPECTED_STATUS", "204")
+	_ = os.Setenv("ECHO_OBSERVATORY_EXTERNAL_READINESS_PROBE_TYPE", "http")
+	_ = os.Setenv("ECHO_OBSERVATORY_EXTERNAL_READINESS_PROBE_TARGET", "http://upstream/health")
+	_ = os.Setenv("ECHO_OBSERVATORY_EXTERNAL_READINESS_PROBE_INTERVAL", "5s")
+	_ = os.Setenv("ECHO_OBSERVATORY_EXTERNAL_READINESS_PROBE_TIMEOUT", "500ms")
+	_ = os.Setenv("ECHO_OBSERVATORY_EXTERNAL_READINESS_HTTP_METHOD", "HEAD")
+	_ = os.Setenv("ECHO_OBSERVATORY_EXTERNAL_READINESS_HTTP_EXPECTED_STATUS", "204")
 	defer func() {
-		_ = os.Unsetenv("ECHO_APP_EXTERNAL_READINESS_PROBE_TYPE")
-		_ = os.Unsetenv("ECHO_APP_EXTERNAL_READINESS_PROBE_TARGET")
-		_ = os.Unsetenv("ECHO_APP_EXTERNAL_READINESS_PROBE_INTERVAL")
-		_ = os.Unsetenv("ECHO_APP_EXTERNAL_READINESS_PROBE_TIMEOUT")
-		_ = os.Unsetenv("ECHO_APP_EXTERNAL_READINESS_HTTP_METHOD")
-		_ = os.Unsetenv("ECHO_APP_EXTERNAL_READINESS_HTTP_EXPECTED_STATUS")
+		_ = os.Unsetenv("ECHO_OBSERVATORY_EXTERNAL_READINESS_PROBE_TYPE")
+		_ = os.Unsetenv("ECHO_OBSERVATORY_EXTERNAL_READINESS_PROBE_TARGET")
+		_ = os.Unsetenv("ECHO_OBSERVATORY_EXTERNAL_READINESS_PROBE_INTERVAL")
+		_ = os.Unsetenv("ECHO_OBSERVATORY_EXTERNAL_READINESS_PROBE_TIMEOUT")
+		_ = os.Unsetenv("ECHO_OBSERVATORY_EXTERNAL_READINESS_HTTP_METHOD")
+		_ = os.Unsetenv("ECHO_OBSERVATORY_EXTERNAL_READINESS_HTTP_EXPECTED_STATUS")
 	}()
 
 	cfg, err := Load()
@@ -410,7 +410,7 @@ func TestLoadRejectsInvalidConfiguration(t *testing.T) {
 			viper.Reset()
 			t.Cleanup(viper.Reset)
 			for name, value := range tc.env {
-				t.Setenv("ECHO_APP_"+name, value)
+				t.Setenv("ECHO_OBSERVATORY_"+name, value)
 			}
 			cfg, err := Load()
 			require.Error(t, err)
@@ -422,9 +422,9 @@ func TestLoadRejectsInvalidConfiguration(t *testing.T) {
 func TestLoadAllowsSharedUDPPort(t *testing.T) {
 	viper.Reset()
 	t.Cleanup(viper.Reset)
-	t.Setenv("ECHO_APP_QUIC", "true")
-	t.Setenv("ECHO_APP_QUIC_PORT", "8080")
-	t.Setenv("ECHO_APP_UNSAFE_HEADERS", "true")
+	t.Setenv("ECHO_OBSERVATORY_QUIC", "true")
+	t.Setenv("ECHO_OBSERVATORY_QUIC_PORT", "8080")
+	t.Setenv("ECHO_OBSERVATORY_UNSAFE_HEADERS", "true")
 	cfg, err := Load()
 	require.NoError(t, err)
 	assert.True(t, cfg.UnsafeHeaders)

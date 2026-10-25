@@ -113,16 +113,16 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          output="echo-app-${{ matrix.goos }}-${{ matrix.goarch }}"
+          output="echo-observatory-${{ matrix.goos }}-${{ matrix.goarch }}"
           if [ "${{ matrix.goos }}" = "windows" ]; then
             output="${output}.exe"
           fi
-          go build -ldflags="-s -w" -o "build/${output}" cmd/echo-app/main.go
+          go build -ldflags="-s -w" -o "build/${output}" ./cmd/echo-observatory
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: echo-app-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: echo-observatory-${{ matrix.goos }}-${{ matrix.goarch }}
           path: build/*
           retention-days: 7
 

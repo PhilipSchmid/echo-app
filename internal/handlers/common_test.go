@@ -3,7 +3,7 @@ package handlers
 import (
 	"testing"
 
-	"github.com/PhilipSchmid/echo-app/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/PhilipSchmid/echo-app/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/PhilipSchmid/echo-app/internal/config"
-	"github.com/PhilipSchmid/echo-app/internal/handlers"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/handlers"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/sirupsen/logrus"

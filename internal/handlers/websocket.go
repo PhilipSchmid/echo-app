@@ -8,8 +8,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/PhilipSchmid/echo-app/internal/config"
-	"github.com/PhilipSchmid/echo-app/internal/metrics"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/metrics"
 	"github.com/coder/websocket"
 )
 

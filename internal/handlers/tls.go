@@ -7,8 +7,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/PhilipSchmid/echo-app/internal/config"
-	"github.com/PhilipSchmid/echo-app/internal/utils"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/utils"
 )
 
 var (

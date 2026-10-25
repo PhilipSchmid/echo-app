@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/PhilipSchmid/echo-app/internal/config"
-	"github.com/PhilipSchmid/echo-app/internal/metrics"
-	"github.com/PhilipSchmid/echo-app/proto"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/metrics"
+	"github.com/PhilipSchmid/echo-observatory/v2/proto"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
