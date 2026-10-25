@@ -6,7 +6,6 @@ function renderCertificate(data) {
   const textFields = ["subject", "issuer", "not_before", "not_after", "sha256_fingerprint", "serial_number", "public_key_algorithm", "signature_algorithm"];
   if (certificate !== null && (!certificate || textFields.some((field) => typeof certificate[field] !== "string") || ["dns_names", "ip_addresses"].some((field) => certificate[field] !== null && (!Array.isArray(certificate[field]) || certificate[field].some((name) => typeof name !== "string"))) || typeof certificate.self_signed !== "boolean")) throw new Error("Invalid certificate details");
   const selfSigned = data.mode === "demo" || certificate?.self_signed === true;
-  $("certificate-trust-help").open = selfSigned || data.mode === "acme-staging";
   $("certificate-note").textContent = data.mode === "disabled" ? "No app TLS listener is enabled."
     : data.mode === "acme-staging" ? "The app uses Let's Encrypt staging certificates. Normal clients do not trust this testing CA; configure its CA only for testing."
     : selfSigned ? "The app uses a self-signed certificate. Add its certificate to your client's trust configuration when connecting directly."

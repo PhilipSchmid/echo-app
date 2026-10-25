@@ -66,15 +66,6 @@
                 <p id="certificate-status" class="field-hint" role="status" aria-live="polite">Open this section to load the current certificate.</p>
                 <dl id="certificate-fields" class="certificate-fields" hidden></dl>
                 <details id="certificate-technical-details" class="certificate-more" hidden><summary>More certificate details</summary><dl id="certificate-technical-fields" class="certificate-fields"></dl></details>
-                <details id="certificate-trust-help" class="certificate-more">
-                  <summary>Custom CA &amp; client certificates</summary>
-                  <dl class="certificate-options">
-                    <div><dt>curl</dt><dd><code>--cacert ca.pem</code></dd></div>
-                    <div><dt>GNU wget</dt><dd><code>--ca-certificate=ca.pem</code></dd></div>
-                    <div><dt>grpcurl</dt><dd><code>-cacert ca.pem</code></dd></div>
-                  </dl>
-                  <p class="field-hint">For a private CA or self-signed certificate, use the operator's CA or certificate as <code>ca.pem</code>. For mutual TLS, also provide your client certificate and key. Keep certificate verification enabled.</p>
-                </details>
               </div>
             </details>
             {{end}}

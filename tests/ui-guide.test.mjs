@@ -76,6 +76,7 @@ test("TLS examples link to certificate insights on Your request", () => {
   for (const [name, enabled] of [["HTTPS", { tls: true }], ["HTTP/3", { quic: true }], ["gRPC", { grpc: true, grpc_tls: true }]]) {
     const { card } = render({ ...ports, ...enabled });
     const link = card(name).querySelector(".certificate-link");
+    assert.equal(link.textContent, "Certificate details →");
     assert.equal(link.href, "https://echo.test/prefix/ui/#certificate-help");
   }
   assert.doesNotMatch(html, /id="certificate-(?:help|fields|technical-fields)"/);
