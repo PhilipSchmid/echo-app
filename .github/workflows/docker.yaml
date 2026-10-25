@@ -16,7 +16,7 @@ on:
 env:
   REGISTRY: ghcr.io
   # Keep published image references stable across repository renames.
-  IMAGE_NAME: philipschmid/echo-app
+  IMAGE_NAME: philipschmid/echo-observatory
 
 jobs:
   checks:

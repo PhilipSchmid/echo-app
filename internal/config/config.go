@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/PhilipSchmid/echo-app/internal/utils"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -46,7 +46,7 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	viper.SetEnvPrefix("ECHO_APP")
+	viper.SetEnvPrefix("ECHO_OBSERVATORY")
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
 

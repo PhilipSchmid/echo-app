@@ -23,7 +23,7 @@ RUN go mod download
 COPY . .
 
 # Compile the application to a binary with all dependencies included
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -a -o /main cmd/echo-app/main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -a -o /echo-observatory ./cmd/echo-observatory
 
 # Final stage
 FROM scratch
@@ -33,23 +33,23 @@ ARG BUILD_DATE
 ARG VCS_REF
 
 # Add metadata to the image using opencontainers labels
-LABEL org.opencontainers.image.title="echo-app" \
+LABEL org.opencontainers.image.title="echo-observatory" \
       org.opencontainers.image.description="Tiny golang app which returns a timestamp, a customizable message, the hostname, the request source IP, and optionally the HTTP request headers." \
-      org.opencontainers.image.url="https://github.com/philipschmid/echo-app" \
-      org.opencontainers.image.source="https://github.com/philipschmid/echo-app" \
+      org.opencontainers.image.url="https://github.com/philipschmid/echo-observatory" \
+      org.opencontainers.image.source="https://github.com/philipschmid/echo-observatory" \
       org.opencontainers.image.vendor="philipschmid" \
       org.opencontainers.image.licenses="Apache-2.0 license" \
       org.opencontainers.image.revision="$VCS_REF" \
       org.opencontainers.image.created="$BUILD_DATE"
 
 # Copy the compiled binary from the builder stage
-COPY --from=builder /main /main
+COPY --from=builder /echo-observatory /echo-observatory
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
 USER 65532:65532
 
 # Set the binary as the entrypoint of the container
-ENTRYPOINT ["/main"]
+ENTRYPOINT ["/echo-observatory"]
 
 # Expose port 8080
 EXPOSE 8080

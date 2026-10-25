@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/PhilipSchmid/echo-app/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
 )
 
 // QUICHandler returns an HTTP handler for QUIC

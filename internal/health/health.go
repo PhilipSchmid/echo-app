@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/PhilipSchmid/echo-app/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
 	probing "github.com/prometheus-community/pro-bing"
 	"github.com/sirupsen/logrus"
 )

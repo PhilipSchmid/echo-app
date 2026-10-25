@@ -1,4 +1,4 @@
-# Makefile for echo-app
+# Makefile for echo-observatory
 # A versatile Go application that echoes request information across multiple protocols
 
 # Use /bin/bash as the shell
@@ -8,7 +8,7 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 # Variables
-APP_NAME := echo-app
+APP_NAME := echo-observatory
 DOCKER_IMAGE := ghcr.io/philipschmid/$(APP_NAME)
 PROTO_FILES := proto/echo.proto
 GO_FILES := $(shell find . -type f -name '*.go' -not -path "./vendor/*")
@@ -32,7 +32,7 @@ GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 # Help target - improved with categories
 .PHONY: help
 help: ## Show this help message
-	@printf "$(BLUE)echo-app Makefile$(NC)\n"
+	@printf "$(BLUE)echo-observatory Makefile$(NC)\n"
 	@printf "$(BLUE)=================$(NC)\n"
 	@printf "\n"
 	@printf "$(GREEN)Usage:$(NC) make [target]\n"
@@ -104,24 +104,24 @@ build: ## BUILD: Build the application with all checks
 		$(LDFLAGS) \
 		-a \
 		-o $(APP_NAME) \
-		cmd/echo-app/main.go
+		./cmd/echo-observatory
 	@printf "$(GREEN)✓ Build completed: $(APP_NAME)$(NC)\n"
 
 .PHONY: build-quick
 build-quick: ## BUILD: Quick build without checks
 	@printf "$(BLUE)Quick building $(APP_NAME)...$(NC)\n"
-	@go build $(LDFLAGS) -o $(APP_NAME) cmd/echo-app/main.go
+	@go build $(LDFLAGS) -o $(APP_NAME) ./cmd/echo-observatory
 	@printf "$(GREEN)✓ Quick build completed$(NC)\n"
 
 .PHONY: build-all
 build-all: ## BUILD: Build for all platforms
 	@printf "$(BLUE)Building for all platforms...$(NC)\n"
 	@mkdir -p $(BUILD_DIR)
-	@GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 ./cmd/echo-app
-	@GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-linux-arm64 ./cmd/echo-app
-	@GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 ./cmd/echo-app
-	@GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 ./cmd/echo-app
-	@GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe ./cmd/echo-app
+	@GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 ./cmd/echo-observatory
+	@GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-linux-arm64 ./cmd/echo-observatory
+	@GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 ./cmd/echo-observatory
+	@GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 ./cmd/echo-observatory
+	@GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe ./cmd/echo-observatory
 	@printf "$(GREEN)✓ Built for all platforms$(NC)\n"
 	@ls -la $(BUILD_DIR)/
 
@@ -217,7 +217,7 @@ debug: ## RUN: Run with delve debugger (requires dlv)
 	@command -v dlv >/dev/null 2>&1 || { printf "$(RED)Error: delve is not installed. Install it with: go install github.com/go-delve/delve/cmd/dlv@latest$(NC)\n"; exit 1; }
 	@printf "$(BLUE)Starting $(APP_NAME) with delve debugger...$(NC)\n"
 	@printf "$(YELLOW)Connect with: dlv connect :2345$(NC)\n"
-	dlv debug cmd/echo-app/main.go -- \
+	dlv debug ./cmd/echo-observatory -- \
 		--tls \
 		--tcp \
 		--grpc \
@@ -234,11 +234,11 @@ run-docker: ## RUN: Run the application in Docker
 		-p 50051:50051 \
 		-p 4433:4433/udp \
 		-p 3000:3000 \
-		-e ECHO_APP_TLS=true \
-		-e ECHO_APP_TCP=true \
-		-e ECHO_APP_GRPC=true \
-		-e ECHO_APP_QUIC=true \
-		-e ECHO_APP_MESSAGE="docker-test" \
+		-e ECHO_OBSERVATORY_TLS=true \
+		-e ECHO_OBSERVATORY_TCP=true \
+		-e ECHO_OBSERVATORY_GRPC=true \
+		-e ECHO_OBSERVATORY_QUIC=true \
+		-e ECHO_OBSERVATORY_MESSAGE="docker-test" \
 		$(DOCKER_IMAGE)
 
 # Docker targets
@@ -286,7 +286,7 @@ clean: ## MAINT: Clean build artifacts and test cache
 .PHONY: install
 install: build ## MAINT: Install the application to GOPATH/bin
 	@printf "$(BLUE)Installing $(APP_NAME)...$(NC)\n"
-	@go install cmd/echo-app/main.go
+	@go install ./cmd/echo-observatory
 	@printf "$(GREEN)✓ $(APP_NAME) installed to $(GOPATH)/bin$(NC)\n"
 
 .PHONY: uninstall

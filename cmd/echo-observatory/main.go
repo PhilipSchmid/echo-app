@@ -7,9 +7,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/PhilipSchmid/echo-app/internal/config"
-	"github.com/PhilipSchmid/echo-app/internal/health"
-	"github.com/PhilipSchmid/echo-app/internal/server"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/health"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/server"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"

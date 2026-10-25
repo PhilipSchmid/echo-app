@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/PhilipSchmid/echo-app/proto"
+	pb "github.com/PhilipSchmid/echo-observatory/v2/proto"
 	"github.com/quic-go/quic-go/http3"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -30,8 +30,8 @@ func TestAllProtocols(t *testing.T) {
 	if testing.Short() {
 		t.Skip("integration test builds and launches the application")
 	}
-	binary := filepath.Join(t.TempDir(), "echo-app")
-	if output, err := exec.Command("go", "build", "-o", binary, "../cmd/echo-app").CombinedOutput(); err != nil {
+	binary := filepath.Join(t.TempDir(), "echo-observatory")
+	if output, err := exec.Command("go", "build", "-o", binary, "../cmd/echo-observatory").CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, output)
 	}
 	ports := make(map[string]string)
@@ -54,7 +54,7 @@ func TestAllProtocols(t *testing.T) {
 	defer func() { _ = logFile.Close() }()
 	cmd := exec.Command(binary, args...)
 	for _, value := range os.Environ() {
-		if !strings.HasPrefix(value, "ECHO_APP_") {
+		if !strings.HasPrefix(value, "ECHO_OBSERVATORY_") {
 			cmd.Env = append(cmd.Env, value)
 		}
 	}

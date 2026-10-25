@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/PhilipSchmid/echo-app/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
 )
 
 func TestQUICHandler(t *testing.T) {

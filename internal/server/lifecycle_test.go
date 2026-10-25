@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/PhilipSchmid/echo-app/internal/config"
-	pb "github.com/PhilipSchmid/echo-app/proto"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	pb "github.com/PhilipSchmid/echo-observatory/v2/proto"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"

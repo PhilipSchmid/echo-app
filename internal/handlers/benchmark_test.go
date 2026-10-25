@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/PhilipSchmid/echo-app/internal/config"
-	"github.com/PhilipSchmid/echo-app/proto"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/proto"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 )

@@ -3,7 +3,7 @@ package server
 import (
 	"sync"
 
-	apphealth "github.com/PhilipSchmid/echo-app/internal/health"
+	apphealth "github.com/PhilipSchmid/echo-observatory/v2/internal/health"
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/PhilipSchmid/echo-app/internal/config"
-	"github.com/PhilipSchmid/echo-app/proto"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/proto"
 )
 
 func TestEchoServer_Echo(t *testing.T) {
