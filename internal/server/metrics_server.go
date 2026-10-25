@@ -66,6 +66,7 @@ func (s *MetricsServer) Start(ctx context.Context) error {
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  120 * time.Second,
+		ErrorLog:     httpErrorLog("Metrics"),
 	}
 
 	ln, err := net.Listen("tcp", s.listenAddr)

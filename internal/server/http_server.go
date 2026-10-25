@@ -97,6 +97,7 @@ func NewHTTPServer(cfg *config.Config, useTLS bool, tlsConfig *tls.Config, sourc
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    maxHTTPHeaderBytes,
 		HTTP2:             &http.HTTP2Config{MaxConcurrentStreams: maxConcurrentRequests},
+		ErrorLog:          httpErrorLog(listener),
 	}
 	return s
 }

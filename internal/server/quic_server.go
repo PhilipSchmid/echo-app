@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"time"
@@ -67,7 +68,7 @@ func NewQUICServer(cfg *config.Config, tlsConfig *tls.Config, sources ...handler
 		http.Error(w, "WebSocket requires HTTP/1.1", http.StatusUpgradeRequired)
 	})
 	mux.HandleFunc("/", handlers.QUICHandler(cfg))
-	s.server = &http3.Server{Addr: s.listenAddr, Handler: browserSecurityHeaders(metrics.InstrumentHTTP("QUIC", s.streamDeadlineMiddleware(protectHTTP(func() *protection.Guard { return s.protection }, requestLimitMiddleware(&s.activeRequests, mux, "QUIC"), "QUIC")))), IdleTimeout: 30 * time.Second, MaxHeaderBytes: maxHTTP3HeaderBytes, ConnContext: s.limitConnectionLifetime}
+	s.server = &http3.Server{Addr: s.listenAddr, Handler: browserSecurityHeaders(metrics.InstrumentHTTP("QUIC", s.streamDeadlineMiddleware(protectHTTP(func() *protection.Guard { return s.protection }, requestLimitMiddleware(&s.activeRequests, mux, "QUIC"), "QUIC")))), IdleTimeout: 30 * time.Second, MaxHeaderBytes: maxHTTP3HeaderBytes, ConnContext: s.limitConnectionLifetime, Logger: slog.New(http3Diagnostics{})}
 	return s
 }
 
