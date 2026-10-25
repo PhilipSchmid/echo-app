@@ -60,6 +60,7 @@ func TCPHandler(ctx context.Context, conn net.Conn, cfg *config.Config) {
 	}
 
 	response := TCPResponse{BaseResponse: NewBaseResponse(cfg, "TCP", remoteAddr)}
+	setSocketPeer(&response.BaseResponse, conn.RemoteAddr())
 	data, err := json.Marshal(response)
 	if err != nil {
 		logrus.Error("Failed to marshal TCP response")

@@ -24,6 +24,12 @@ The browser UI is enabled by default; use `--ui=false` or
 `ECHO_OBSERVATORY_UI=false` for a metadata-only service. Certificate automation
 remains opt-in; self-signed and operator-supplied certificates work offline.
 
+PROXY protocol remains disabled by default. Deployments behind a trusted TCP
+proxy can opt in with `--proxy-protocol` and an explicit
+`--proxy-trusted-cidrs` allowlist. This requires the upstream proxy to send a
+PROXY header on every public TCP connection; direct on-premises profiles need
+no changes. See [trusted PROXY protocol](configuration.md#trusted-proxy-protocol).
+
 Incoming bodies/messages and outgoing echo responses now default to 64 KiB.
 Use `--max-request-size` and `--max-response-size` when a controlled test needs
 more; response output retains an absolute 1 MiB ceiling. Shared rate protection

@@ -5,7 +5,9 @@
 A Go service for testing network paths, proxies, and load balancers. Connect over
 HTTP, HTTPS, HTTP/3, TCP, or gRPC to inspect the receiving server and request.
 WebSocket connections echo text and binary messages. IPv4 and IPv6 requests
-report the observed IP family beside the socket peer address in the UI and JSON.
+report the received client address and IP family in the UI and JSON.
+An optional [trusted PROXY protocol mode](docs/configuration.md#trusted-proxy-protocol)
+preserves original client addresses behind a TCP proxy while TLS stays in the app.
 
 ## Connect to Echo Observatory
 
@@ -104,8 +106,10 @@ reverse proxy returned this HTTPS response (abridged):
 ```
 
 See which backend answered, the request it received, and the protocol negotiated
-on that connection. `source_ip` remains the socket peer (here, the proxy), while
-the forwarded client address stays in a header and `Authorization` is redacted.
+on that connection. By default, `source_ip` is the socket peer (here, the proxy),
+while forwarded HTTP headers remain untrusted and `Authorization` is redacted.
+Trusted PROXY protocol mode reports the original client in `source_ip` and
+preserves the transport peer in separate `socket_peer_*` fields.
 
 ## Endpoints at a glance
 
@@ -126,6 +130,7 @@ opt-in. All bind ports are configurable. Existing 1.x image paths are unchanged.
 ## Version 2.0
 
 The current preview is [v2.0.0-pre.0](https://github.com/PhilipSchmid/echo-observatory/releases/tag/v2.0.0-pre.0). Stable 2.0.0 is not released yet.
+Trusted PROXY protocol support is available on `main` after this preview.
 
 Version 2.0 adds the browser UI, automatic certificate management, and the
 renamed executable. Images starting with 2.0.0 use

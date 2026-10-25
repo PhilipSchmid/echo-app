@@ -69,7 +69,7 @@ These metadata responses do not echo application payloads.
 
 Open [http://localhost/ui/](http://localhost/ui/), or
 `https://localhost/ui/`, with the deployment profile. Your page request appears
-immediately, with its socket peer, HTTP/TLS
+immediately, with its client address, HTTP/TLS
 connection, and server-observed JSON. This is the actual navigation request,
 not a second request made by the browser. Header output follows the instance
 settings and redaction policy.
@@ -193,8 +193,14 @@ HTTP/3 responses also report TLS version, cipher suite, SNI, and the negotiated
 application protocol. The original request URI preserves escaping and query
 parameters; `http_endpoint` contains the decoded path.
 
-`source_ip` always identifies the actual socket peer. Forwarded headers appear
-in the optional header output and never replace the peer address.
+`source_ip` identifies the socket peer by default. With
+[trusted PROXY protocol](configuration.md#trusted-proxy-protocol) enabled, a
+validated header supplies the original client address and family; the actual
+transport peer is preserved in `socket_peer_ip`, `socket_peer_ip_version` and
+`socket_peer_addr`. HTTP `remote_addr` and `local_addr` then describe the original
+client and destination; `socket_local_addr` and `socket_local_ip_version` retain
+the app's receiving socket. Forwarded HTTP headers appear in optional header
+output and never establish a trusted client address.
 
 Enable header output with `--print-http-request-headers`. Authorization and
 cookie headers, and fields whose names contain secret, token, or key, are
@@ -213,18 +219,20 @@ contact details.
 ## IPv4 and IPv6
 
 All native listeners accept IPv4 and IPv6 when the host and deployment network
-support them. The UI shows an IP-family badge next to the peer address and an
+support them. The UI shows an IP-family badge next to the client address and an
 IP-family row in workbench responses. JSON and gRPC responses include
 `ip_version` (`IPv4` or `IPv6`); HTTP JSON also includes `local_ip_version` for
-the receiving socket. Unavailable or invalid addresses omit the corresponding
-family field. IPv4-mapped IPv6 addresses such as `::ffff:192.0.2.1` are labelled
+the destination, or the receiving socket without PROXY forwarding. Unavailable
+or invalid addresses omit the corresponding family field. IPv4-mapped IPv6
+addresses such as `::ffff:192.0.2.1` are labelled
 IPv4, while scoped IPv6 addresses retain their zone identifier.
 
-These values describe the socket connection received by the app. They do not
-identify the visitor's internet capabilities. Proxies, NAT and Docker Desktop
-port forwarding can translate IPv6 to IPv4. Forwarded headers remain untrusted
-claims and never override the peer address or family. No third-party IP lookup
-is performed.
+By default, these values describe the socket connection received by the app.
+Proxies, NAT and Docker Desktop port forwarding can translate IPv6 to IPv4.
+Trusted PROXY protocol preserves the original client's IPv4/IPv6 address and
+keeps the forwarding socket separately identifiable. Ordinary forwarded HTTP
+headers remain untrusted. The family describes this connection, not every
+protocol the visitor's device supports; no third-party IP lookup is performed.
 
 The Connect page offers IPv4/IPv6 curl comparisons for hostnames, with the same
 service path and certificate verification. Browsers choose their address family;

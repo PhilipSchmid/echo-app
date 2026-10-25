@@ -301,6 +301,32 @@ test("responses and socket messages announce concise results without reading pay
   assert.equal(page.$("socket-log-title").focused, true);
 });
 
+test("response metadata distinguishes trusted client addresses from the socket hop", () => {
+  for (const forwarded of [false, true]) {
+    const page = fixture();
+    const data = { source_ip: "2001:db8::42", ip_version: "IPv6", remote_addr: "[2001:db8::42]:40500", local_addr: "[2001:db8::43]:443" };
+    if (forwarded) Object.assign(data, { socket_peer_ip: "172.16.0.2", socket_peer_ip_version: "IPv4", socket_peer_addr: "172.16.0.2:50000", socket_local_addr: "172.16.0.3:8443", socket_local_ip_version: "IPv4" });
+    page.context.showResponse({ status: 200, statusText: "OK", headers: new Headers({ "Content-Type": "application/json" }) },
+      { text: JSON.stringify(data), bytes: 100, truncated: false }, 12, { method: "GET" }, true);
+    const rows = (id) => Object.fromEntries(page.$(id).children.map((row) => row.children.map((node) => node.textContent)));
+    const summary = rows("response-metadata");
+    assert.equal(summary[forwarded ? "Client IP" : "Socket peer IP"], data.source_ip);
+    assert.equal(summary[forwarded ? "Client IP family" : "IP family on this hop"], "IPv6");
+    const details = rows("connection-metadata");
+    if (forwarded) {
+      assert.equal(details["Client address"], data.remote_addr);
+      assert.equal(details["Destination address"], data.local_addr);
+      assert.equal(details["Socket peer"], data.socket_peer_addr);
+      assert.equal(details["Socket peer IP family"], "IPv4");
+      assert.equal(details["App socket"], data.socket_local_addr);
+    } else {
+      assert.equal(details["Remote socket"], data.remote_addr);
+      assert.equal(details["Local socket"], data.local_addr);
+      assert.equal(details["Socket peer"], undefined);
+    }
+  }
+});
+
 test("workbench tab shortcuts preserve modifier and composition keys", () => {
   const page = fixture();
   const current = page.$("request-tab");

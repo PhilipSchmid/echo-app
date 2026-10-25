@@ -4,7 +4,7 @@
 
 ## Requirements
 
-- Go 1.26 or newer, with a current security patch.
+- Go 1.26.9 or newer, with a current security patch.
 - Make and Bash for the repository targets.
 - Node.js 22 or newer for `make test-ui`; no npm packages are needed.
 - golangci-lint v2; `make tools` installs the CI version, v2.13.2.
@@ -100,7 +100,7 @@ client's URL handling, example presets, copied commands, and clipboard feedback.
 It needs no npm
 packages and is also run in CI; building and running Echo Observatory still require only Go.
 
-Use Go 1.26 with CI's pinned golangci-lint v2.13.2; that linter cannot read
+Use Go 1.26.9+ with CI's pinned golangci-lint v2.13.2; that linter cannot read
 Go 1.27 compiler export data. Local Go 1.27 lint checks pass with v2.15.0.
 
 Useful focused commands:

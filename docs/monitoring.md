@@ -42,7 +42,7 @@ their first event.
 | `echo_observatory_http_responses_total` | Counter | HTTP outcome by `listener`, `endpoint`, `status_code`. Includes UI, admin, invalid requests and admission-limit responses. |
 | `echo_observatory_http_response_bytes_total` | Counter | Response body bytes written by `listener`; excludes headers and WebSocket frames. |
 | `echo_observatory_transport_bytes_total` | Counter | Socket bytes actually received or successfully sent. `listener`, `direction` (`received` or `sent`). Includes TLS/QUIC framing; excludes IP/TCP/UDP headers and traffic outside the app. |
-| `echo_observatory_http_protocol_requests_total` | Counter | Completed HTTP requests by `listener`, actual `protocol` and socket-peer `ip_version`. Distinguishes HTTP/1.0, HTTP/1.1, HTTP/2 and HTTP/3, plus IPv4/IPv6. |
+| `echo_observatory_http_protocol_requests_total` | Counter | Completed HTTP requests by `listener`, actual `protocol` and client `ip_version` (socket peer by default; validated original address in PROXY mode). Distinguishes HTTP/1.0, HTTP/1.1, HTTP/2 and HTTP/3, plus IPv4/IPv6. |
 | `echo_observatory_grpc_responses_total` | Counter | Final gRPC status for each completed unary or streaming call. `method`, `code`. Includes echo, health, reflection and unknown methods grouped as `other`. |
 | `echo_observatory_requests_in_flight` | Gauge | Running HTTP handlers and gRPC calls by `listener`. Open WebSocket handlers and streaming RPCs remain in flight. |
 | `echo_observatory_errors_total` | Counter | Actual application failures by `listener`, `error_type`, such as body-limit, read/write and panic failures. An intentional `?status=500` is an HTTP outcome, not an internal failure. |
@@ -80,8 +80,10 @@ admin paths have fixed route labels. UI assets share `ui_assets`. Arbitrary echo
 paths and unknown methods are grouped as `other`. Query strings, addresses,
 hosts, headers, payloads, probe targets and error text never become metric
 labels. This keeps the number of time series bounded and avoids recording
-visitor details in labels. IP-family metrics use the actual socket peer, treating
-IPv4-mapped IPv6 addresses as IPv4; forwarded headers do not change them.
+visitor details in labels. IP-family metrics use the actual socket peer by
+default, or the validated original client address in trusted PROXY protocol
+mode. IPv4-mapped IPv6 addresses count as IPv4; forwarded HTTP headers do not
+change these labels.
 
 HTTP `status_code` values normally contain a numeric response code. A canceled
 request or escaping panic before a final response uses `canceled` or `panic`

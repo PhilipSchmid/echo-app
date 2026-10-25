@@ -58,17 +58,20 @@ func (*EchoRequest) Descriptor() ([]byte, []int) {
 }
 
 type EchoResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Timestamp     string                 `protobuf:"bytes,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Hostname      string                 `protobuf:"bytes,3,opt,name=hostname,proto3" json:"hostname,omitempty"`
-	Listener      string                 `protobuf:"bytes,4,opt,name=listener,proto3" json:"listener,omitempty"`
-	Node          string                 `protobuf:"bytes,5,opt,name=node,proto3" json:"node,omitempty"`
-	SourceIp      string                 `protobuf:"bytes,6,opt,name=source_ip,json=sourceIp,proto3" json:"source_ip,omitempty"`
-	GrpcMethod    string                 `protobuf:"bytes,7,opt,name=grpc_method,json=grpcMethod,proto3" json:"grpc_method,omitempty"`
-	IpVersion     string                 `protobuf:"bytes,8,opt,name=ip_version,json=ipVersion,proto3" json:"ip_version,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Timestamp           string                 `protobuf:"bytes,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Message             string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Hostname            string                 `protobuf:"bytes,3,opt,name=hostname,proto3" json:"hostname,omitempty"`
+	Listener            string                 `protobuf:"bytes,4,opt,name=listener,proto3" json:"listener,omitempty"`
+	Node                string                 `protobuf:"bytes,5,opt,name=node,proto3" json:"node,omitempty"`
+	SourceIp            string                 `protobuf:"bytes,6,opt,name=source_ip,json=sourceIp,proto3" json:"source_ip,omitempty"`
+	GrpcMethod          string                 `protobuf:"bytes,7,opt,name=grpc_method,json=grpcMethod,proto3" json:"grpc_method,omitempty"`
+	IpVersion           string                 `protobuf:"bytes,8,opt,name=ip_version,json=ipVersion,proto3" json:"ip_version,omitempty"`
+	SocketPeerIp        string                 `protobuf:"bytes,9,opt,name=socket_peer_ip,json=socketPeerIp,proto3" json:"socket_peer_ip,omitempty"`
+	SocketPeerIpVersion string                 `protobuf:"bytes,10,opt,name=socket_peer_ip_version,json=socketPeerIpVersion,proto3" json:"socket_peer_ip_version,omitempty"`
+	SocketPeerAddr      string                 `protobuf:"bytes,11,opt,name=socket_peer_addr,json=socketPeerAddr,proto3" json:"socket_peer_addr,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *EchoResponse) Reset() {
@@ -157,12 +160,33 @@ func (x *EchoResponse) GetIpVersion() string {
 	return ""
 }
 
+func (x *EchoResponse) GetSocketPeerIp() string {
+	if x != nil {
+		return x.SocketPeerIp
+	}
+	return ""
+}
+
+func (x *EchoResponse) GetSocketPeerIpVersion() string {
+	if x != nil {
+		return x.SocketPeerIpVersion
+	}
+	return ""
+}
+
+func (x *EchoResponse) GetSocketPeerAddr() string {
+	if x != nil {
+		return x.SocketPeerAddr
+	}
+	return ""
+}
+
 var File_proto_echo_proto protoreflect.FileDescriptor
 
 const file_proto_echo_proto_rawDesc = "" +
 	"\n" +
 	"\x10proto/echo.proto\x12\x04echo\"\r\n" +
-	"\vEchoRequest\"\xef\x01\n" +
+	"\vEchoRequest\"\xf4\x02\n" +
 	"\fEchoResponse\x12\x1c\n" +
 	"\ttimestamp\x18\x01 \x01(\tR\ttimestamp\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1a\n" +
@@ -173,7 +197,11 @@ const file_proto_echo_proto_rawDesc = "" +
 	"\vgrpc_method\x18\a \x01(\tR\n" +
 	"grpcMethod\x12\x1d\n" +
 	"\n" +
-	"ip_version\x18\b \x01(\tR\tipVersion2>\n" +
+	"ip_version\x18\b \x01(\tR\tipVersion\x12$\n" +
+	"\x0esocket_peer_ip\x18\t \x01(\tR\fsocketPeerIp\x123\n" +
+	"\x16socket_peer_ip_version\x18\n" +
+	" \x01(\tR\x13socketPeerIpVersion\x12(\n" +
+	"\x10socket_peer_addr\x18\v \x01(\tR\x0esocketPeerAddr2>\n" +
 	"\vEchoService\x12/\n" +
 	"\x04Echo\x12\x11.echo.EchoRequest\x1a\x12.echo.EchoResponse\"\x00B3Z1github.com/PhilipSchmid/echo-observatory/v2/protob\x06proto3"
 

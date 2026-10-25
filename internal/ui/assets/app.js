@@ -145,8 +145,8 @@ function showResponse(response, result, elapsed, request, textual) {
   $("response-metadata").replaceChildren();
   $("connection-metadata").replaceChildren();
   if (data && typeof data === "object" && !Array.isArray(data)) {
-    for (const [label, key] of [["Server hostname", "hostname"], ["Listener", "listener"], ["Socket peer IP", "source_ip"], ["IP family on this hop", "ip_version"], ["Node", "node"]]) addMetadata($("response-metadata"), label, data[key]);
-    for (const [label, key] of [["Host", "http_host"], ["Original URI", "http_request_uri"], ["Remote socket", "remote_addr"], ["Local socket", "local_addr"], ["Local IP family", "local_ip_version"], ["TLS version", "tls_version"], ["Cipher suite", "tls_cipher_suite"], ["Server name", "tls_server_name"], ["ALPN", "tls_negotiated_protocol"]]) addMetadata($("connection-metadata"), label, data[key]);
+    for (const [label, key] of [["Server hostname", "hostname"], ["Listener", "listener"], [data.socket_peer_ip ? "Client IP" : "Socket peer IP", "source_ip"], [data.socket_peer_ip ? "Client IP family" : "IP family on this hop", "ip_version"], ["Node", "node"]]) addMetadata($("response-metadata"), label, data[key]);
+    for (const [label, key] of [["Host", "http_host"], ["Original URI", "http_request_uri"], [data.socket_peer_ip ? "Client address" : "Remote socket", "remote_addr"], [data.socket_peer_ip ? "Destination address" : "Local socket", "local_addr"], [data.socket_peer_ip ? "Destination IP family" : "Local IP family", "local_ip_version"], ["Socket peer", "socket_peer_addr"], ["Socket peer IP family", "socket_peer_ip_version"], ["App socket", "socket_local_addr"], ["App socket IP family", "socket_local_ip_version"], ["TLS version", "tls_version"], ["Cipher suite", "tls_cipher_suite"], ["Server name", "tls_server_name"], ["ALPN", "tls_negotiated_protocol"]]) addMetadata($("connection-metadata"), label, data[key]);
   }
   $("response-metadata").hidden = !$("response-metadata").children.length;
   $("connection-details").hidden = !$("connection-metadata").children.length;

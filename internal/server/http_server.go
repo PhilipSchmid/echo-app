@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/connection"
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/handlers"
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/metrics"
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/protection"
@@ -99,6 +100,9 @@ func NewHTTPServer(cfg *config.Config, useTLS bool, tlsConfig *tls.Config, sourc
 		HTTP2:             &http.HTTP2Config{MaxConcurrentStreams: maxConcurrentRequests},
 		ErrorLog:          httpErrorLog(listener),
 	}
+	if cfg.ProxyProtocol {
+		s.server.ConnContext = connection.WithConn
+	}
 	return s
 }
 
@@ -158,7 +162,13 @@ func (s *HTTPServer) Start(ctx context.Context) error {
 		s.mu.Unlock()
 		return err
 	}
-	ln = netutil.LimitListener(protectListener(trackConnections(ln, s.listener), s.protection, s.listener), maxHTTPConnections)
+	wrapped, err := publicTCPListener(trackConnections(ln, s.listener), s.cfg, s.protection, s.listener)
+	if err != nil {
+		_ = ln.Close()
+		s.mu.Unlock()
+		return err
+	}
+	ln = netutil.LimitListener(wrapped, maxHTTPConnections)
 	s.netListener = ln
 	s.markReady()
 	s.mu.Unlock()
