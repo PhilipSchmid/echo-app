@@ -79,7 +79,7 @@ function renderListeners(settings) {
       if (hint) body.append($(hint + "-hint-template").content.firstElementChild.cloneNode(true));
       body.append(commandPicker(directCommands(name, settings, serviceBase), name));
       if (name === "HTTPS" || name === "HTTP/3" || (name === "gRPC" && settings.grpc_tls)) {
-        const help = element("a", "certificate-link", "Certificate setup →");
+        const help = element("a", "certificate-link", "Certificate details →");
         help.href = new URL("./#certificate-help", uiBase).href;
         body.append(help);
       }

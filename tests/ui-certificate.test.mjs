@@ -20,7 +20,7 @@ class Node {
 }
 
 function render(fetch = () => { throw new Error("Unexpected certificate request"); }, hash = "", enabled = true) {
-  const nodes = new Map(["certificate-help", "certificate-note", "certificate-trust-help", "certificate-status", "certificate-fields", "certificate-technical-details", "certificate-technical-fields"].map((id) => [id, new Node("div")]));
+  const nodes = new Map(["certificate-help", "certificate-note", "certificate-status", "certificate-fields", "certificate-technical-details", "certificate-technical-fields"].map((id) => [id, new Node("div")]));
   if (!enabled) nodes.delete("certificate-help");
   const timers = new Map();
   const listeners = new Map();
@@ -45,6 +45,15 @@ test("certificate insights belong to request connection security, without claimi
   assert.doesNotMatch(connect, /id="certificate-(?:help|fields|status)"/);
   assert.match(visit, /import \{ initCertificateDetails \} from "\.\/certificate\.js"/);
   assert.match(visit, /initCertificateDetails\(uiBase\)/);
+});
+
+test("certificate insights show certificate details without a client setup box", () => {
+  const security = html.match(/<article id="connection-security"[\s\S]*?<\/article>/)?.[0];
+  assert.ok(security);
+  assert.match(security, /id="certificate-fields"/);
+  assert.match(security, /<summary>More certificate details<\/summary>/);
+  assert.match(security, /id="certificate-technical-fields"/);
+  assert.doesNotMatch(security, /certificate-trust-help|Custom CA &amp; client certificates|--cacert|--ca-certificate|-cacert/);
 });
 
 test("certificate deep links open the request details and instances without TLS remain usable", () => {
@@ -87,16 +96,15 @@ test("certificate details render actual public fields as text and normalize date
   assert.match(html, /<details id="certificate-help" class="connection-help certificate-insights">/);
 });
 
-test("CA guidance follows certificate mode and self-signature without implying file certificates are trusted", () => {
-  for (const [mode, self_signed, open, note] of [
-    ["demo", true, true, /self-signed/], ["file", true, true, /self-signed/],
-    ["acme", false, false, /Let's Encrypt.*renewed automatically.*normally trust/],
-    ["acme-staging", false, true, /do not trust this testing CA/],
-    ["file", false, false, /trust depends on its issuer/]
+test("certificate notes follow mode and self-signature without implying file certificates are trusted", () => {
+  for (const [mode, self_signed, note] of [
+    ["demo", true, /self-signed/], ["file", true, /self-signed/],
+    ["acme", false, /Let's Encrypt.*renewed automatically.*normally trust/],
+    ["acme-staging", false, /do not trust this testing CA/],
+    ["file", false, /trust depends on its issuer/]
   ]) {
     const { nodes, renderCertificate } = render();
     renderCertificate({ mode, certificate: { ...certificate, self_signed } });
-    assert.equal(nodes.get("certificate-trust-help").open, open, mode);
     assert.match(nodes.get("certificate-note").textContent, note);
   }
 });
