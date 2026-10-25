@@ -15,7 +15,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # Keep published image references stable across repository renames.
+  # The 2.0 development line uses the new package; published 1.x images stay put.
   IMAGE_NAME: philipschmid/echo-observatory
 
 jobs:
@@ -44,11 +44,10 @@ jobs:
         with:
           context: .
           load: true
-          tags: echo-app-smoke:local
+          tags: echo-observatory-smoke:local
 
       - name: Test image before publication
-        run: bash scripts/test-image.sh echo-app-smoke:local
-
+        run: bash scripts/test-image.sh echo-observatory-smoke:local
       - name: Log in to GitHub Container Registry
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push)
         uses: docker/login-action@v4

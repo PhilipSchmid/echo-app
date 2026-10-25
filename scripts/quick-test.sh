@@ -3,7 +3,7 @@
 
 set -e
 
-echo "🚀 Echo-App Quick Test Script"
+echo "🚀 Echo Observatory Quick Test Script"
 echo "============================"
 echo ""
 

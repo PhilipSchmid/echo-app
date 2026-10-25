@@ -76,6 +76,9 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
+      - name: Test browser client
+        run: make test-ui
+
       - name: Run tests with race detector
         run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
 

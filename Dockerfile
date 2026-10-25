@@ -25,20 +25,20 @@ COPY . .
 # Compile the application to a binary with all dependencies included
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -a -o /echo-observatory ./cmd/echo-observatory
 
-# Final stage
-FROM scratch
+# Non-root runtime image.
+FROM scratch AS final
 
 # Re-declare ARGs in the final stage to use them
 ARG BUILD_DATE
 ARG VCS_REF
 
 # Add metadata to the image using opencontainers labels
-LABEL org.opencontainers.image.title="echo-observatory" \
-      org.opencontainers.image.description="Tiny golang app which returns a timestamp, a customizable message, the hostname, the request source IP, and optionally the HTTP request headers." \
+LABEL org.opencontainers.image.title="Echo Observatory" \
+      org.opencontainers.image.description="Multi-protocol network diagnostics for HTTP, TLS, WebSocket, TCP, gRPC, and HTTP/3 connections." \
       org.opencontainers.image.url="https://github.com/philipschmid/echo-observatory" \
       org.opencontainers.image.source="https://github.com/philipschmid/echo-observatory" \
       org.opencontainers.image.vendor="philipschmid" \
-      org.opencontainers.image.licenses="Apache-2.0 license" \
+      org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.revision="$VCS_REF" \
       org.opencontainers.image.created="$BUILD_DATE"
 
@@ -51,5 +51,5 @@ USER 65532:65532
 # Set the binary as the entrypoint of the container
 ENTRYPOINT ["/echo-observatory"]
 
-# Expose port 8080
-EXPOSE 8080
+# Internal listeners; deployment mappings expose HTTP 80 and HTTPS/HTTP3 443.
+EXPOSE 8080/tcp 8443/tcp 4433/udp 9090/tcp 50051/tcp 3000/tcp
