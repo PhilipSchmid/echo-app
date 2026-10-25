@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/metrics"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,6 +64,8 @@ func TestTCPServer_StartAndStop(t *testing.T) {
 
 func TestTCPServer_ConnectionLimit(t *testing.T) {
 	srv := NewTCPServer(&config.Config{TCPPort: "0"})
+	rejected := metrics.RejectionsTotal.WithLabelValues("TCP", "connection_limit")
+	beforeRejected := testutil.ToFloat64(rejected)
 	atomic.StoreInt32(&srv.activeConns, maxTCPConnections)
 	done := make(chan error, 1)
 	go func() { done <- srv.Start(context.Background()) }()
@@ -75,6 +79,7 @@ func TestTCPServer_ConnectionLimit(t *testing.T) {
 	require.NoError(t, conn.SetReadDeadline(time.Now().Add(time.Second)))
 	_, err = conn.Read(make([]byte, 1))
 	require.ErrorIs(t, err, io.EOF, "a full server must reject rather than return an echo")
+	require.Equal(t, beforeRejected+1, testutil.ToFloat64(rejected))
 	_ = conn.Close()
 	atomic.StoreInt32(&srv.activeConns, 0)
 	conn, err = net.DialTimeout("tcp", srv.listener.Addr().String(), time.Second)

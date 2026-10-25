@@ -43,7 +43,7 @@ func checkRequestDiagnostics(response *http.Response, body map[string]any) error
 	for _, name := range []string{"remote_addr", "local_addr"} {
 		address, _ := body[name].(string)
 		host, port, err := net.SplitHostPort(address)
-		if err != nil || net.ParseIP(host) == nil || port == "" || (name == "remote_addr" && host != "127.0.0.1") {
+		if err != nil || net.ParseIP(host) == nil || port == "" || (name == "remote_addr" && host != body["source_ip"]) {
 			return fmt.Errorf("invalid %s: %q", name, address)
 		}
 	}
@@ -89,7 +89,7 @@ func checkResponseControls(t *testing.T, client *http.Client, baseURL string) {
 	}{
 		{"status=418&delay=30ms&size=17", http.StatusTeapot, 17},
 		{"status=200&delay=0s&size=0", http.StatusOK, 0},
-		{"status=599&size=1048576", 599, 1 << 20},
+		{"status=599&size=65536", 599, 65536},
 		{"status=204&size=17", http.StatusNoContent, 0},
 		{"status=199", http.StatusBadRequest, -1},
 		{"status=600", http.StatusBadRequest, -1},
@@ -97,7 +97,7 @@ func checkResponseControls(t *testing.T, client *http.Client, baseURL string) {
 		{"delay=-1ns", http.StatusBadRequest, -1},
 		{"delay=10.000000001s", http.StatusBadRequest, -1},
 		{"size=-1", http.StatusBadRequest, -1},
-		{"size=1048577", http.StatusBadRequest, -1},
+		{"size=65537", http.StatusBadRequest, -1},
 	} {
 		t.Run(tc.query, func(t *testing.T) {
 			start := time.Now()
@@ -136,7 +136,7 @@ func checkResponseControls(t *testing.T, client *http.Client, baseURL string) {
 	}
 }
 
-func prepareFeatureShutdown(t *testing.T, ports map[string]string, setDependencyReady func(bool)) func() {
+func prepareFeatureShutdown(t *testing.T, ports map[string]string, setDependencyReady func(bool), host string) func() {
 	t.Helper()
 	var sockets []*websocket.Conn
 	for _, scheme := range []string{"ws", "wss"} {
@@ -147,7 +147,7 @@ func prepareFeatureShutdown(t *testing.T, ports map[string]string, setDependency
 		transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} // Self-signed demo certificate.
 		t.Cleanup(transport.CloseIdleConnections)
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		conn, response, err := websocket.Dial(ctx, scheme+"://127.0.0.1:"+port+"/ws", &websocket.DialOptions{HTTPClient: &http.Client{Transport: transport, Timeout: 3 * time.Second}})
+		conn, response, err := websocket.Dial(ctx, scheme+"://"+net.JoinHostPort(host, port)+"/ws", &websocket.DialOptions{HTTPClient: &http.Client{Transport: transport, Timeout: 3 * time.Second}})
 		cancel()
 		if err != nil {
 			if response != nil {
@@ -173,7 +173,7 @@ func prepareFeatureShutdown(t *testing.T, ports map[string]string, setDependency
 		}
 		sockets = append(sockets, conn)
 	}
-	conn, err := grpc.NewClient("127.0.0.1:"+ports["grpc"], grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(net.JoinHostPort(host, ports["grpc"]), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func prepareFeatureShutdown(t *testing.T, ports map[string]string, setDependency
 			t.Fatalf("gRPC health Watch: expected %v, response=%v err=%v", want, response, err)
 		}
 		requestCtx, stop := context.WithTimeout(context.Background(), 2*time.Second)
-		request, err := http.NewRequestWithContext(requestCtx, http.MethodGet, "http://127.0.0.1:"+ports["metrics"]+"/ready", nil)
+		request, err := http.NewRequestWithContext(requestCtx, http.MethodGet, "http://"+net.JoinHostPort(host, ports["metrics"])+"/ready", nil)
 		if err != nil {
 			stop()
 			t.Fatal(err)

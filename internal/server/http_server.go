@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -10,29 +11,36 @@ import (
 
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/handlers"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/metrics"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/protection"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/ui"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/netutil"
 )
 
 const (
-	// Maximum concurrent HTTP connections (same as TCP)
-	maxHTTPConnections = 1000
+	maxHTTPConnections    = 1000
+	maxConcurrentRequests = 100
+	maxHTTPHeaderBytes    = 64 << 10
 )
 
 // HTTPServer represents an HTTP server
 type HTTPServer struct {
 	lifecycle
-	cfg             *config.Config
-	server          *http.Server
-	netListener     net.Listener
-	listenAddr      string
-	listener        string
-	activeConns     int32
-	closeWebSockets func()
+	cfg               *config.Config
+	tlsConfig         *tls.Config
+	certificateSource handlers.CertificateSource
+	server            *http.Server
+	netListener       net.Listener
+	listenAddr        string
+	listener          string
+	activeRequests    int32
+	protection        *protection.Guard
+	closeWebSockets   func()
 }
 
 // NewHTTPServer creates a new HTTP server
-func NewHTTPServer(cfg *config.Config, useTLS bool) *HTTPServer {
+func NewHTTPServer(cfg *config.Config, useTLS bool, tlsConfig *tls.Config, sources ...handlers.CertificateSource) *HTTPServer {
 	port := cfg.HTTPPort
 	listener := "HTTP"
 	switch {
@@ -44,22 +52,51 @@ func NewHTTPServer(cfg *config.Config, useTLS bool) *HTTPServer {
 	}
 
 	s := &HTTPServer{
-		lifecycle:  newLifecycle(),
+		lifecycle:  newLifecycle(listener),
 		cfg:        cfg,
+		tlsConfig:  tlsConfig,
 		listenAddr: ":" + port,
 		listener:   listener,
 	}
+	if len(sources) > 0 {
+		s.certificateSource = sources[0]
+	}
 	mux := http.NewServeMux()
-	websocketHandler, closeWebSockets := handlers.NewWebSocketHandler(cfg)
+	websocketHandler, closeWebSockets := handlers.NewWebSocketHandler(cfg, func() *protection.Guard { return s.protection })
 	s.closeWebSockets = closeWebSockets
 	mux.Handle("/ws", websocketHandler)
+	if cfg.UI {
+		uiHandler := ui.NewHandler(cfg, listener, func() *handlers.ServerCertificate {
+			s.mu.Lock()
+			source := s.certificateSource
+			s.mu.Unlock()
+			if source == nil {
+				return nil
+			}
+			return source()
+		})
+		mux.Handle("/ui", uiHandler)
+		mux.Handle("/ui/", uiHandler)
+		mux.Handle("/robots.txt", uiHandler)
+		mux.Handle("/sitemap.xml", uiHandler)
+	}
 	mux.HandleFunc("/", handlers.HTTPHandler(cfg, listener))
+	var handler http.Handler = mux
+	if useTLS && cfg.QUIC && cfg.QUICAdvertisePort != "" {
+		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Alt-Svc", fmt.Sprintf(`h3=":%s"; ma=300`, cfg.QUICAdvertisePort))
+			mux.ServeHTTP(w, r)
+		})
+	}
 	s.server = &http.Server{
-		Addr:         s.listenAddr,
-		Handler:      s.connectionLimitMiddleware(mux),
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		Addr:              s.listenAddr,
+		Handler:           browserSecurityHeaders(metrics.InstrumentHTTP(listener, protectHTTP(func() *protection.Guard { return s.protection }, requestLimitMiddleware(&s.activeRequests, handler, listener), listener))),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    maxHTTPHeaderBytes,
+		HTTP2:             &http.HTTP2Config{MaxConcurrentStreams: maxConcurrentRequests},
 	}
 	return s
 }
@@ -69,16 +106,16 @@ func (s *HTTPServer) Name() string {
 	return s.listener
 }
 
-// connectionLimitMiddleware limits concurrent connections
-func (s *HTTPServer) connectionLimitMiddleware(next http.Handler) http.Handler {
-	return requestLimitMiddleware(&s.activeConns, next)
-}
-
-func requestLimitMiddleware(active *int32, next http.Handler) http.Handler {
+func requestLimitMiddleware(active *int32, next http.Handler, listeners ...string) http.Handler {
+	listener := "HTTP"
+	if len(listeners) > 0 {
+		listener = listeners[0]
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if atomic.AddInt32(active, 1) > maxHTTPConnections {
+		if atomic.AddInt32(active, 1) > maxConcurrentRequests {
 			atomic.AddInt32(active, -1)
-			http.Error(w, "Service Unavailable: Connection limit reached", http.StatusServiceUnavailable)
+			metrics.RecordRejection(listener, "request_limit")
+			http.Error(w, "Service Unavailable: Concurrent request limit reached", http.StatusServiceUnavailable)
 			return
 		}
 
@@ -97,10 +134,13 @@ func (s *HTTPServer) Start(ctx context.Context) error {
 	}
 
 	if s.listener == "TLS" {
-		tlsConfig, err := handlers.GetTLSConfig(s.cfg)
+		tlsConfig, err := listenerTLSConfig(s.cfg, s.tlsConfig)
 		if err != nil {
 			s.mu.Unlock()
 			return fmt.Errorf("failed to get TLS config: %w", err)
+		}
+		if s.certificateSource == nil {
+			s.certificateSource = handlers.TrackServerCertificate(tlsConfig)
 		}
 		s.server.TLSConfig = tlsConfig
 	}
@@ -117,10 +157,11 @@ func (s *HTTPServer) Start(ctx context.Context) error {
 		s.mu.Unlock()
 		return err
 	}
-	ln = netutil.LimitListener(ln, maxHTTPConnections)
+	ln = netutil.LimitListener(protectListener(trackConnections(ln, s.listener), s.protection, s.listener), maxHTTPConnections)
 	s.netListener = ln
-	close(s.ready)
+	s.markReady()
 	s.mu.Unlock()
+	defer s.markFinished()
 	logrus.Infof("%s server listening on %s", s.listener, ln.Addr())
 	return serveWithContext(ctx, func() error {
 		if s.listener == "TLS" {
@@ -133,7 +174,7 @@ func (s *HTTPServer) Start(ctx context.Context) error {
 // Shutdown gracefully shuts down the HTTP server
 func (s *HTTPServer) Shutdown(ctx context.Context) error {
 	s.mu.Lock()
-	s.stopped = true
+	s.markStopped()
 	srv := s.server
 	closeWebSockets := s.closeWebSockets
 	s.mu.Unlock()
@@ -149,3 +190,6 @@ func (s *HTTPServer) Shutdown(ctx context.Context) error {
 	}
 	return nil
 }
+
+// SetProtection installs the shared guard before Start.
+func (s *HTTPServer) SetProtection(guard *protection.Guard) { s.protection = guard }

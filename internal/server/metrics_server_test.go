@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/metrics"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -80,6 +82,8 @@ func TestMetricsServer_StartAndShutdown(t *testing.T) {
 }
 
 func TestMetricsServer_HealthEndpoint(t *testing.T) {
+	requests := metrics.RequestsTotal.WithLabelValues("Metrics", http.MethodGet, "/health")
+	before := testutil.ToFloat64(requests)
 	cfg := &config.Config{
 		MetricsPort: "13003",
 	}
@@ -102,6 +106,7 @@ func TestMetricsServer_HealthEndpoint(t *testing.T) {
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	assert.Equal(t, "healthy", string(body))
+	require.Eventually(t, func() bool { return testutil.ToFloat64(requests) == before+1 }, time.Second, time.Millisecond)
 
 	// Shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -183,10 +188,7 @@ func TestMetricsServer_MetricsTimeout(t *testing.T) {
 	defer close(release)
 	registry := prometheus.NewRegistry()
 	require.NoError(t, registry.Register(blockingCollector{release: release}))
-	previous := prometheus.DefaultGatherer
-	prometheus.DefaultGatherer = registry
-	defer func() { prometheus.DefaultGatherer = previous }()
-	srv := httptest.NewServer(metricsHandler(20 * time.Millisecond))
+	srv := httptest.NewServer(metricsHandlerWithGatherer(registry, 20*time.Millisecond))
 	defer srv.Close()
 	client := &http.Client{Timeout: time.Second}
 	resp, err := client.Get(srv.URL)
