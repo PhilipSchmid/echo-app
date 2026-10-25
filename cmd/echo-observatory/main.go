@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -84,6 +85,7 @@ func main() {
 	if err != nil {
 		logrus.Fatalf("Failed to load configuration: %v", err)
 	}
+	server.ConfigureProtocolLogging()
 	var sharedTLS *tls.Config
 	var certificateSource handlers.CertificateSource
 	if cfg.TLS || cfg.GRPCTLS || cfg.QUIC {
@@ -195,7 +197,11 @@ func warmCertificate(ctx context.Context, domain string, getCertificate func(*tl
 			logrus.Infof("ACME certificate ready for %s; automatic renewal enabled", domain)
 			return
 		} else {
-			logrus.Warnf("ACME certificate for %s is not ready; retrying in %s: %v", domain, retry, err)
+			if ctx.Err() != nil {
+				return
+			}
+			logrus.WithFields(logrus.Fields{"domain": domain, "retry_in": retry}).Warn("ACME certificate not ready; retrying")
+			logrus.WithField("error_type", fmt.Sprintf("%T", err)).Debug("ACME certificate retrieval failed")
 		}
 		timer := time.NewTimer(retry)
 		select {

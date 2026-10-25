@@ -95,7 +95,14 @@ func (s *TCPServer) Start(ctx context.Context) error {
 		default:
 			// Set accept deadline to check for shutdown periodically
 			if err := listener.(*net.TCPListener).SetDeadline(time.Now().Add(1 * time.Second)); err != nil {
-				logrus.Errorf("Failed to set accept deadline: %v", err)
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-s.shutdown:
+					return nil
+				default:
+					return fmt.Errorf("set TCP accept deadline: %w", err)
+				}
 			}
 
 			conn, err := listener.Accept()
@@ -126,7 +133,7 @@ func (s *TCPServer) Start(ctx context.Context) error {
 			if atomic.LoadInt32(&s.shuttingDown) == 1 {
 				s.mu.Unlock()
 				if err := conn.Close(); err != nil {
-					logrus.Errorf("Failed to close connection during shutdown: %v", err)
+					logrus.Debug("TCP connection cleanup failed during shutdown")
 				}
 				return nil
 			}
@@ -137,7 +144,7 @@ func (s *TCPServer) Start(ctx context.Context) error {
 				s.mu.Unlock()
 				metrics.RecordRejection("TCP", "connection_limit")
 				if err := conn.Close(); err != nil {
-					logrus.Errorf("Failed to close rejected connection: %v", err)
+					logrus.Debug("Rejected TCP connection cleanup failed")
 				}
 				time.Sleep(time.Millisecond)
 				continue
@@ -164,7 +171,9 @@ func (s *TCPServer) handleConnection(conn net.Conn) {
 
 	// Set connection timeout
 	if err := conn.SetDeadline(time.Now().Add(tcpTimeout)); err != nil {
-		logrus.Errorf("Failed to set connection deadline: %v", err)
+		logrus.Debug("TCP connection deadline could not be set")
+		_ = conn.Close()
+		return
 	}
 
 	// Get context safely
@@ -208,10 +217,10 @@ func (s *TCPServer) Shutdown(ctx context.Context) error {
 		s.mu.Unlock()
 
 		// Close all active connections
-		s.connections.Range(func(key, value interface{}) bool {
+		s.connections.Range(func(_, value interface{}) bool {
 			if conn, ok := value.(net.Conn); ok {
 				if cerr := conn.Close(); cerr != nil {
-					logrus.Errorf("Failed to close connection %v: %v", key, cerr)
+					logrus.Debug("TCP connection cleanup failed during shutdown")
 				}
 			}
 			return true
