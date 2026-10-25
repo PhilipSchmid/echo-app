@@ -17,7 +17,8 @@ var (
 	tlsCertErr  error
 )
 
-// GetTLSConfig loads explicit trust material or uses the cached demo certificate.
+// GetTLSConfig creates an ACME provider, loads explicit trust material, or uses the cached demo certificate.
+// Call once and clone the result for encrypted listeners to share an ACME manager.
 func GetTLSConfig(configs ...*config.Config) (*tls.Config, error) {
 	var cfg config.Config
 	if len(configs) > 0 && configs[0] != nil {
@@ -26,18 +27,28 @@ func GetTLSConfig(configs ...*config.Config) (*tls.Config, error) {
 	if (cfg.TLSCertFile == "") != (cfg.TLSKeyFile == "") {
 		return nil, fmt.Errorf("TLS certificate and key files must be supplied together")
 	}
-	var cert tls.Certificate
-	var err error
-	if cfg.TLSCertFile != "" {
-		cert, err = tls.LoadX509KeyPair(cfg.TLSCertFile, cfg.TLSKeyFile)
+	var result *tls.Config
+	if cfg.ACMEDomain != "" {
+		manager, err := newACMEManager(&cfg)
+		if err != nil {
+			return nil, err
+		}
+		result = manager.TLSConfig()
 	} else {
-		tlsCertOnce.Do(func() { tlsCert, tlsCertErr = utils.GenerateSelfSignedCert() })
-		cert, err = tlsCert, tlsCertErr
+		var cert tls.Certificate
+		var err error
+		if cfg.TLSCertFile != "" {
+			cert, err = tls.LoadX509KeyPair(cfg.TLSCertFile, cfg.TLSKeyFile)
+		} else {
+			tlsCertOnce.Do(func() { tlsCert, tlsCertErr = utils.GenerateSelfSignedCert() })
+			cert, err = tlsCert, tlsCertErr
+		}
+		if err != nil {
+			return nil, fmt.Errorf("load server certificate: %w", err)
+		}
+		result = &tls.Config{Certificates: []tls.Certificate{cert}}
 	}
-	if err != nil {
-		return nil, fmt.Errorf("load server certificate: %w", err)
-	}
-	result := &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}
+	result.MinVersion = tls.VersionTLS12
 	if cfg.TLSClientCAFile != "" {
 		data, err := os.ReadFile(cfg.TLSClientCAFile)
 		if err != nil {
