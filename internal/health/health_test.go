@@ -390,16 +390,15 @@ func (h *testLogHook) Entries() []logrus.Entry {
 func captureLogEntries(t *testing.T) *testLogHook {
 	t.Helper()
 	logger := logrus.StandardLogger()
-	originalHooks := logger.Hooks
+	originalHooks := logger.ReplaceHooks(make(logrus.LevelHooks))
 	originalOutput := logger.Out
 	originalLevel := logger.GetLevel()
-	logger.Hooks = make(logrus.LevelHooks)
 	logger.SetOutput(io.Discard)
 	logger.SetLevel(logrus.InfoLevel)
 	hook := &testLogHook{}
 	logger.AddHook(hook)
 	t.Cleanup(func() {
-		logger.Hooks = originalHooks
+		logger.ReplaceHooks(originalHooks)
 		logger.SetOutput(originalOutput)
 		logger.SetLevel(originalLevel)
 	})
