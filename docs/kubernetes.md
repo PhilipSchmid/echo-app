@@ -199,8 +199,11 @@ isolate it from other pods.
 Controller configuration depends on where TLS terminates and which transports
 it supports. A client speaking HTTP/3 to an ingress may still reach echo-observatory
 through HTTP/1.1 or HTTP/2; the response reports the protocol received by the
-app. Forwarded headers never replace `source_ip`, which identifies the socket
-peer. With TLS termination at ingress, backend mutual TLS authenticates the
+app. Forwarded HTTP headers never replace `source_ip`, which identifies the
+socket peer by default. A TCP gateway that sends PROXY protocol can supply
+original client metadata with the application's opt-in
+[trusted PROXY protocol mode](configuration.md#trusted-proxy-protocol); the
+provided manifests leave it disabled. With TLS termination at ingress, backend mutual TLS authenticates the
 ingress connection rather than the original client.
 
 ## Public demo

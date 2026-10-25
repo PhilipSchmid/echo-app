@@ -222,11 +222,50 @@ func (g *Guard) allow(peer string, connection bool) error {
 }
 
 // AllowOperation limits HTTP requests, RPCs, and WebSocket messages together.
-// peer must be the actual socket peer, never an untrusted forwarded header.
+// peer must be the socket peer or a validated PROXY client, never an HTTP header.
 func (g *Guard) AllowOperation(peer string) error { return g.allow(peer, false) }
 
 // AllowConnection separately limits new transports before expensive handshakes.
 func (g *Guard) AllowConnection(peer string) error { return g.allow(peer, true) }
+
+// AllowProxyConnection bounds raw transports before reading a trusted header.
+func (g *Guard) AllowProxyConnection() error {
+	if g == nil {
+		return nil
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.closed {
+		return ErrClosed
+	}
+	if !g.connections.available(1, g.now()) {
+		return ErrConnectionRate
+	}
+	g.connections.tokens--
+	return nil
+}
+
+// AllowPeerConnection completes admission without charging the global bucket again.
+func (g *Guard) AllowPeerConnection(peer string) error {
+	if g == nil {
+		return nil
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.closed {
+		return ErrClosed
+	}
+	if g.opts.PeerRate <= 0 {
+		return nil
+	}
+	now := g.now()
+	b := &g.peer(peer, now).connections
+	if !b.available(1, now) {
+		return ErrPeerRate
+	}
+	b.tokens--
+	return nil
+}
 
 // AllowIngress charges received transport bytes. Callers must drop or close on rejection.
 func (g *Guard) AllowIngress(n int) error {

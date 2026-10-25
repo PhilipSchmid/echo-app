@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/connection"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,13 +32,26 @@ func getHostname() string {
 
 // BaseResponse contains common fields for all responses
 type BaseResponse struct {
-	Timestamp string `json:"timestamp"`
-	Message   string `json:"message,omitempty"`
-	Hostname  string `json:"hostname"`
-	Listener  string `json:"listener"`
-	Node      string `json:"node,omitempty"`
-	SourceIP  string `json:"source_ip"`
-	IPVersion string `json:"ip_version,omitempty"`
+	Timestamp           string `json:"timestamp"`
+	Message             string `json:"message,omitempty"`
+	Hostname            string `json:"hostname"`
+	Listener            string `json:"listener"`
+	Node                string `json:"node,omitempty"`
+	SourceIP            string `json:"source_ip"`
+	IPVersion           string `json:"ip_version,omitempty"`
+	SocketPeerIP        string `json:"socket_peer_ip,omitempty"`
+	SocketPeerIPVersion string `json:"socket_peer_ip_version,omitempty"`
+	SocketPeerAddr      string `json:"socket_peer_addr,omitempty"`
+}
+
+func setSocketPeer(response *BaseResponse, remote net.Addr) {
+	socket := connection.SocketAddr(remote)
+	if socket == nil {
+		return
+	}
+	response.SocketPeerAddr = socket.String()
+	response.SocketPeerIP = extractIP(response.SocketPeerAddr)
+	response.SocketPeerIPVersion = ipVersion(response.SocketPeerIP)
 }
 
 // NewBaseResponse creates a base response with common fields

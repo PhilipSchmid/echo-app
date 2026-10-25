@@ -30,6 +30,8 @@ type Config struct {
 	ResponseControls       bool
 	UI                     bool
 	PublicURL              string
+	ProxyProtocol          bool
+	ProxyTrustedCIDRs      []string
 	TLSCertFile            string
 	TLSKeyFile             string
 	TLSClientCAFile        string
@@ -76,6 +78,8 @@ func Load() (*Config, error) {
 	viper.SetDefault("response-controls", false)
 	viper.SetDefault("ui", true)
 	viper.SetDefault("public-url", "")
+	viper.SetDefault("proxy-protocol", false)
+	viper.SetDefault("proxy-trusted-cidrs", "")
 	viper.SetDefault("tls-cert-file", "")
 	viper.SetDefault("tls-key-file", "")
 	viper.SetDefault("tls-client-ca-file", "")
@@ -128,6 +132,7 @@ func Load() (*Config, error) {
 		ResponseControls:  viper.GetBool("response-controls"),
 		UI:                viper.GetBool("ui"),
 		PublicURL:         viper.GetString("public-url"),
+		ProxyProtocol:     viper.GetBool("proxy-protocol"),
 		TLSCertFile:       viper.GetString("tls-cert-file"),
 		TLSKeyFile:        viper.GetString("tls-key-file"),
 		TLSClientCAFile:   viper.GetString("tls-client-ca-file"),
@@ -174,6 +179,12 @@ func Load() (*Config, error) {
 			HTTPExpectedStatus: viper.GetInt("external-readiness-http-expected-status"),
 		},
 	}
+	if trustedCIDRs := viper.GetString("proxy-trusted-cidrs"); trustedCIDRs != "" {
+		cfg.ProxyTrustedCIDRs = strings.Split(trustedCIDRs, ",")
+		for i := range cfg.ProxyTrustedCIDRs {
+			cfg.ProxyTrustedCIDRs[i] = strings.TrimSpace(cfg.ProxyTrustedCIDRs[i])
+		}
+	}
 
 	// Set log level
 	lvl, err := logrus.ParseLevel(viper.GetString("log-level"))
@@ -194,6 +205,18 @@ func Load() (*Config, error) {
 func (c *Config) Validate() error {
 	if err := protection.ValidateOptions(c.Protection); err != nil {
 		return err
+	}
+	if c.ProxyProtocol && len(c.ProxyTrustedCIDRs) == 0 {
+		return fmt.Errorf("PROXY protocol requires explicitly trusted proxy CIDRs")
+	}
+	if !c.ProxyProtocol && len(c.ProxyTrustedCIDRs) > 0 {
+		return fmt.Errorf("PROXY protocol trust CIDRs require proxy-protocol to be enabled")
+	}
+	for _, cidr := range c.ProxyTrustedCIDRs {
+		prefix, err := netip.ParsePrefix(cidr)
+		if err != nil || prefix != prefix.Masked() || prefix.Bits() == 0 || prefix.Addr().IsUnspecified() || prefix.Addr().IsMulticast() || prefix.Addr().Is4In6() {
+			return fmt.Errorf("PROXY protocol trust must use canonical, non-unspecified unicast CIDRs without /0")
+		}
 	}
 	if c.PublicURL != "" {
 		publicURL, err := normalizePublicURL(c.PublicURL)

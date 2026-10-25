@@ -34,7 +34,7 @@ One guard shares budgets across public listeners. The admin listener is excluded
 | --- | --- | --- | --- |
 | `ECHO_OBSERVATORY_PROTECTION` | `--protection` | `true` | Enable shared operation, connection and transfer budgets. |
 | `ECHO_OBSERVATORY_REQUEST_RATE` | `--request-rate` | `20` | Sustained operations/second and, independently, new connections/second. |
-| `ECHO_OBSERVATORY_PEER_REQUEST_RATE` | `--peer-request-rate` | `5` | Operations and connections/second per socket peer; `0` disables peer limits. IPv6 peers share a `/64`. |
+| `ECHO_OBSERVATORY_PEER_REQUEST_RATE` | `--peer-request-rate` | `5` | Operations and connections/second per client address (socket peer by default, validated original address in PROXY mode); `0` disables peer limits. IPv6 clients share a `/64`. |
 | `ECHO_OBSERVATORY_INGRESS_BYTES_PER_SECOND` | `--ingress-bytes-per-second` | `262144` | Sustained incoming public transport bytes/second: 256 KiB/s. |
 | `ECHO_OBSERVATORY_EGRESS_BYTES_PER_SECOND` | `--egress-bytes-per-second` | `1048576` | Sustained outgoing public transport bytes/second: 1 MiB/s. |
 | `ECHO_OBSERVATORY_DAILY_EGRESS_BYTES` | `--daily-egress-bytes` | `1073741824` | Shared outgoing transport allowance per UTC day: 1 GiB. |
@@ -94,6 +94,43 @@ Compose and Kubernetes advertise HTTP 80, HTTPS/HTTP3 443, TCP 9090 and
 gRPC 50051. For a custom mapping such as `18080:8080`, set
 `--http-advertise-port=18080`. The search-discovery `--public-url` setting does
 not select these ports. The public UI does not advertise private admin settings.
+
+## Trusted PROXY protocol
+
+Available on `main`; not included in `v2.0.0-pre.0`.
+
+Direct connections remain the default, including on-premises installations.
+Enable PROXY protocol only when a trusted TCP proxy sends a header before the
+application data or TLS handshake.
+
+| Environment variable | Flag | Default | Behavior |
+| --- | --- | --- | --- |
+| `ECHO_OBSERVATORY_PROXY_PROTOCOL` | `--proxy-protocol` | `false` | Require PROXY protocol v1/v2 on the public HTTP, HTTPS, raw TCP and gRPC listeners. |
+| `ECHO_OBSERVATORY_PROXY_TRUSTED_CIDRS` | `--proxy-trusted-cidrs` | Empty | Comma-separated CIDRs for the actual proxy socket peers allowed to provide these headers. Required when PROXY protocol is enabled. |
+
+For example, replace these documentation addresses with your proxy's actual
+source addresses:
+
+```bash
+./echo-observatory --tls --proxy-protocol \
+  --proxy-trusted-cidrs='192.0.2.10/32,2001:db8:1::10/128'
+```
+
+Enabled listeners reject untrusted peers and missing or malformed PROXY headers.
+Use the narrowest proxy CIDRs and restrict network access to the backend ports;
+the header itself is not authentication. Trust lists with invalid CIDRs, host
+bits, unspecified or multicast addresses, IPv4-mapped IPv6 prefixes, or `/0`
+are rejected at startup. A trust list without `--proxy-protocol` is also an error.
+
+Only validated address-bearing PROXY headers supply original client metadata.
+The actual socket peer remains separately identifiable. `Forwarded`,
+`X-Forwarded-For` and other HTTP headers do not establish a trusted client address.
+Headers are consumed before TLS, so HTTPS, gRPC TLS and ACME still terminate
+inside the application. Configure the upstream proxy to send the PROXY header
+on every connection, including TLS-ALPN certificate validation connections.
+
+UDP/QUIC and the private admin listener do not use PROXY protocol. Leave the
+feature disabled for direct access; the Compose and Kubernetes defaults do so.
 
 ## TLS and client authentication
 

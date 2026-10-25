@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"net"
 	"time"
 
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
@@ -71,20 +72,25 @@ func (s *EchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (response
 // buildGRPCResponse constructs the response struct for gRPC
 func buildGRPCResponse(ctx context.Context, cfg *config.Config, method string) *proto.EchoResponse {
 	remoteAddr := ""
+	var remote net.Addr
 	if p, ok := peer.FromContext(ctx); ok && p.Addr != nil {
+		remote = p.Addr
 		remoteAddr = p.Addr.String()
 	}
-
 	base := NewBaseResponse(cfg, "gRPC", remoteAddr)
+	setSocketPeer(&base, remote)
 
 	return &proto.EchoResponse{
-		Timestamp:  base.Timestamp,
-		Message:    base.Message,
-		Hostname:   base.Hostname,
-		Listener:   base.Listener,
-		Node:       base.Node,
-		SourceIp:   base.SourceIP,
-		IpVersion:  base.IPVersion,
-		GrpcMethod: method,
+		Timestamp:           base.Timestamp,
+		Message:             base.Message,
+		Hostname:            base.Hostname,
+		Listener:            base.Listener,
+		Node:                base.Node,
+		SourceIp:            base.SourceIP,
+		IpVersion:           base.IPVersion,
+		SocketPeerIp:        base.SocketPeerIP,
+		SocketPeerIpVersion: base.SocketPeerIPVersion,
+		SocketPeerAddr:      base.SocketPeerAddr,
+		GrpcMethod:          method,
 	}
 }

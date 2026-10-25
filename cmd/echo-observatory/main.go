@@ -24,6 +24,8 @@ func main() {
 	pflag.Bool("response-controls", false, "Enable bounded status, delay and size query controls")
 	pflag.Bool("ui", true, "Enable the browser interface at /ui/ on HTTP, HTTPS and HTTP/3")
 	pflag.String("public-url", "", "Public service base URL for UI search discovery; empty disables indexing")
+	pflag.Bool("proxy-protocol", false, "Require trusted PROXY protocol headers on public TCP listeners")
+	pflag.String("proxy-trusted-cidrs", "", "Comma-separated CIDRs allowed to supply PROXY protocol headers")
 	// Define command-line flags
 	pflag.String("message", "", "Custom message")
 	pflag.String("node", "", "Node name")
@@ -60,7 +62,7 @@ func main() {
 	pflag.Int64("max-response-size", 65536, "Maximum echo response size in bytes (0 uses the legacy 1 MiB cap)")
 	pflag.Bool("protection", true, "Enable shared public listener rate and transfer budgets")
 	pflag.Float64("request-rate", 20, "Global operations and new connections per second (independent buckets)")
-	pflag.Float64("peer-request-rate", 5, "Operations and new connections per second per socket peer (0 disables)")
+	pflag.Float64("peer-request-rate", 5, "Operations and new connections per second per client address (0 disables)")
 	pflag.Int64("ingress-bytes-per-second", 262144, "Shared public ingress byte rate")
 	pflag.Int64("egress-bytes-per-second", 1048576, "Shared public egress byte rate")
 	pflag.Int64("daily-egress-bytes", 1073741824, "Public outbound byte allowance per UTC day")

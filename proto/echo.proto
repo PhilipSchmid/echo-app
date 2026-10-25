@@ -19,4 +19,7 @@ message EchoResponse {
   string source_ip = 6;
   string grpc_method = 7;
   string ip_version = 8;
+  string socket_peer_ip = 9;
+  string socket_peer_ip_version = 10;
+  string socket_peer_addr = 11;
 }

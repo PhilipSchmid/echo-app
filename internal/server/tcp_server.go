@@ -68,16 +68,21 @@ func (s *TCPServer) Start(ctx context.Context) error {
 		s.mu.Unlock()
 		return err
 	}
-	listener, err := net.Listen("tcp", s.listenAddr)
+	rawListener, err := net.Listen("tcp", s.listenAddr)
 	if err != nil {
 		s.mu.Unlock()
 		return fmt.Errorf("failed to listen on %s: %w", s.listenAddr, err)
+	}
+	listener, err := publicTCPListener(rawListener, s.cfg, s.protection, "TCP")
+	if err != nil {
+		_ = rawListener.Close()
+		s.mu.Unlock()
+		return err
 	}
 
 	// Store context and listener with mutex protection
 	s.ctx = ctx
 	s.listener = listener
-	guard := s.protection
 	s.markReady()
 	s.mu.Unlock()
 	defer s.markFinished()
@@ -94,7 +99,7 @@ func (s *TCPServer) Start(ctx context.Context) error {
 			return nil
 		default:
 			// Set accept deadline to check for shutdown periodically
-			if err := listener.(*net.TCPListener).SetDeadline(time.Now().Add(1 * time.Second)); err != nil {
+			if err := rawListener.(*net.TCPListener).SetDeadline(time.Now().Add(1 * time.Second)); err != nil {
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
@@ -119,14 +124,6 @@ func (s *TCPServer) Start(ctx context.Context) error {
 					return fmt.Errorf("accept TCP connection: %w", err)
 				}
 			}
-			if err := guard.AllowConnection(conn.RemoteAddr().String()); err != nil {
-				metrics.RecordRejection("TCP", err.Error())
-				_ = conn.Close()
-				time.Sleep(time.Millisecond)
-				continue
-			}
-			conn = protectConn(conn, guard, "TCP")
-
 			// Use mutex to make shutdown check and wg.Add atomic
 			// This prevents race between wg.Add() here and wg.Wait() in Shutdown
 			s.mu.Lock()
@@ -151,7 +148,7 @@ func (s *TCPServer) Start(ctx context.Context) error {
 			}
 
 			// Handle connection - wg.Add protected by mutex
-			s.connections.Store(conn.RemoteAddr().String(), conn)
+			s.connections.Store(conn, conn)
 			s.wg.Add(1)
 			atomic.AddInt32(&s.activeConns, 1)
 			s.mu.Unlock()
@@ -166,14 +163,18 @@ func (s *TCPServer) handleConnection(conn net.Conn) {
 	defer atomic.AddInt32(&s.activeConns, -1)
 
 	// Store connection for graceful shutdown
-	connID := conn.RemoteAddr().String()
-	defer s.connections.Delete(connID)
+	defer s.connections.Delete(conn)
 
 	// Set connection timeout
 	if err := conn.SetDeadline(time.Now().Add(tcpTimeout)); err != nil {
 		logrus.Debug("TCP connection deadline could not be set")
 		_ = conn.Close()
 		return
+	}
+	if forwarded, ok := conn.(*forwardingConn); ok {
+		if err := forwarded.prepare(); err != nil {
+			return
+		}
 	}
 
 	// Get context safely

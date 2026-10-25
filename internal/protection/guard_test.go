@@ -73,6 +73,8 @@ func TestDisabledAndClosedGuard(t *testing.T) {
 	require.Nil(t, g)
 	require.NoError(t, g.AllowOperation("invalid"))
 	require.NoError(t, g.AllowConnection("invalid"))
+	require.NoError(t, g.AllowProxyConnection())
+	require.NoError(t, g.AllowPeerConnection("invalid"))
 	require.NoError(t, g.AllowIngress(100))
 	require.NoError(t, g.ReserveEgress(100))
 	require.Equal(t, Snapshot{}, g.Snapshot())
@@ -82,8 +84,24 @@ func TestDisabledAndClosedGuard(t *testing.T) {
 	require.NoError(t, g.Close())
 	require.ErrorIs(t, g.AllowOperation("127.0.0.1"), ErrClosed)
 	require.ErrorIs(t, g.AllowConnection("127.0.0.1"), ErrClosed)
+	require.ErrorIs(t, g.AllowProxyConnection(), ErrClosed)
+	require.ErrorIs(t, g.AllowPeerConnection("127.0.0.1"), ErrClosed)
 	require.ErrorIs(t, g.AllowIngress(1), ErrClosed)
 	require.ErrorIs(t, g.ReserveEgress(1), ErrClosed)
+}
+
+func TestProxyAdmissionChargesGlobalOnceAndPeersSeparately(t *testing.T) {
+	o := testOptions()
+	o.RequestRate, o.PeerRate = 1, 0.1
+	g, _ := testGuard(t, o)
+	require.NoError(t, g.AllowProxyConnection())
+	require.NoError(t, g.AllowPeerConnection("192.0.2.1:1000"))
+	require.NoError(t, g.AllowProxyConnection())
+	require.ErrorIs(t, g.AllowPeerConnection("192.0.2.1:2000"), ErrPeerRate)
+	require.NoError(t, g.AllowProxyConnection())
+	require.NoError(t, g.AllowPeerConnection("[2001:db8::1]:1000"))
+	require.ErrorIs(t, g.AllowProxyConnection(), ErrConnectionRate)
+	require.Len(t, g.peers, 2, "the proxy hop must not get a shared peer budget")
 }
 
 func TestOperationAndConnectionBudgets(t *testing.T) {

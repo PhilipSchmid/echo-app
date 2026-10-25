@@ -18,9 +18,10 @@ type protectedListener struct {
 	net.Listener
 	guard *protection.Guard
 	name  string
+	proxy bool
 }
 
-func protectListener(ln net.Listener, guard *protection.Guard, name string) net.Listener {
+func protectListener(ln net.Listener, guard *protection.Guard, name string) *protectedListener {
 	return &protectedListener{Listener: ln, guard: guard, name: name}
 }
 
@@ -30,7 +31,13 @@ func (l *protectedListener) Accept() (net.Conn, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := l.guard.AllowConnection(conn.RemoteAddr().String()); err != nil {
+		var admissionErr error
+		if l.proxy {
+			admissionErr = l.guard.AllowProxyConnection()
+		} else {
+			admissionErr = l.guard.AllowConnection(conn.RemoteAddr().String())
+		}
+		if err := admissionErr; err != nil {
 			metrics.RecordRejection(l.name, err.Error())
 			_ = conn.Close()
 			time.Sleep(time.Millisecond)

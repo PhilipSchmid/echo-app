@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/connection"
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/metrics"
 	"github.com/sirupsen/logrus"
 )
@@ -26,6 +27,8 @@ type HTTPResponse struct {
 	RemoteAddr            string              `json:"remote_addr,omitempty"`
 	LocalAddr             string              `json:"local_addr,omitempty"`
 	LocalIPVersion        string              `json:"local_ip_version,omitempty"`
+	SocketLocalAddr       string              `json:"socket_local_addr,omitempty"`
+	SocketLocalIPVersion  string              `json:"socket_local_ip_version,omitempty"`
 	TLSVersion            string              `json:"tls_version,omitempty"`
 	TLSCipherSuite        string              `json:"tls_cipher_suite,omitempty"`
 	TLSServerName         string              `json:"tls_server_name,omitempty"`
@@ -177,12 +180,17 @@ func NewHTTPResponse(r *http.Request, cfg *config.Config, listener string) HTTPR
 		HTTPRequestURI: r.RequestURI,
 		RemoteAddr:     r.RemoteAddr,
 	}
+	setSocketPeer(&response.BaseResponse, connection.RemoteAddr(r.Context()))
 	if response.HTTPRequestURI == "" {
 		response.HTTPRequestURI = r.URL.RequestURI()
 	}
 	if local, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr); ok {
 		response.LocalAddr = local.String()
 		response.LocalIPVersion = ipVersion(extractIP(local.String()))
+		if socket := connection.SocketAddr(local); socket != nil {
+			response.SocketLocalAddr = socket.String()
+			response.SocketLocalIPVersion = ipVersion(extractIP(socket.String()))
+		}
 	}
 	if r.TLS != nil {
 		response.TLSVersion = tls.VersionName(r.TLS.Version)

@@ -29,6 +29,8 @@ func TestLoad_DefaultValues(t *testing.T) {
 	assert.False(t, cfg.ResponseControls)
 	assert.True(t, cfg.UI)
 	assert.Empty(t, cfg.PublicURL)
+	assert.False(t, cfg.ProxyProtocol)
+	assert.Empty(t, cfg.ProxyTrustedCIDRs)
 	assert.False(t, cfg.GRPCTLS)
 	assert.Empty(t, cfg.TLSCertFile)
 	assert.Empty(t, cfg.TLSKeyFile)
@@ -82,6 +84,78 @@ func TestLoad_Protection(t *testing.T) {
 	cfg, err = Load()
 	require.NoError(t, err)
 	assert.False(t, cfg.Protection.Enabled)
+}
+
+func TestProxyProtocolEnvironmentAndFlagPrecedence(t *testing.T) {
+	for _, test := range []struct {
+		name, environment, cidrs string
+		flags                    []string
+		want                     []string
+	}{
+		{"environment", "true", "192.0.2.10/32, 2001:db8:1::10/128", nil, []string{"192.0.2.10/32", "2001:db8:1::10/128"}},
+		{"flag enables environment", "false", "", []string{"--proxy-protocol", "--proxy-trusted-cidrs=127.0.0.1/32,::1/128"}, []string{"127.0.0.1/32", "::1/128"}},
+		{"flag replaces environment list", "true", "192.0.2.10/32", []string{"--proxy-trusted-cidrs=10.20.30.0/24"}, []string{"10.20.30.0/24"}},
+		{"flag disables and clears environment", "true", "192.0.2.10/32", []string{"--proxy-protocol=false", "--proxy-trusted-cidrs="}, nil},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			t.Setenv("ECHO_OBSERVATORY_PROXY_PROTOCOL", test.environment)
+			t.Setenv("ECHO_OBSERVATORY_PROXY_TRUSTED_CIDRS", test.cidrs)
+			flags := pflag.NewFlagSet("proxy", pflag.ContinueOnError)
+			flags.Bool("proxy-protocol", false, "")
+			flags.String("proxy-trusted-cidrs", "", "")
+			require.NoError(t, flags.Parse(test.flags))
+			require.NoError(t, viper.BindPFlags(flags))
+			cfg, err := Load()
+			require.NoError(t, err)
+			assert.Equal(t, len(test.want) > 0, cfg.ProxyProtocol)
+			assert.Equal(t, test.want, cfg.ProxyTrustedCIDRs)
+		})
+	}
+}
+
+func TestValidateProxyProtocolTrust(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		enabled bool
+		cidrs   []string
+	}{
+		{"missing trust", true, nil},
+		{"unused trust", false, []string{"192.0.2.10/32"}},
+		{"empty entry", true, []string{""}},
+		{"missing prefix", true, []string{"192.0.2.10"}},
+		{"invalid prefix", true, []string{"192.0.2.10/33"}},
+		{"IPv4 host bits", true, []string{"192.0.2.10/24"}},
+		{"IPv6 host bits", true, []string{"2001:db8::1/64"}},
+		{"IPv4 all peers", true, []string{"0.0.0.0/0"}},
+		{"IPv6 all peers", true, []string{"::/0"}},
+		{"unspecified peer", true, []string{"0.0.0.0/32"}},
+		{"IPv6 unspecified peer", true, []string{"::/128"}},
+		{"mapped IPv4", true, []string{"::ffff:192.0.2.10/128"}},
+		{"multicast IPv4", true, []string{"224.0.0.0/4"}},
+		{"multicast IPv6", true, []string{"ff00::/8"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := &Config{HTTPPort: "8080", MaxRequestSize: 1024, ProxyProtocol: test.enabled, ProxyTrustedCIDRs: test.cidrs}
+			require.ErrorContains(t, cfg.Validate(), "PROXY protocol")
+		})
+	}
+	for _, cidr := range []string{"127.0.0.1/32", "::1/128", "192.0.2.10/32", "10.20.30.0/24", "fd00::/8", "2001:db8:1::10/128"} {
+		t.Run("valid/"+cidr, func(t *testing.T) {
+			cfg := &Config{HTTPPort: "8080", MaxRequestSize: 1024, ProxyProtocol: true, ProxyTrustedCIDRs: []string{cidr}}
+			require.NoError(t, cfg.Validate())
+		})
+	}
+}
+
+func TestLoadRejectsEmptyProxyTrustEntries(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	t.Setenv("ECHO_OBSERVATORY_PROXY_PROTOCOL", "true")
+	t.Setenv("ECHO_OBSERVATORY_PROXY_TRUSTED_CIDRS", "192.0.2.10/32,,::1/128")
+	_, err := Load()
+	require.ErrorContains(t, err, "PROXY protocol")
 }
 
 func TestLoad_EnvironmentVariables(t *testing.T) {

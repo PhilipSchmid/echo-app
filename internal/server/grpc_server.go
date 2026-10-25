@@ -118,7 +118,13 @@ func (s *GRPCServer) Start(ctx context.Context) error {
 		s.mu.Unlock()
 		return fmt.Errorf("failed to listen on %s: %w", s.listenAddr, err)
 	}
-	listener = netutil.LimitListener(protectListener(trackConnections(listener, "gRPC"), s.protection, "gRPC"), maxGRPCConnections)
+	wrapped, err := publicTCPListener(trackConnections(listener, "gRPC"), s.cfg, s.protection, "gRPC")
+	if err != nil {
+		_ = listener.Close()
+		s.mu.Unlock()
+		return err
+	}
+	listener = netutil.LimitListener(wrapped, maxGRPCConnections)
 	s.listener = listener
 	s.server = grpc.NewServer(opts...)
 
