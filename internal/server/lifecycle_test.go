@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/metrics"
 	pb "github.com/PhilipSchmid/echo-observatory/v2/proto"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -22,11 +24,11 @@ import (
 func testServers() map[string]func() Server {
 	cfg := &config.Config{HTTPPort: "0", TLSPort: "0", TCPPort: "0", GRPCPort: "0", QUICPort: "0", MetricsPort: "0"}
 	return map[string]func() Server{
-		"HTTP":    func() Server { return NewHTTPServer(cfg, false) },
-		"TLS":     func() Server { return NewHTTPServer(cfg, true) },
+		"HTTP":    func() Server { return NewHTTPServer(cfg, false, nil) },
+		"TLS":     func() Server { return NewHTTPServer(cfg, true, nil) },
 		"TCP":     func() Server { return NewTCPServer(cfg) },
-		"gRPC":    func() Server { return NewGRPCServer(cfg) },
-		"QUIC":    func() Server { return NewQUICServer(cfg) },
+		"gRPC":    func() Server { return NewGRPCServer(cfg, nil, nil) },
+		"QUIC":    func() Server { return NewQUICServer(cfg, nil) },
 		"metrics": func() Server { return NewMetricsServer(cfg, nil) },
 	}
 }
@@ -64,13 +66,14 @@ func TestServer_ConcurrentStartShutdown(t *testing.T) {
 					_ = srv.Shutdown(ctx)
 				}()
 				wg.Wait()
+				require.Zero(t, testutil.ToFloat64(metrics.ListenerUp.WithLabelValues(srv.Name())), "shutdown must win over a concurrent bind")
 			}
 		})
 	}
 }
 
 func TestHTTPServer_DrainsActiveRequest(t *testing.T) {
-	srv := NewHTTPServer(&config.Config{HTTPPort: "0"}, false)
+	srv := NewHTTPServer(&config.Config{HTTPPort: "0"}, false, nil)
 	srv.listenAddr = "127.0.0.1:0"
 	done := make(chan error, 1)
 	entered, release := make(chan struct{}), make(chan struct{})
@@ -107,7 +110,7 @@ func TestHTTPServer_DrainsActiveRequest(t *testing.T) {
 }
 
 func TestGRPCServer_WireAndDrain(t *testing.T) {
-	srv := NewGRPCServer(&config.Config{GRPCPort: "0", Message: "grpc-test"})
+	srv := NewGRPCServer(&config.Config{GRPCPort: "0", Message: "grpc-test"}, nil, nil)
 	srv.listenAddr = "127.0.0.1:0"
 	done := make(chan error, 1)
 	go func() { done <- srv.Start(context.Background()) }()
@@ -140,7 +143,7 @@ func TestGRPCServer_WireAndDrain(t *testing.T) {
 }
 
 func TestQUICServer_WireAndDrain(t *testing.T) {
-	srv := NewQUICServer(&config.Config{QUICPort: "0"})
+	srv := NewQUICServer(&config.Config{QUICPort: "0"}, nil)
 	srv.listenAddr = "127.0.0.1:0"
 	done := make(chan error, 1)
 	entered, release := make(chan struct{}), make(chan struct{})
@@ -188,15 +191,21 @@ func TestQUICServer_WireAndDrain(t *testing.T) {
 }
 
 func TestQUICServer_ConnectionAdmission(t *testing.T) {
-	srv := NewQUICServer(&config.Config{})
+	srv := NewQUICServer(&config.Config{}, nil)
 	srv.connections = make(chan struct{}, 1)
+	active := metrics.ActiveConnections.WithLabelValues("QUIC")
+	rejected := metrics.RejectionsTotal.WithLabelValues("QUIC", "connection_limit")
+	beforeActive, beforeRejected := testutil.ToFloat64(active), testutil.ToFloat64(rejected)
 	ctx, cancel := context.WithCancel(context.Background())
 	_, err := srv.connectionContext(ctx, nil)
 	require.NoError(t, err)
+	require.Equal(t, beforeActive+1, testutil.ToFloat64(active))
 	_, err = srv.connectionContext(context.Background(), nil)
 	require.Error(t, err)
+	require.Equal(t, beforeRejected+1, testutil.ToFloat64(rejected))
 	cancel()
 	require.Eventually(t, func() bool { return len(srv.connections) == 0 }, time.Second, time.Millisecond)
+	require.Eventually(t, func() bool { return testutil.ToFloat64(active) == beforeActive }, time.Second, time.Millisecond)
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 	_, err = srv.connectionContext(ctx, nil)

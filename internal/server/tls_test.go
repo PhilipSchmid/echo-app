@@ -80,17 +80,17 @@ func TestTLSListenersVerifyBothPeers(t *testing.T) {
 			var address func() string
 			switch protocol {
 			case "HTTP3":
-				q := NewQUICServer(&fixture.cfg)
+				q := NewQUICServer(&fixture.cfg, nil)
 				q.listenAddr = "127.0.0.1:0"
 				srv = q
 				address = func() string { return q.packet.LocalAddr().String() }
 			case "gRPC":
-				g := NewGRPCServer(&fixture.cfg)
+				g := NewGRPCServer(&fixture.cfg, nil, nil)
 				g.listenAddr = "127.0.0.1:0"
 				srv = g
 				address = func() string { return g.listener.Addr().String() }
 			default:
-				h := NewHTTPServer(&fixture.cfg, true)
+				h := NewHTTPServer(&fixture.cfg, true, nil)
 				h.listenAddr = "127.0.0.1:0"
 				srv = h
 				address = func() string { return h.netListener.Addr().String() }
@@ -173,7 +173,7 @@ func TestTLSListenersVerifyBothPeers(t *testing.T) {
 func TestGRPCHealthTracksReadinessAndFinishesWatches(t *testing.T) {
 	checker := apphealth.NewChecker(config.ExternalReadinessProbe{})
 	checker.SetReady(false, "starting")
-	srv := NewGRPCServer(&config.Config{GRPCPort: "0"}, checker)
+	srv := NewGRPCServer(&config.Config{GRPCPort: "0"}, checker, nil)
 	srv.listenAddr = "127.0.0.1:0"
 	done := make(chan error, 1)
 	go func() { done <- srv.Start(context.Background()) }()

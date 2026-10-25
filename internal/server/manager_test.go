@@ -76,8 +76,8 @@ func TestManager_StartFailure(t *testing.T) {
 	defer func() { _ = ln.Close() }()
 	checker := health.NewChecker(config.ExternalReadinessProbe{})
 	manager := NewManager(&config.Config{}, checker)
-	first := NewHTTPServer(&config.Config{HTTPPort: "0"}, false)
-	bad := NewHTTPServer(&config.Config{}, false)
+	first := NewHTTPServer(&config.Config{HTTPPort: "0"}, false, nil)
+	bad := NewHTTPServer(&config.Config{}, false, nil)
 	bad.listenAddr = ln.Addr().String()
 	manager.RegisterServer(first)
 	manager.RegisterServer(bad)
@@ -94,7 +94,7 @@ func TestManager_StartFailure(t *testing.T) {
 func TestManager_RuntimeFailure(t *testing.T) {
 	checker := health.NewChecker(config.ExternalReadinessProbe{})
 	manager := NewManager(&config.Config{}, checker)
-	srv := NewHTTPServer(&config.Config{HTTPPort: "0"}, false)
+	srv := NewHTTPServer(&config.Config{HTTPPort: "0"}, false, nil)
 	manager.RegisterServer(srv)
 	require.NoError(t, manager.Start(context.Background()))
 	require.NoError(t, srv.netListener.Close())
@@ -137,7 +137,7 @@ func TestManager_ShutdownBeforeStart(t *testing.T) {
 
 func TestManager_DuplicateStartKeepsServing(t *testing.T) {
 	manager := NewManager(&config.Config{}, nil)
-	srv := NewHTTPServer(&config.Config{HTTPPort: "0"}, false)
+	srv := NewHTTPServer(&config.Config{HTTPPort: "0"}, false, nil)
 	srv.listenAddr = "127.0.0.1:0"
 	manager.RegisterServer(srv)
 	require.NoError(t, manager.Start(context.Background()))
@@ -152,7 +152,7 @@ func TestManager_DuplicateStartKeepsServing(t *testing.T) {
 
 func TestManager_ConsumedFailureDuringStartup(t *testing.T) {
 	manager := NewManager(&config.Config{}, nil)
-	first := NewHTTPServer(&config.Config{HTTPPort: "0"}, false)
+	first := NewHTTPServer(&config.Config{HTTPPort: "0"}, false, nil)
 	second := newMockServer("second")
 	entered, ready := make(chan struct{}), make(chan struct{})
 	second.startFn = func(context.Context) error {

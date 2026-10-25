@@ -11,6 +11,8 @@ import (
 
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/handlers"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/metrics"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/protection"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,12 +36,13 @@ type TCPServer struct {
 	shutdown     chan struct{}
 	wg           sync.WaitGroup
 	ctx          context.Context
+	protection   *protection.Guard
 }
 
 // NewTCPServer creates a new TCP server
 func NewTCPServer(cfg *config.Config) *TCPServer {
 	return &TCPServer{
-		lifecycle:  newLifecycle(),
+		lifecycle:  newLifecycle("TCP"),
 		cfg:        cfg,
 		listenAddr: ":" + cfg.TCPPort,
 		shutdown:   make(chan struct{}),
@@ -49,6 +52,13 @@ func NewTCPServer(cfg *config.Config) *TCPServer {
 // Name returns the server name
 func (s *TCPServer) Name() string {
 	return "TCP"
+}
+
+// SetProtection configures shared budgets before Start is called.
+func (s *TCPServer) SetProtection(guard *protection.Guard) {
+	s.mu.Lock()
+	s.protection = guard
+	s.mu.Unlock()
 }
 
 // Start starts the TCP server
@@ -67,8 +77,10 @@ func (s *TCPServer) Start(ctx context.Context) error {
 	// Store context and listener with mutex protection
 	s.ctx = ctx
 	s.listener = listener
-	close(s.ready)
+	guard := s.protection
+	s.markReady()
 	s.mu.Unlock()
+	defer s.markFinished()
 	defer func() { _ = listener.Close() }()
 
 	logrus.Infof("TCP server listening on %s", s.listenAddr)
@@ -100,6 +112,13 @@ func (s *TCPServer) Start(ctx context.Context) error {
 					return fmt.Errorf("accept TCP connection: %w", err)
 				}
 			}
+			if err := guard.AllowConnection(conn.RemoteAddr().String()); err != nil {
+				metrics.RecordRejection("TCP", err.Error())
+				_ = conn.Close()
+				time.Sleep(time.Millisecond)
+				continue
+			}
+			conn = protectConn(conn, guard, "TCP")
 
 			// Use mutex to make shutdown check and wg.Add atomic
 			// This prevents race between wg.Add() here and wg.Wait() in Shutdown
@@ -116,10 +135,11 @@ func (s *TCPServer) Start(ctx context.Context) error {
 			currentConns := atomic.LoadInt32(&s.activeConns)
 			if currentConns >= maxTCPConnections {
 				s.mu.Unlock()
-				logrus.Warnf("Connection limit reached (%d), rejecting new connection", maxTCPConnections)
+				metrics.RecordRejection("TCP", "connection_limit")
 				if err := conn.Close(); err != nil {
 					logrus.Errorf("Failed to close rejected connection: %v", err)
 				}
+				time.Sleep(time.Millisecond)
 				continue
 			}
 
@@ -150,7 +170,14 @@ func (s *TCPServer) handleConnection(conn net.Conn) {
 	// Get context safely
 	s.mu.Lock()
 	ctx := s.ctx
+	guard := s.protection
 	s.mu.Unlock()
+
+	if err := guard.AllowOperation(conn.RemoteAddr().String()); err != nil {
+		metrics.RecordRejection("TCP", err.Error())
+		_ = conn.Close()
+		return
+	}
 
 	// Handle the connection with context
 	handlers.TCPHandler(ctx, conn, s.cfg)
@@ -171,7 +198,7 @@ func (s *TCPServer) Shutdown(ctx context.Context) error {
 		// Start() holds this lock while calling wg.Add(), so acquiring it here
 		// guarantees all pending wg.Add() calls have completed before wg.Wait()
 		s.mu.Lock()
-		s.stopped = true
+		s.markStopped()
 		listener := s.listener
 		if listener != nil {
 			if cerr := listener.Close(); cerr != nil && !errors.Is(cerr, net.ErrClosed) {

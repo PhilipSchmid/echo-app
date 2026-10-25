@@ -42,7 +42,7 @@ func TestHTTPServer_StartAndStop(t *testing.T) {
 		Message:  "test",
 	}
 
-	server := NewHTTPServer(cfg, false)
+	server := NewHTTPServer(cfg, false, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -82,7 +82,7 @@ func TestTLSServer_StartAndStop(t *testing.T) {
 		Message: "test",
 	}
 
-	server := NewHTTPServer(cfg, true)
+	server := NewHTTPServer(cfg, true, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -129,12 +129,12 @@ func TestTLSServer_StartAndStop(t *testing.T) {
 	}
 }
 
-func TestHTTPServer_ConnectionLimit(t *testing.T) {
-	srv := NewHTTPServer(&config.Config{}, false)
-	atomic.StoreInt32(&srv.activeConns, maxHTTPConnections-1)
+func TestHTTPServer_RequestLimit(t *testing.T) {
+	srv := NewHTTPServer(&config.Config{}, false, nil)
+	atomic.StoreInt32(&srv.activeRequests, maxConcurrentRequests-1)
 	entered := make(chan struct{}, 100)
 	release := make(chan struct{})
-	handler := srv.connectionLimitMiddleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { entered <- struct{}{}; <-release }))
+	handler := requestLimitMiddleware(&srv.activeRequests, http.HandlerFunc(func(http.ResponseWriter, *http.Request) { entered <- struct{}{}; <-release }))
 	results := make(chan int, 100)
 	var wg sync.WaitGroup
 	for range 100 {
@@ -163,7 +163,7 @@ func TestHTTPServer_ConnectionLimit(t *testing.T) {
 	}
 	require.Equal(t, 1, accepted)
 	require.Equal(t, 99, rejected)
-	require.Equal(t, int32(maxHTTPConnections-1), atomic.LoadInt32(&srv.activeConns))
+	require.Equal(t, int32(maxConcurrentRequests-1), atomic.LoadInt32(&srv.activeRequests))
 }
 
 func TestHTTPServer_Name(t *testing.T) {
@@ -191,7 +191,7 @@ func TestHTTPServer_Name(t *testing.T) {
 				TLSPort:  "18444",
 			}
 
-			server := NewHTTPServer(cfg, tt.useTLS)
+			server := NewHTTPServer(cfg, tt.useTLS, nil)
 			assert.Equal(t, tt.expected, server.Name())
 		})
 	}
@@ -203,7 +203,7 @@ func TestHTTPServer_GracefulShutdown(t *testing.T) {
 		Message:  "test",
 	}
 
-	server := NewHTTPServer(cfg, false)
+	server := NewHTTPServer(cfg, false, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -243,7 +243,7 @@ func TestHTTPServer_ConcurrentRequests(t *testing.T) {
 		Message:  "test",
 	}
 
-	server := NewHTTPServer(cfg, false)
+	server := NewHTTPServer(cfg, false, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -292,7 +292,7 @@ func TestHTTPServer_ShutdownWithoutStart(t *testing.T) {
 		HTTPPort: "18085",
 	}
 
-	server := NewHTTPServer(cfg, false)
+	server := NewHTTPServer(cfg, false, nil)
 
 	// Shutdown without starting should not error
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -308,7 +308,7 @@ func TestHTTPServer_ActiveConnectionTracking(t *testing.T) {
 		Message:  "test",
 	}
 
-	server := NewHTTPServer(cfg, false)
+	server := NewHTTPServer(cfg, false, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -317,7 +317,7 @@ func TestHTTPServer_ActiveConnectionTracking(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Initially no connections
-	assert.Equal(t, int32(0), atomic.LoadInt32(&server.activeConns))
+	assert.Equal(t, int32(0), atomic.LoadInt32(&server.activeRequests))
 
 	// Make a request
 	resp, err := http.Get("http://localhost:18086/")
@@ -331,7 +331,7 @@ func TestHTTPServer_ActiveConnectionTracking(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Should be back to 0 (or very low due to timing)
-	activeConns := atomic.LoadInt32(&server.activeConns)
+	activeConns := atomic.LoadInt32(&server.activeRequests)
 	assert.LessOrEqual(t, activeConns, int32(1))
 
 	// Shutdown
@@ -348,7 +348,7 @@ func TestH2CServer_HTTP2Negotiation(t *testing.T) {
 		Message:  "h2c-test",
 	}
 
-	server := NewHTTPServer(cfg, false)
+	server := NewHTTPServer(cfg, false, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
