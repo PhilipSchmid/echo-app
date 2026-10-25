@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net"
 	"net/http/httptest"
 	"testing"
@@ -10,11 +11,27 @@ import (
 
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
 	"github.com/PhilipSchmid/echo-observatory/v2/proto"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 )
 
+// Keep logging configuration stable so output I/O does not dominate the hot paths.
+func quietBenchmark(b *testing.B) {
+	b.Helper()
+	logger := logrus.StandardLogger()
+	output, level := logger.Out, logger.GetLevel()
+	logger.SetOutput(io.Discard)
+	logger.SetLevel(logrus.InfoLevel)
+	b.Cleanup(func() {
+		logger.SetOutput(output)
+		logger.SetLevel(level)
+	})
+	b.ReportAllocs()
+}
+
 func BenchmarkHTTPHandler(b *testing.B) {
+	quietBenchmark(b)
 	cfg := &config.Config{
 		Message: "benchmark-test",
 		Node:    "bench-node",
@@ -32,6 +49,7 @@ func BenchmarkHTTPHandler(b *testing.B) {
 }
 
 func BenchmarkHTTPHandlerWithHeaders(b *testing.B) {
+	quietBenchmark(b)
 	cfg := &config.Config{
 		Message:      "benchmark-test",
 		Node:         "bench-node",
@@ -53,6 +71,7 @@ func BenchmarkHTTPHandlerWithHeaders(b *testing.B) {
 }
 
 func BenchmarkNewBaseResponse(b *testing.B) {
+	quietBenchmark(b)
 	cfg := &config.Config{
 		Message: "benchmark-test",
 		Node:    "bench-node",
@@ -65,6 +84,7 @@ func BenchmarkNewBaseResponse(b *testing.B) {
 }
 
 func BenchmarkExtractIP(b *testing.B) {
+	quietBenchmark(b)
 	addresses := []string{
 		"192.168.1.1:8080",
 		"[2001:db8::1]:8080",
@@ -80,6 +100,7 @@ func BenchmarkExtractIP(b *testing.B) {
 }
 
 func BenchmarkGRPCEcho(b *testing.B) {
+	quietBenchmark(b)
 	cfg := &config.Config{
 		Message: "benchmark-test",
 		Node:    "bench-node",
@@ -102,6 +123,7 @@ func BenchmarkGRPCEcho(b *testing.B) {
 }
 
 func BenchmarkTCPHandler(b *testing.B) {
+	quietBenchmark(b)
 	cfg := &config.Config{
 		Message: "benchmark-test",
 		Node:    "bench-node",
@@ -134,6 +156,7 @@ func (c *benchmarkConn) SetReadDeadline(t time.Time) error  { return nil }
 func (c *benchmarkConn) SetWriteDeadline(t time.Time) error { return nil }
 
 func BenchmarkQUICHandler(b *testing.B) {
+	quietBenchmark(b)
 	cfg := &config.Config{
 		Message: "benchmark-test",
 		Node:    "bench-node",
@@ -152,6 +175,7 @@ func BenchmarkQUICHandler(b *testing.B) {
 
 // Benchmark for JSON marshaling which is a common operation
 func BenchmarkJSONMarshal(b *testing.B) {
+	quietBenchmark(b)
 	cfg := &config.Config{
 		Message: "benchmark-test",
 		Node:    "bench-node",
@@ -172,6 +196,7 @@ func BenchmarkJSONMarshal(b *testing.B) {
 
 // Parallel benchmark to test concurrent performance
 func BenchmarkHTTPHandlerParallel(b *testing.B) {
+	quietBenchmark(b)
 	cfg := &config.Config{
 		Message: "benchmark-test",
 		Node:    "bench-node",
@@ -191,6 +216,7 @@ func BenchmarkHTTPHandlerParallel(b *testing.B) {
 
 // Benchmark for hostname caching efficiency
 func BenchmarkGetHostname(b *testing.B) {
+	quietBenchmark(b)
 	// First call initializes the cache
 	_ = getHostname()
 

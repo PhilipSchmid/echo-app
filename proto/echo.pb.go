@@ -66,6 +66,7 @@ type EchoResponse struct {
 	Node          string                 `protobuf:"bytes,5,opt,name=node,proto3" json:"node,omitempty"`
 	SourceIp      string                 `protobuf:"bytes,6,opt,name=source_ip,json=sourceIp,proto3" json:"source_ip,omitempty"`
 	GrpcMethod    string                 `protobuf:"bytes,7,opt,name=grpc_method,json=grpcMethod,proto3" json:"grpc_method,omitempty"`
+	IpVersion     string                 `protobuf:"bytes,8,opt,name=ip_version,json=ipVersion,proto3" json:"ip_version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -149,12 +150,19 @@ func (x *EchoResponse) GetGrpcMethod() string {
 	return ""
 }
 
+func (x *EchoResponse) GetIpVersion() string {
+	if x != nil {
+		return x.IpVersion
+	}
+	return ""
+}
+
 var File_proto_echo_proto protoreflect.FileDescriptor
 
 const file_proto_echo_proto_rawDesc = "" +
 	"\n" +
 	"\x10proto/echo.proto\x12\x04echo\"\r\n" +
-	"\vEchoRequest\"\xd0\x01\n" +
+	"\vEchoRequest\"\xef\x01\n" +
 	"\fEchoResponse\x12\x1c\n" +
 	"\ttimestamp\x18\x01 \x01(\tR\ttimestamp\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1a\n" +
@@ -163,7 +171,9 @@ const file_proto_echo_proto_rawDesc = "" +
 	"\x04node\x18\x05 \x01(\tR\x04node\x12\x1b\n" +
 	"\tsource_ip\x18\x06 \x01(\tR\bsourceIp\x12\x1f\n" +
 	"\vgrpc_method\x18\a \x01(\tR\n" +
-	"grpcMethod2>\n" +
+	"grpcMethod\x12\x1d\n" +
+	"\n" +
+	"ip_version\x18\b \x01(\tR\tipVersion2>\n" +
 	"\vEchoService\x12/\n" +
 	"\x04Echo\x12\x11.echo.EchoRequest\x1a\x12.echo.EchoResponse\"\x00B3Z1github.com/PhilipSchmid/echo-observatory/v2/protob\x06proto3"
 

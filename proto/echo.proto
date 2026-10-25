@@ -18,4 +18,5 @@ message EchoResponse {
   string node = 5;
   string source_ip = 6;
   string grpc_method = 7;
+  string ip_version = 8;
 }
