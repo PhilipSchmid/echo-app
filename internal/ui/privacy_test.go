@@ -16,9 +16,9 @@ func TestPrivacyNoticeDescribesInstanceWithoutReflectingRequestData(t *testing.T
 		headers, unsafe bool
 		policy          string
 	}{
-		{"default redaction", true, false, "Common credential headers are redacted by default."},
-		{"unsafe headers", true, true, "Credential redaction is disabled on this instance."},
-		{"unsafe without header output", false, true, "Credential redaction is disabled on this instance."},
+		{"default redaction", true, false, "Common credential headers are also redacted in responses."},
+		{"unsafe headers", true, true, "Response credential redaction is disabled on this instance."},
+		{"unsafe without header output", false, true, "Response credential redaction is disabled on this instance."},
 		{"no header output", false, false, "Request headers are not included in responses on this instance."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -31,6 +31,10 @@ func TestPrivacyNoticeDescribesInstanceWithoutReflectingRequestData(t *testing.T
 			assert.Contains(t, page, "<h1>Privacy &amp; data</h1>")
 			assert.Contains(t, page, tc.policy)
 			assert.Contains(t, page, "session storage")
+			assert.Contains(t, page, "Philip Schmid")
+			assert.Contains(t, page, "seven days")
+			assert.Contains(t, page, "Common credential headers are always redacted in diagnostic logs.")
+			assert.NotContains(t, page, "Obtain those details from its operator")
 			assert.Contains(t, page, `<a href="mailto:privacy@container.education">privacy@container.education</a>`)
 			assert.Contains(t, page, "https://github.com/philipschmid/echo-observatory/blob/main/docs/privacy.md")
 			assert.NotContains(t, page, "private-marker")

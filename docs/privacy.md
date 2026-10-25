@@ -1,98 +1,85 @@
-# Privacy and logging
+# Privacy notice
 
 Updated: 2026-10-25
 
 [README](../README.md) · [Usage](usage.md) · [Configuration](configuration.md)
 
-This describes the application's behavior, not a complete privacy notice for a
-particular deployment. The UI footer links to a summary at `/ui/privacy/`.
-Use synthetic data: diagnostics expose request and connection information and
-cannot guarantee privacy or confidentiality.
+This notice applies to the public demo at `echo.container.education`, operated
+by **Philip Schmid**. Contact [privacy@container.education](mailto:privacy@container.education)
+for privacy questions or to exercise your rights. Other installations have their
+own operators and privacy arrangements.
 
-Privacy contact for the public demo at `echo.container.education`:
-[privacy@container.education](mailto:privacy@container.education).
-For self-hosted instances, contact your operator.
+## What we process and why
 
-## Browser storage and external services
+The service processes your IP address, URL, headers, protocol and connection
+details, and data you deliberately send, to provide the diagnostics you request
+and protect the service against misuse. Opening `/ui/` also displays the request
+used to load that page. Use synthetic data, never real credentials or confidential
+content.
 
-The application sets no cookies and includes no analytics, advertising,
-fingerprinting, or third-party asset loads. UI assets are bundled; browser
-requests and WebSocket connections use this service. External GitHub links only
-contact GitHub when you follow them.
+Where the GDPR applies, this processing relies on our legitimate interests in
+providing a network-testing service and keeping it secure (Article 6(1)(f)).
+We do not sell personal data, use it for advertising, create visitor profiles,
+or make automated decisions with legal or similarly significant effects.
 
-The UI writes these `sessionStorage` values only after you choose a preference:
+## Storage and retention
 
-| Key | Purpose |
-| --- | --- |
-| `echo-observatory-theme` | Remember the selected light or dark theme. |
-| `echo-observatory-terminal-client` | Remember curl or GNU wget for command examples. |
+- **Request contents:** HTTP bodies are consumed and discarded after handling.
+  WebSocket messages are echoed over the live connection. The app keeps no
+  persistent request history; workbench activity stays in page memory.
+- **Browser preferences:** only your chosen theme and curl/wget preference enter
+  this tab's `sessionStorage`. They contain no request data or visitor identifier.
+  They last for the tab's session; browser session restoration can preserve them.
+- **Operational logs:** the public demo disables routine request diagnostics.
+  Hosting infrastructure retains operational logs for seven days. Error
+  diagnostics can include hostnames, paths and technical connection information.
+  We do not export a separate copy of these logs.
+- **Service measurements:** aggregate operational metrics may remain for about
+  15 days. Application metric labels contain no visitor IPs, header values or
+  arbitrary request URLs.
+- **Protection state:** temporary connection and rate-limit state lives in
+  memory. Idle peer-prefix entries are removed during subsequent checks after
+  ten minutes; restart clears them. Durable quotas contain only a UTC day and
+  aggregate byte counts, without visitor identifiers.
+- **Privacy correspondence:** if you email us, we use your address and message
+  to handle the request and retain them only as needed to resolve it and meet
+  applicable legal obligations.
 
-They are scoped to this origin and browser tab, survive reloads, and last for
-the tab's session. Browser session restoration can preserve them. They contain
-no request contents or visitor identifier.
-Without a saved choice, the theme follows the system and commands use curl.
-The controls still work when browser storage is unavailable. The UI does not
-save request history or use persistent `localStorage`.
+The app sets no cookies and includes no analytics, ads, trackers, external fonts
+or third-party asset loads. Session preferences are saved only after you choose
+them. There is no consent banner for these requested preferences. GitHub receives
+a request only if you follow a GitHub link.
 
-Requested session preferences do not by themselves create a blanket requirement
-for a consent banner. Storage rules also cover technologies other than cookies;
-their purpose matters. Reassess consent and notice requirements if tracking,
-third-party services, or other storage purposes are introduced. See the
-[CNIL guidance on cookies and other trackers](https://www.cnil.fr/fr/cookies-et-autres-traceurs/regles/cookies/comment-mettre-mon-site-web-en-conformite).
+## Recipients and international processing
 
-## Requests, logs, and redaction
+Authorized operators and hosting, network and operational service providers
+process data as needed to deliver and secure the service. The application runs
+in Germany; infrastructure logs, metrics and support operations can involve the
+United States. Transfers to certified US recipients rely on recognized data
+privacy adequacy frameworks. You can request details of recipients and transfer
+safeguards through the privacy contact.
 
-The server processes IP addresses, URLs, headers, and other connection metadata
-to produce diagnostics. HTTP bodies are read within the configured size limit
-and discarded. WebSocket messages are echoed over the live connection. The
-application does not log request or message payloads or keep request history.
+## Your rights
 
-Rate protection keeps a bounded set of socket IP prefixes in memory. It removes
-entries idle for ten minutes during peer checks; process exit clears them all.
-Optional durable quota state records
-only the UTC day and aggregate reserved bytes, without visitor identifiers.
+Subject to applicable law, you can request access, correction, deletion,
+restriction or portability of your personal data, and object to processing based
+on legitimate interests. We may need proportionate identity verification. We do
+not collect extra identifiers just to identify diagnostic requests that are no
+longer retained.
 
-At debug level, HTTP diagnostics include the socket peer IP, request path and
-method. Request log lines omit the query string, but diagnostic responses include
-the original URI. Enabling HTTP header output also adds selected headers and the
-redacted header map to debug logs. TCP and gRPC connection or request diagnostics
-are debug-only; gRPC debug logs include metadata. Successful requests are not
-logged at the default info level. Operators, reverse proxies, and hosting
-platforms may record additional data and determine log retention.
+You may complain to your local data-protection authority, including the
+[Swiss FDPIC](https://www.edoeb.admin.ch/en/)
+or a [competent EU supervisory authority](https://www.edpb.europa.eu/about-edpb/about-edpb/members_en).
 
-HTTP readiness probe logs identify only the target host and port. Probe logs
-and readiness errors omit URL credentials, paths, queries and fragments, and
-report fixed failure categories rather than raw HTTP client errors.
+## Technical privacy limits
 
-The default filter redacts header names matching Authorization,
-Proxy-Authorization, Cookie, or Set-Cookie, and names containing token, secret,
-key, password, passphrase, or credential, case-insensitively.
-`--unsafe-headers` disables this filter in diagnostic output and debug metadata
-logs. It does not enable HTTP header output by itself.
+Common credential headers are redacted in responses by default and always in
+application diagnostic logs. `--unsafe-headers` can disable response redaction
+on self-hosted instances; it does not disable log redaction or enable header
+output. Header-name filtering is not exhaustive. Personal or confidential values
+can still appear in paths, queries, custom headers or other diagnostic fields.
 
-This name filter is not exhaustive. Paths, custom headers, user agents, and debug
-metadata may contain personal or confidential data; headers such as Referer may
-contain URLs. Never send real credentials or confidential content in paths,
-queries, headers, bodies, or WebSocket messages.
-
-Use HTTPS and WSS with a trusted certificate for public browser traffic, and TLS
-for gRPC. Plain HTTP, h2c, raw TCP, and plaintext gRPC are unencrypted. TLS protects
-traffic in transit; the service and any TLS-terminating proxy still receive it.
-
-## Public deployment responsibilities
-
-Before operating a public instance, provide an accessible notice identifying the
-controller and a real privacy contact. Describe the data processed, purposes and
-applicable legal basis, hosting and other recipients, countries and transfer
-safeguards where applicable, actual retention periods or their criteria, and
-users' rights and complaint route. Explain both application and infrastructure
-logs. Choose and enforce retention rather than assuming that discarded payloads
-mean no data is retained.
-
-The operator must supply these facts; this repository does not establish an
-operator, contact address, hosting arrangement, or retention period for every
-instance. Consent to browser storage and transparency about personal-data
-processing are separate questions. See the
-[European Commission's information requirements](https://commission.europa.eu/law/law-topic/data-protection/information-individuals_en)
-and the
-[Swiss FDPIC's duty to provide information](https://www.edoeb.admin.ch/en/duty-to-provide-information).
+Use HTTPS, WSS or TLS-enabled gRPC with a trusted certificate to encrypt traffic.
+Plain HTTP, h2c, raw TCP and plaintext gRPC are unencrypted. The service receives
+the data you send even when TLS protects it in transit. Privacy and
+confidentiality cannot be guaranteed.
