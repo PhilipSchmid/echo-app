@@ -47,11 +47,11 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 		// Panic recovery to prevent handler crashes
 		defer func() {
 			if rec := recover(); rec != nil {
-				logrus.Errorf("[%s] Recovered from panic: %v", listener, rec)
+				logrus.Errorf("[%s] Recovered from panic", listener)
 				metrics.RecordError(listener, "panic")
 				w.WriteHeader(http.StatusInternalServerError)
 				if _, writeErr := w.Write([]byte("Internal Server Error")); writeErr != nil {
-					logrus.Errorf("Failed to write panic response: %v", writeErr)
+					logrus.Debug("Failed to write panic response")
 				}
 			}
 		}()
@@ -90,7 +90,7 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 				r.Host,
 				r.Header.Get("Content-Type"),
 				r.Header.Get("Accept"))
-			logrus.Debugf("[%s] Request headers: %+v", listener, diagnosticHeaders(r.Header, cfg.UnsafeHeaders))
+			logrus.Debugf("[%s] Request headers: %+v", listener, diagnosticHeaders(r.Header, false))
 		}
 
 		controls := responseControls{status: http.StatusOK, size: -1}
@@ -149,7 +149,7 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 				written = int64(n)
 			}
 			if writeErr != nil {
-				logrus.Debugf("Failed to write response: %v", writeErr)
+				logrus.Debug("Failed to write response")
 				metrics.RecordError(listener, "write_error")
 			}
 		}

@@ -36,7 +36,7 @@ func (s *EchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (response
 	// Panic recovery to prevent handler crashes
 	defer func() {
 		if rec := recover(); rec != nil {
-			logrus.Errorf("[gRPC] Recovered from panic: %v", rec)
+			logrus.Error("[gRPC] Recovered from panic")
 			metrics.RecordError("gRPC", "panic")
 			response = nil
 			err = status.Error(codes.Internal, "internal server error")
@@ -52,7 +52,7 @@ func (s *EchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (response
 		}
 		logrus.Debugf("[gRPC] Request: %s from %s", method, remoteAddr)
 		if md, ok := metadata.FromIncomingContext(ctx); ok {
-			logrus.Debugf("[gRPC] Request metadata: %+v", diagnosticHeaders(md, s.cfg != nil && s.cfg.UnsafeHeaders))
+			logrus.Debugf("[gRPC] Request metadata: %+v", diagnosticHeaders(md, false))
 		}
 		defer func() {
 			logrus.Debugf("[gRPC] Response sent to %s in %.3fms", remoteAddr, float64(time.Since(start))/float64(time.Millisecond))

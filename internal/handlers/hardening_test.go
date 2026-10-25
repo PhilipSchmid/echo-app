@@ -92,26 +92,26 @@ func TestHTTPDiagnosticHeaderRedaction(t *testing.T) {
 		assert.Contains(t, logs.String(), "diagnostic.example")
 		if unsafe {
 			assert.Contains(t, w.Body.String(), "credential-value")
-			assert.Contains(t, logs.String(), "credential-value")
 		} else {
 			assert.NotContains(t, w.Body.String(), "credential-value")
-			assert.NotContains(t, logs.String(), "credential-value")
 			assert.Equal(t, []string{"[REDACTED]"}, response.Headers["Authorization"])
 		}
+		assert.NotContains(t, logs.String(), "credential-value", "unsafe echo headers must not disable log redaction")
 	}
 }
 
 func TestGRPCMetadataRedaction(t *testing.T) {
 	logs := captureDebugLogs(t)
 	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "credential-value", "x-api-key", "api-key-value", "x-password", "password-value", "x-passphrase", "passphrase-value", "x-credentials", "credentials-value", "x-diagnostic", "visible-value"))
-	_, err := NewEchoServer(&config.Config{}).Echo(ctx, &proto.EchoRequest{})
-	require.NoError(t, err)
-	assert.NotContains(t, logs.String(), "credential-value")
-	assert.NotContains(t, logs.String(), "api-key-value")
-	assert.NotContains(t, logs.String(), "password-value")
-	assert.NotContains(t, logs.String(), "passphrase-value")
-	assert.NotContains(t, logs.String(), "credentials-value")
-	assert.Contains(t, logs.String(), "visible-value")
+	for _, unsafe := range []bool{false, true} {
+		logs.Reset()
+		_, err := NewEchoServer(&config.Config{UnsafeHeaders: unsafe}).Echo(ctx, &proto.EchoRequest{})
+		require.NoError(t, err)
+		for _, secret := range []string{"credential-value", "api-key-value", "password-value", "passphrase-value", "credentials-value"} {
+			assert.NotContains(t, logs.String(), secret, "unsafe echo headers must not disable log redaction")
+		}
+		assert.Contains(t, logs.String(), "visible-value")
+	}
 }
 
 func TestGRPCPanicReturnsInternal(t *testing.T) {

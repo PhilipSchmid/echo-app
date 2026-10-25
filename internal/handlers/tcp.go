@@ -24,14 +24,14 @@ func TCPHandler(ctx context.Context, conn net.Conn, cfg *config.Config) {
 	// Panic recovery to prevent handler crashes
 	defer func() {
 		if rec := recover(); rec != nil {
-			logrus.Errorf("[TCP] Recovered from panic: %v", rec)
+			logrus.Error("[TCP] Recovered from panic")
 			metrics.RecordError("TCP", "panic")
 		}
 	}()
 
 	defer func() {
 		if err := conn.Close(); err != nil {
-			logrus.Errorf("Failed to close TCP connection: %v", err)
+			logrus.Debug("Failed to close TCP connection")
 		}
 		if debug {
 			logrus.Debugf("[TCP] Connection closed from %s after %.3fms", remoteAddr, float64(time.Since(start))/float64(time.Millisecond))
@@ -62,7 +62,7 @@ func TCPHandler(ctx context.Context, conn net.Conn, cfg *config.Config) {
 	response := TCPResponse{BaseResponse: NewBaseResponse(cfg, "TCP", remoteAddr)}
 	data, err := json.Marshal(response)
 	if err != nil {
-		logrus.Errorf("Failed to marshal JSON: %v", err)
+		logrus.Error("Failed to marshal TCP response")
 		metrics.RecordError("TCP", "marshal_error")
 		return
 	}
@@ -76,7 +76,7 @@ func TCPHandler(ctx context.Context, conn net.Conn, cfg *config.Config) {
 	}
 	if _, err := conn.Write(data); err != nil {
 		if debug {
-			logrus.Debugf("Failed to write to connection: %v", err)
+			logrus.Debug("Failed to write to TCP connection")
 		}
 		metrics.RecordError("TCP", "write_error")
 	} else if debug {

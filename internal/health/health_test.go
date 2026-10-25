@@ -244,14 +244,13 @@ func TestCheckerLogsExternalProbeStatusChangesOnly(t *testing.T) {
 	assert.Equal(t, logrus.WarnLevel, entries[0].Level)
 	assert.Equal(t, "external readiness probe is not ready", entries[0].Message)
 	assert.Equal(t, "icmp", entries[0].Data["probe_type"])
-	assert.Equal(t, "192.0.2.1", entries[0].Data["target"])
-	loggedErr, ok := entries[0].Data[logrus.ErrorKey].(error)
-	require.True(t, ok)
-	assert.EqualError(t, loggedErr, "icmp failed")
+	assert.NotContains(t, entries[0].Data, "target")
+	assert.NotContains(t, entries[0].Data, logrus.ErrorKey)
+	assert.Equal(t, "probe_failed", entries[0].Data["reason"])
 	assert.Equal(t, logrus.InfoLevel, entries[1].Level)
 	assert.Equal(t, "external readiness probe is ready", entries[1].Message)
 	assert.Equal(t, "icmp", entries[1].Data["probe_type"])
-	assert.Equal(t, "192.0.2.1", entries[1].Data["target"])
+	assert.NotContains(t, entries[1].Data, "target")
 }
 
 type probeTransportFunc func(*http.Request) (*http.Response, error)
@@ -289,7 +288,7 @@ func TestHTTPProbeOmitsURLSecretsFromLogsAndReadiness(t *testing.T) {
 			checker.checkOnce(context.Background())
 			entries := hook.Entries()
 			require.Len(t, entries, 1)
-			assert.Equal(t, "upstream.example:8443", entries[0].Data["target"])
+			assert.NotContains(t, entries[0].Data, "target")
 			response := httptest.NewRecorder()
 			checker.ReadyHandler(response, httptest.NewRequest(http.MethodGet, "/ready", nil))
 			assert.Equal(t, tc.reason == "", checker.IsReady())
@@ -302,6 +301,50 @@ func TestHTTPProbeOmitsURLSecretsFromLogsAndReadiness(t *testing.T) {
 				assert.NotContains(t, output, secret)
 			}
 		})
+	}
+}
+
+func TestProbeLogsKeepRawErrorsPrivateAndTargetsDebugOnly(t *testing.T) {
+	const target = "https://probe-user:probe-pass@upstream.example:8443/private-path?token=secret-query"
+	for _, level := range []logrus.Level{logrus.InfoLevel, logrus.DebugLevel} {
+		for _, probeType := range []string{"https", "tcp", "icmp"} {
+			t.Run(level.String()+"/"+probeType, func(t *testing.T) {
+				hook := captureLogEntries(t)
+				logrus.SetLevel(level)
+				probeTarget := "192.0.2.1:54321"
+				if probeType == "https" {
+					probeTarget = target
+				}
+				checker := NewChecker(config.ExternalReadinessProbe{Type: probeType, Target: probeTarget})
+				checker.logExternalReadinessChange(false, &net.OpError{Op: "dial", Addr: &net.TCPAddr{IP: net.ParseIP("192.0.2.1"), Port: 54321}, Err: errors.New("raw-error-private-marker " + target)})
+				entries := hook.Entries()
+				require.NotEmpty(t, entries)
+				last := entries[len(entries)-1]
+				assert.Equal(t, logrus.WarnLevel, last.Level)
+				assert.Equal(t, "probe_failed", last.Data["reason"])
+				assert.NotContains(t, last.Data, "target")
+				assert.NotContains(t, last.Data, logrus.ErrorKey)
+				for _, entry := range entries {
+					output := entry.Message + fmt.Sprint(entry.Data)
+					for _, secret := range []string{"raw-error-private-marker", "probe-user", "probe-pass", "private-path", "secret-query"} {
+						assert.NotContains(t, output, secret)
+					}
+				}
+				if level == logrus.InfoLevel {
+					require.Len(t, entries, 1)
+					assert.NotContains(t, fmt.Sprint(last.Data), "192.0.2.1")
+					assert.NotContains(t, fmt.Sprint(last.Data), "upstream.example")
+				} else {
+					require.Len(t, entries, 2)
+					assert.Equal(t, logrus.DebugLevel, entries[0].Level)
+					wantTarget := probeTarget
+					if probeType == "https" {
+						wantTarget = "upstream.example:8443"
+					}
+					assert.Equal(t, wantTarget, entries[0].Data["target"])
+				}
+			})
+		}
 	}
 }
 
@@ -349,13 +392,16 @@ func captureLogEntries(t *testing.T) *testLogHook {
 	logger := logrus.StandardLogger()
 	originalHooks := logger.Hooks
 	originalOutput := logger.Out
+	originalLevel := logger.GetLevel()
 	logger.Hooks = make(logrus.LevelHooks)
 	logger.SetOutput(io.Discard)
+	logger.SetLevel(logrus.InfoLevel)
 	hook := &testLogHook{}
 	logger.AddHook(hook)
 	t.Cleanup(func() {
 		logger.Hooks = originalHooks
 		logger.SetOutput(originalOutput)
+		logger.SetLevel(originalLevel)
 	})
 	return hook
 }

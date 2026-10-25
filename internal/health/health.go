@@ -99,23 +99,42 @@ func (c *Checker) checkOnce(parent context.Context) {
 }
 
 func (c *Checker) logExternalReadinessChange(ready bool, err error) {
-	target := c.probe.Target
-	if probeType := strings.ToLower(c.probe.Type); probeType == "http" || probeType == "https" {
-		target = "invalid HTTP target"
-		if parsed, parseErr := url.Parse(c.probe.Target); parseErr == nil && parsed.Host != "" {
-			target = parsed.Host
+	entry := logrus.WithField("probe_type", c.probe.Type)
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		target := c.probe.Target
+		if probeType := strings.ToLower(c.probe.Type); probeType == "http" || probeType == "https" {
+			target = "invalid HTTP target"
+			if parsed, parseErr := url.Parse(c.probe.Target); parseErr == nil && parsed.Host != "" {
+				target = parsed.Host
+			}
 		}
+		entry.WithField("target", target).Debug("external readiness probe target")
 	}
-	entry := logrus.WithFields(logrus.Fields{
-		"probe_type": c.probe.Type,
-		"target":     target,
-	})
 	if ready {
 		entry.Info("external readiness probe is ready")
 		return
 	}
 	if err != nil {
-		entry = entry.WithError(err)
+		// Network error strings can contain addresses, URLs or untrusted response data.
+		reason := "probe_failed"
+		var dnsError *net.DNSError
+		var tlsError *tls.CertificateVerificationError
+		var networkError net.Error
+		switch {
+		case errors.Is(err, context.Canceled):
+			reason = "canceled"
+		case errors.Is(err, context.DeadlineExceeded):
+			reason = "timeout"
+		case errors.As(err, &dnsError):
+			reason = "dns_error"
+		case errors.As(err, &tlsError):
+			reason = "certificate_error"
+		case errors.Is(err, syscall.ECONNREFUSED):
+			reason = "connection_refused"
+		case errors.As(err, &networkError) && networkError.Timeout():
+			reason = "timeout"
+		}
+		entry = entry.WithField("reason", reason)
 	}
 	entry.Warn("external readiness probe is not ready")
 }
