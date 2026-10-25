@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"sync"
@@ -10,14 +11,31 @@ import (
 
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/metrics"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/protection"
 	"github.com/coder/websocket"
 )
 
 // NewWebSocketHandler returns bounded message echo and a shutdown hook for hijacked connections.
-func NewWebSocketHandler(cfg *config.Config) (http.Handler, func()) {
+func NewWebSocketHandler(cfg *config.Config, guards ...func() *protection.Guard) (http.Handler, func()) {
 	var mu sync.Mutex
 	closed := false
 	connections := make(map[*websocket.Conn]struct{})
+	recordFailure := func(err error, operation string) {
+		mu.Lock()
+		stopped := closed
+		mu.Unlock()
+		code := websocket.CloseStatus(err)
+		if stopped || code == websocket.StatusNormalClosure || code == websocket.StatusGoingAway {
+			return
+		}
+		reason := operation + "_error"
+		if errors.Is(err, context.DeadlineExceeded) {
+			reason = operation + "_timeout"
+		} else if errors.Is(err, websocket.ErrMessageTooBig) || code == websocket.StatusMessageTooBig {
+			reason = "message_too_large"
+		}
+		metrics.RecordError("WebSocket", reason)
+	}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		if r.ProtoMajor != 1 || r.ProtoMinor < 1 {
@@ -47,7 +65,17 @@ func NewWebSocketHandler(cfg *config.Config) (http.Handler, func()) {
 			return
 		}
 		defer func() { _ = conn.CloseNow() }()
-		conn.SetReadLimit(min(cfg.MaxRequestSize, int64(maxResponseSize)))
+		conn.SetReadLimit(min(cfg.MaxRequestSize, responseLimit(cfg)))
+		var guard *protection.Guard
+		if len(guards) > 0 {
+			guard = guards[0]()
+		}
+		sessionCtx := context.Background()
+		if guard != nil {
+			var cancel context.CancelFunc
+			sessionCtx, cancel = context.WithTimeout(sessionCtx, 2*time.Minute)
+			defer cancel()
+		}
 		mu.Lock()
 		if closed {
 			mu.Unlock()
@@ -62,23 +90,47 @@ func NewWebSocketHandler(cfg *config.Config) (http.Handler, func()) {
 		}()
 		metrics.ConnectionOpened("WebSocket")
 		defer metrics.ConnectionClosed("WebSocket")
+		messages, payloadBytes := 0, 0
 		for {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(sessionCtx, 30*time.Second)
 			messageType, data, err := conn.Read(ctx)
 			cancel()
 			if err != nil {
+				recordFailure(err, "read")
 				return
 			}
+			if guard != nil {
+				messages++
+				payloadBytes += len(data)
+				if messages > 60 || payloadBytes > 1<<20 {
+					metrics.RecordRejection("WebSocket", "session_limit")
+					_ = conn.Close(websocket.StatusPolicyViolation, "Session allowance reached; reconnect to continue")
+					return
+				}
+				if err := guard.AllowOperation(r.RemoteAddr); err != nil {
+					metrics.RecordRejection("WebSocket", err.Error())
+					_ = conn.Close(websocket.StatusTryAgainLater, "Message rate limit reached")
+					return
+				}
+			}
+			kind := "text"
+			if messageType == websocket.MessageBinary {
+				kind = "binary"
+			}
+			metrics.RecordWebSocketMessage("received", kind, len(data))
 			if messageType == websocket.MessageText && !utf8.Valid(data) {
+				metrics.RecordError("WebSocket", "invalid_utf8")
 				_ = conn.Close(websocket.StatusInvalidFramePayloadData, "invalid UTF-8")
 				return
 			}
-			ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel = context.WithTimeout(sessionCtx, 30*time.Second)
 			err = conn.Write(ctx, messageType, data)
 			cancel()
 			if err != nil {
+				recordFailure(err, "write")
 				return
 			}
+			metrics.RecordWebSocketMessage("sent", kind, len(data))
 		}
 	})
 	return handler, func() {

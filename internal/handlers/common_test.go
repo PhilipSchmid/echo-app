@@ -120,3 +120,22 @@ func TestNewBaseResponse_EmptyConfig(t *testing.T) {
 }
 
 // TestHostnameCaching tests that hostname is properly cached
+
+func TestConnectionIPVersion(t *testing.T) {
+	for _, tc := range []struct{ remote, ip, version string }{
+		{"192.0.2.1:8080", "192.0.2.1", "IPv4"},
+		{"[2001:db8::1]:8080", "2001:db8::1", "IPv6"},
+		{"[::1]:8080", "::1", "IPv6"},
+		{"[fe80::1%eth0]:8080", "fe80::1%eth0", "IPv6"},
+		{"[::ffff:192.0.2.1]:8080", "::ffff:192.0.2.1", "IPv4"},
+		{"2001:db8::1", "2001:db8::1", "IPv6"},
+		{"not-an-ip", "not-an-ip", ""},
+		{"", "", ""},
+	} {
+		t.Run(tc.remote, func(t *testing.T) {
+			response := NewBaseResponse(&config.Config{}, "TCP", tc.remote)
+			assert.Equal(t, tc.ip, response.SourceIP)
+			assert.Equal(t, tc.version, response.IPVersion)
+		})
+	}
+}

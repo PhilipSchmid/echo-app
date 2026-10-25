@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
 )
 
 const (
@@ -19,7 +21,11 @@ type responseControls struct {
 	size   int
 }
 
-func parseResponseControls(rawQuery string) (responseControls, error) {
+func parseResponseControls(rawQuery string, limits ...int64) (responseControls, error) {
+	limit := int64(maxResponseSize)
+	if len(limits) > 0 && limits[0] > 0 {
+		limit = min(limit, limits[0])
+	}
 	controls := responseControls{status: http.StatusOK, size: -1}
 	query, err := url.ParseQuery(rawQuery)
 	if err != nil {
@@ -46,8 +52,8 @@ func parseResponseControls(rawQuery string) (responseControls, error) {
 			}
 		case "size":
 			controls.size, err = strconv.Atoi(values[0])
-			if err != nil || controls.size < 0 || controls.size > maxResponseSize {
-				return controls, fmt.Errorf("size must be between 0 and 1048576 bytes")
+			if err != nil || controls.size < 0 || int64(controls.size) > limit {
+				return controls, fmt.Errorf("size must be between 0 and %d bytes", limit)
 			}
 		}
 	}
@@ -59,4 +65,11 @@ type zeroReader struct{}
 func (zeroReader) Read(data []byte) (int, error) {
 	clear(data)
 	return len(data), nil
+}
+
+func responseLimit(cfg *config.Config) int64 {
+	if cfg.MaxResponseSize > 0 {
+		return min(cfg.MaxResponseSize, int64(maxResponseSize))
+	}
+	return maxResponseSize
 }

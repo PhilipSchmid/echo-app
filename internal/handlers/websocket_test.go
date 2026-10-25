@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/metrics"
 	"github.com/coder/websocket"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -104,6 +106,8 @@ func TestWebSocketMessageLimits(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			server, _ := webSocketTestServer(t, tc.limit)
+			tooLarge := metrics.ErrorsTotal.WithLabelValues("WebSocket", "message_too_large")
+			beforeTooLarge := testutil.ToFloat64(tooLarge)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(server.URL, "http")+"/ws", nil)
@@ -124,6 +128,7 @@ func TestWebSocketMessageLimits(t *testing.T) {
 			_, _, err = conn.Read(ctx)
 			require.Error(t, err)
 			assert.Equal(t, websocket.StatusMessageTooBig, websocket.CloseStatus(err))
+			require.Eventually(t, func() bool { return testutil.ToFloat64(tooLarge) == beforeTooLarge+1 }, time.Second, time.Millisecond)
 		})
 	}
 }

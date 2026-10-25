@@ -10,7 +10,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
 	"github.com/PhilipSchmid/echo-observatory/v2/proto"
@@ -78,7 +77,7 @@ func TestHTTPDiagnosticHeaderRedaction(t *testing.T) {
 	logs := captureDebugLogs(t)
 	for _, unsafe := range []bool{false, true} {
 		req := httptest.NewRequest(http.MethodGet, "http://diagnostic.example/", nil)
-		for _, name := range []string{"Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie", "X-Api-Key", "X-Access-Token", "X-Client-Secret"} {
+		for _, name := range []string{"Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie", "X-Api-Key", "X-Access-Token", "X-Client-Secret", "X-Password", "X-Passphrase", "X-Credentials"} {
 			req.Header.Set(name, "credential-value")
 		}
 		req.Header.Set("X-Diagnostic", "visible-value")
@@ -104,11 +103,14 @@ func TestHTTPDiagnosticHeaderRedaction(t *testing.T) {
 
 func TestGRPCMetadataRedaction(t *testing.T) {
 	logs := captureDebugLogs(t)
-	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "credential-value", "x-api-key", "api-key-value", "x-diagnostic", "visible-value"))
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "credential-value", "x-api-key", "api-key-value", "x-password", "password-value", "x-passphrase", "passphrase-value", "x-credentials", "credentials-value", "x-diagnostic", "visible-value"))
 	_, err := NewEchoServer(&config.Config{}).Echo(ctx, &proto.EchoRequest{})
 	require.NoError(t, err)
 	assert.NotContains(t, logs.String(), "credential-value")
 	assert.NotContains(t, logs.String(), "api-key-value")
+	assert.NotContains(t, logs.String(), "password-value")
+	assert.NotContains(t, logs.String(), "passphrase-value")
+	assert.NotContains(t, logs.String(), "credentials-value")
 	assert.Contains(t, logs.String(), "visible-value")
 }
 
@@ -131,68 +133,4 @@ func TestHTTPHandlerDoesNotRetainBodyWrappers(t *testing.T) {
 	}
 	_, err := io.Copy(io.Discard, req.Body)
 	require.NoError(t, err)
-}
-
-type deadlineWriter struct {
-	*httptest.ResponseRecorder
-	readDeadline  time.Time
-	writeDeadline time.Time
-	readError     error
-	writeError    error
-}
-
-func (w *deadlineWriter) SetReadDeadline(deadline time.Time) error {
-	w.readDeadline = deadline
-	return w.readError
-}
-
-func (w *deadlineWriter) SetWriteDeadline(deadline time.Time) error {
-	w.writeDeadline = deadline
-	return w.writeError
-}
-
-type checkingReader func([]byte) (int, error)
-
-func (read checkingReader) Read(data []byte) (int, error) { return read(data) }
-
-func TestHTTP3DeadlinesPrecedeBodyRead(t *testing.T) {
-	w := &deadlineWriter{ResponseRecorder: httptest.NewRecorder()}
-	req := httptest.NewRequest(http.MethodPost, "/", nil)
-	req.ProtoMajor = 3
-	req.Body = io.NopCloser(checkingReader(func([]byte) (int, error) {
-		assert.WithinDuration(t, time.Now().Add(30*time.Second), w.readDeadline, time.Second)
-		assert.Equal(t, w.readDeadline, w.writeDeadline)
-		return 0, io.EOF
-	}))
-	HTTPHandler(&config.Config{MaxRequestSize: 4}, "QUIC")(w, req)
-	assert.Equal(t, http.StatusOK, w.Code)
-}
-
-func TestHTTP3DeadlineErrors(t *testing.T) {
-	for _, tc := range []struct {
-		name       string
-		readError  error
-		writeError error
-		want       int
-	}{
-		{"unsupported recorder", http.ErrNotSupported, http.ErrNotSupported, http.StatusOK},
-		{"read deadline failure", errors.New("read failed"), nil, http.StatusInternalServerError},
-		{"write deadline failure", nil, errors.New("write failed"), http.StatusInternalServerError},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			w := &deadlineWriter{ResponseRecorder: httptest.NewRecorder(), readError: tc.readError, writeError: tc.writeError}
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req.ProtoMajor = 3
-			HTTPHandler(&config.Config{MaxRequestSize: 4}, "QUIC")(w, req)
-			assert.Equal(t, tc.want, w.Code)
-		})
-	}
-}
-
-func TestHTTP1KeepsServerDeadlines(t *testing.T) {
-	w := &deadlineWriter{ResponseRecorder: httptest.NewRecorder()}
-	HTTPHandler(&config.Config{MaxRequestSize: 4}, "HTTP")(w, httptest.NewRequest(http.MethodGet, "/", nil))
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.True(t, w.readDeadline.IsZero())
-	assert.True(t, w.writeDeadline.IsZero())
 }

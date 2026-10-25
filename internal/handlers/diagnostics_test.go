@@ -31,6 +31,8 @@ func TestHTTPDiagnosticsPreservePeerAndOriginalURI(t *testing.T) {
 	assert.Equal(t, "/a/b", response.HTTPEndpoint)
 	assert.Equal(t, "[2001:db8::1]:1234", response.RemoteAddr)
 	assert.Equal(t, "2001:db8::1", response.SourceIP)
+	assert.Equal(t, "IPv6", response.IPVersion)
+	assert.Equal(t, "IPv4", response.LocalIPVersion)
 	assert.Equal(t, "127.0.0.1:8443", response.LocalAddr)
 	assert.Equal(t, []string{"198.51.100.9"}, response.Headers["X-Forwarded-For"])
 	assert.Equal(t, "TLS 1.3", response.TLSVersion)
@@ -66,5 +68,5 @@ func TestHTTPDiagnosticsReflectNegotiatedTLS(t *testing.T) {
 func TestHTTPRequestURIFallback(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, "http://example.com/a%2Fb?item=42", nil)
 	require.NoError(t, err)
-	assert.Equal(t, "/a%2Fb?item=42", buildHTTPResponse(req, &config.Config{}, "HTTP").HTTPRequestURI)
+	assert.Equal(t, "/a%2Fb?item=42", NewHTTPResponse(req, &config.Config{}, "HTTP").HTTPRequestURI)
 }

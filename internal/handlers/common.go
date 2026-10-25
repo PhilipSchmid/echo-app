@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net"
+	"net/netip"
 	"os"
 	"sync"
 	"time"
@@ -36,6 +37,7 @@ type BaseResponse struct {
 	Listener  string `json:"listener"`
 	Node      string `json:"node,omitempty"`
 	SourceIP  string `json:"source_ip"`
+	IPVersion string `json:"ip_version,omitempty"`
 }
 
 // NewBaseResponse creates a base response with common fields
@@ -49,7 +51,20 @@ func NewBaseResponse(cfg *config.Config, listener string, remoteAddr string) Bas
 		Listener:  listener,
 		Node:      cfg.Node,
 		SourceIP:  sourceIP,
+		IPVersion: ipVersion(sourceIP),
 	}
+}
+
+func ipVersion(ip string) string {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil {
+		return ""
+	}
+	// Dual-stack sockets may represent IPv4 peers as ::ffff:a.b.c.d.
+	if addr.Unmap().Is4() {
+		return "IPv4"
+	}
+	return "IPv6"
 }
 
 // extractIP extracts the IP address from a remote address string
@@ -63,28 +78,12 @@ func extractIP(remoteAddr string) string {
 	if err != nil {
 		// If splitting fails, it might be just an IP without port
 		// or a malformed address
-		logrus.Debugf("Failed to split host:port from %s: %v", remoteAddr, err)
+		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+			logrus.Debugf("Failed to split host:port from %s: %v", remoteAddr, err)
+		}
 		// Return the original address as fallback
 		return remoteAddr
 	}
 
 	return ip
-}
-
-// normalizeEndpoint normalizes HTTP endpoints to prevent high cardinality in metrics
-// Known paths are preserved, all others are grouped as "other"
-func normalizeEndpoint(path string) string {
-	// List of known paths to track individually
-	knownPaths := map[string]bool{
-		"/":        true,
-		"/health":  true,
-		"/ready":   true,
-		"/metrics": true,
-	}
-
-	if knownPaths[path] {
-		return path
-	}
-
-	return "other"
 }

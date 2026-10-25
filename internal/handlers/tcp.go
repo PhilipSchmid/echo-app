@@ -19,7 +19,7 @@ type TCPResponse struct {
 func TCPHandler(ctx context.Context, conn net.Conn, cfg *config.Config) {
 	start := time.Now()
 	remoteAddr := conn.RemoteAddr().String()
-	sourceIP := extractIP(remoteAddr)
+	debug := logrus.IsLevelEnabled(logrus.DebugLevel)
 
 	// Panic recovery to prevent handler crashes
 	defer func() {
@@ -29,24 +29,13 @@ func TCPHandler(ctx context.Context, conn net.Conn, cfg *config.Config) {
 		}
 	}()
 
-	// Check if context is already cancelled
-	if ctx.Err() != nil {
-		logrus.Debugf("[TCP] Context cancelled before processing connection from %s", remoteAddr)
-		return
-	}
-
-	// Enhanced request logging at INFO level for troubleshooting
-	logrus.Infof("[TCP] Connection from %s", sourceIP)
-
-	// Debug logging (keep existing for detailed debugging)
-	logrus.Debugf("[TCP] New connection from %s", remoteAddr)
-
 	defer func() {
 		if err := conn.Close(); err != nil {
 			logrus.Errorf("Failed to close TCP connection: %v", err)
 		}
-		duration := time.Since(start).Seconds()
-		logrus.Debugf("[TCP] Connection closed from %s after %.3fms", remoteAddr, duration*1000)
+		if debug {
+			logrus.Debugf("[TCP] Connection closed from %s after %.3fms", remoteAddr, float64(time.Since(start))/float64(time.Millisecond))
+		}
 	}()
 
 	// Track connection
@@ -58,24 +47,39 @@ func TCPHandler(ctx context.Context, conn net.Conn, cfg *config.Config) {
 		metrics.RecordRequest("TCP", "connection", "", duration)
 	}()
 
-	response := buildTCPResponse(conn, cfg)
+	// Accepted connections still need cleanup and accounting during shutdown.
+	if ctx.Err() != nil {
+		if debug {
+			logrus.Debugf("[TCP] Context cancelled before processing connection from %s", remoteAddr)
+		}
+		return
+	}
+
+	if debug {
+		logrus.Debugf("[TCP] Connection from %s", remoteAddr)
+	}
+
+	response := TCPResponse{BaseResponse: NewBaseResponse(cfg, "TCP", remoteAddr)}
 	data, err := json.Marshal(response)
 	if err != nil {
 		logrus.Errorf("Failed to marshal JSON: %v", err)
 		metrics.RecordError("TCP", "marshal_error")
 		return
 	}
-	if _, err := conn.Write(data); err != nil {
-		logrus.Errorf("Failed to write to connection: %v", err)
-		metrics.RecordError("TCP", "write_error")
-	} else {
-		logrus.Debugf("[TCP] Response sent to %s: %d bytes", remoteAddr, len(data))
+	limit := cfg.MaxResponseSize
+	if limit <= 0 {
+		limit = maxResponseSize
 	}
-}
-
-// buildTCPResponse constructs the response for TCP
-func buildTCPResponse(conn net.Conn, cfg *config.Config) TCPResponse {
-	return TCPResponse{
-		BaseResponse: NewBaseResponse(cfg, "TCP", conn.RemoteAddr().String()),
+	if int64(len(data)) > limit {
+		metrics.RecordError("TCP", "response_too_large")
+		return
+	}
+	if _, err := conn.Write(data); err != nil {
+		if debug {
+			logrus.Debugf("Failed to write to connection: %v", err)
+		}
+		metrics.RecordError("TCP", "write_error")
+	} else if debug {
+		logrus.Debugf("[TCP] Response sent to %s: %d bytes", remoteAddr, len(data))
 	}
 }

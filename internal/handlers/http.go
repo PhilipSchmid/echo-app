@@ -25,6 +25,7 @@ type HTTPResponse struct {
 	HTTPRequestURI        string              `json:"http_request_uri,omitempty"`
 	RemoteAddr            string              `json:"remote_addr,omitempty"`
 	LocalAddr             string              `json:"local_addr,omitempty"`
+	LocalIPVersion        string              `json:"local_ip_version,omitempty"`
 	TLSVersion            string              `json:"tls_version,omitempty"`
 	TLSCipherSuite        string              `json:"tls_cipher_suite,omitempty"`
 	TLSServerName         string              `json:"tls_server_name,omitempty"`
@@ -35,8 +36,13 @@ type HTTPResponse struct {
 // HTTPHandler returns an HTTP handler function
 func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
+		debug := logrus.IsLevelEnabled(logrus.DebugLevel)
+		var start time.Time
 		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Robots-Tag", "noindex")
+		if cfg.UI && r.URL.Path == "/" {
+			w.Header().Add("Link", `<ui/>; rel="alternate"; type="text/html"; title="Echo Observatory"`)
+		}
 
 		// Panic recovery to prevent handler crashes
 		defer func() {
@@ -50,26 +56,11 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 			}
 		}()
 
-		if r.ProtoMajor == 3 {
-			controller := http.NewResponseController(w)
-			for _, setDeadline := range []func(time.Time) error{controller.SetReadDeadline, controller.SetWriteDeadline} {
-				if err := setDeadline(start.Add(30 * time.Second)); err != nil && !errors.Is(err, http.ErrNotSupported) {
-					metrics.RecordError(listener, "deadline_error")
-					http.Error(w, "Failed to set stream deadline", http.StatusInternalServerError)
-					return
-				}
-			}
+		// Request diagnostics are opt-in; skip formatting and metadata work otherwise.
+		if debug {
+			start = time.Now()
+			logrus.Debugf("[%s] Request: %s %s from %s", listener, r.Method, r.URL.Path, r.RemoteAddr)
 		}
-
-		// Enhanced request logging at INFO level for troubleshooting
-		sourceIP := extractIP(r.RemoteAddr)
-		userAgent := r.Header.Get("User-Agent")
-		if userAgent == "" {
-			userAgent = "unknown"
-		}
-
-		logrus.Infof("[%s] Request: %s %s from %s (User-Agent: %s)",
-			listener, r.Method, r.URL.Path, sourceIP, userAgent)
 
 		// Read through the limit so oversized bodies are rejected without retaining them.
 		if r.Body != nil {
@@ -93,25 +84,19 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 			}
 		}
 
-		// Additional header information if configured
-		if cfg.PrintHeaders {
-			logrus.Infof("[%s] Headers: Host=%s, Content-Type=%s, Accept=%s",
+		if debug && cfg.PrintHeaders {
+			logrus.Debugf("[%s] Headers: Host=%s, Content-Type=%s, Accept=%s",
 				listener,
 				r.Host,
 				r.Header.Get("Content-Type"),
 				r.Header.Get("Accept"))
-		}
-
-		// Debug logging (keep existing for detailed debugging)
-		logrus.Debugf("[%s] Incoming request: %s %s from %s", listener, r.Method, r.URL.Path, r.RemoteAddr)
-		if logrus.GetLevel() >= logrus.DebugLevel && cfg.PrintHeaders {
 			logrus.Debugf("[%s] Request headers: %+v", listener, diagnosticHeaders(r.Header, cfg.UnsafeHeaders))
 		}
 
 		controls := responseControls{status: http.StatusOK, size: -1}
 		if cfg.ResponseControls {
 			var err error
-			controls, err = parseResponseControls(r.URL.RawQuery)
+			controls, err = parseResponseControls(r.URL.RawQuery, responseLimit(cfg))
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -138,10 +123,15 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 				w.Header().Set("Content-Length", strconv.Itoa(controls.size))
 			} else {
 				var err error
-				data, err = json.Marshal(buildHTTPResponse(r, cfg, listener))
+				data, err = json.Marshal(NewHTTPResponse(r, cfg, listener))
 				if err != nil {
 					metrics.RecordError(listener, "marshal_error")
 					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+					return
+				}
+				if int64(len(data)) > responseLimit(cfg) {
+					metrics.RecordError(listener, "response_too_large")
+					http.Error(w, "Echo response too large", http.StatusRequestEntityTooLarge)
 					return
 				}
 				w.Header().Set("Content-Length", strconv.Itoa(len(data)))
@@ -159,22 +149,18 @@ func HTTPHandler(cfg *config.Config, listener string) http.HandlerFunc {
 				written = int64(n)
 			}
 			if writeErr != nil {
-				logrus.Errorf("Failed to write response: %v", writeErr)
+				logrus.Debugf("Failed to write response: %v", writeErr)
 				metrics.RecordError(listener, "write_error")
 			}
 		}
-		duration := time.Since(start).Seconds()
-		// Normalize endpoint to prevent high cardinality in metrics
-		normalizedPath := normalizeEndpoint(r.URL.Path)
-		metrics.RecordRequest(listener, r.Method, normalizedPath, duration)
-
-		// Debug logging for response
-		logrus.Debugf("[%s] Response sent: %d bytes in %.3fms", listener, written, duration*1000)
+		if debug {
+			logrus.Debugf("[%s] Response sent: %d bytes in %.3fms", listener, written, float64(time.Since(start))/float64(time.Millisecond))
+		}
 	}
 }
 
-// buildHTTPResponse constructs the response struct
-func buildHTTPResponse(r *http.Request, cfg *config.Config, listener string) HTTPResponse {
+// NewHTTPResponse describes the request received by an HTTP listener.
+func NewHTTPResponse(r *http.Request, cfg *config.Config, listener string) HTTPResponse {
 	// When running in H2C mode the listener serves both HTTP/1.1 and HTTP/2
 	// cleartext on the same port. Reflect the actually negotiated protocol so
 	// the response is meaningful rather than always showing "H2C".
@@ -196,6 +182,7 @@ func buildHTTPResponse(r *http.Request, cfg *config.Config, listener string) HTT
 	}
 	if local, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr); ok {
 		response.LocalAddr = local.String()
+		response.LocalIPVersion = ipVersion(extractIP(local.String()))
 	}
 	if r.TLS != nil {
 		response.TLSVersion = tls.VersionName(r.TLS.Version)
