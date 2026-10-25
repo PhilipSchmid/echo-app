@@ -125,6 +125,8 @@ opt-in. All bind ports are configurable. Existing 1.x image paths are unchanged.
 
 ## Version 2.0
 
+The current preview is [v2.0.0-pre.0](https://github.com/PhilipSchmid/echo-observatory/releases/tag/v2.0.0-pre.0). Stable 2.0.0 is not released yet.
+
 Version 2.0 adds the browser UI, automatic certificate management, and the
 renamed executable. Images starting with 2.0.0 use
 `ghcr.io/philipschmid/echo-observatory`;
