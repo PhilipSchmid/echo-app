@@ -2,10 +2,13 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/protection"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,10 +27,16 @@ func TestLoad_DefaultValues(t *testing.T) {
 	assert.Equal(t, "", cfg.Node)
 	assert.False(t, cfg.PrintHeaders)
 	assert.False(t, cfg.ResponseControls)
+	assert.True(t, cfg.UI)
+	assert.Empty(t, cfg.PublicURL)
 	assert.False(t, cfg.GRPCTLS)
 	assert.Empty(t, cfg.TLSCertFile)
 	assert.Empty(t, cfg.TLSKeyFile)
 	assert.Empty(t, cfg.TLSClientCAFile)
+	assert.Empty(t, cfg.ACMEDomain)
+	assert.Empty(t, cfg.ACMECacheDir)
+	assert.False(t, cfg.ACMEAcceptTOS)
+	assert.False(t, cfg.ACMEStaging)
 	assert.False(t, cfg.TLS)
 	assert.False(t, cfg.TCP)
 	assert.False(t, cfg.GRPC)
@@ -38,9 +47,41 @@ func TestLoad_DefaultValues(t *testing.T) {
 	assert.Equal(t, "9090", cfg.TCPPort)
 	assert.Equal(t, "50051", cfg.GRPCPort)
 	assert.Equal(t, "4433", cfg.QUICPort)
+	assert.Empty(t, cfg.QUICHost)
 	assert.Equal(t, "3000", cfg.MetricsPort)
-	assert.Equal(t, int64(10485760), cfg.MaxRequestSize) // 10MB
+	assert.Equal(t, int64(65536), cfg.MaxRequestSize)
+	assert.Equal(t, int64(65536), cfg.MaxResponseSize)
+	assert.Equal(t, protection.Options{
+		Enabled: true, RequestRate: 20, PeerRate: 5,
+		IngressRate: 262144, EgressRate: 1048576, DailyEgress: 1073741824,
+	}, cfg.Protection)
 	assert.Equal(t, logrus.InfoLevel, cfg.LogLevel)
+}
+
+func TestLoad_Protection(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	t.Setenv("ECHO_OBSERVATORY_REQUEST_RATE", "2.5")
+	t.Setenv("ECHO_OBSERVATORY_PEER_REQUEST_RATE", "0")
+	t.Setenv("ECHO_OBSERVATORY_INGRESS_BYTES_PER_SECOND", "1024")
+	t.Setenv("ECHO_OBSERVATORY_EGRESS_BYTES_PER_SECOND", "2048")
+	t.Setenv("ECHO_OBSERVATORY_DAILY_EGRESS_BYTES", "4096")
+	t.Setenv("ECHO_OBSERVATORY_TRANSFER_STATE_FILE", "/not-opened-during-validation/budget.json")
+	cfg, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, protection.Options{
+		Enabled: true, RequestRate: 2.5, PeerRate: 0,
+		IngressRate: 1024, EgressRate: 2048, DailyEgress: 4096,
+		StateFile: "/not-opened-during-validation/budget.json",
+	}, cfg.Protection)
+
+	t.Setenv("ECHO_OBSERVATORY_REQUEST_RATE", "0")
+	_, err = Load()
+	require.ErrorContains(t, err, "request rate")
+	t.Setenv("ECHO_OBSERVATORY_PROTECTION", "false")
+	cfg, err = Load()
+	require.NoError(t, err)
+	assert.False(t, cfg.Protection.Enabled)
 }
 
 func TestLoad_EnvironmentVariables(t *testing.T) {
@@ -447,6 +488,229 @@ func TestValidateTLSSettings(t *testing.T) {
 			require.NoError(t, err)
 			test.change(cfg)
 			require.Error(t, cfg.Validate())
+		})
+	}
+}
+
+func TestUIEnvironmentAndFlagPrecedence(t *testing.T) {
+	for _, test := range []struct {
+		name, environment, flag string
+		want                    bool
+	}{
+		{"environment opt out", "false", "", false},
+		{"environment enabled", "true", "", true},
+		{"flag disables environment", "true", "--ui=false", false},
+		{"flag enables environment", "false", "--ui=true", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			t.Setenv("ECHO_OBSERVATORY_UI", test.environment)
+			flags := pflag.NewFlagSet("ui", pflag.ContinueOnError)
+			flags.Bool("ui", true, "")
+			if test.flag != "" {
+				require.NoError(t, flags.Parse([]string{test.flag}))
+			}
+			require.NoError(t, viper.BindPFlags(flags))
+			cfg, err := Load()
+			require.NoError(t, err)
+			assert.Equal(t, test.want, cfg.UI)
+		})
+	}
+}
+
+func TestPublicURLEnvironmentAndFlagPrecedence(t *testing.T) {
+	for _, test := range []struct{ name, environment, flag, want string }{
+		{"environment", "https://echo.container.education", "", "https://echo.container.education/"},
+		{"flag overrides environment", "https://old.example", "--public-url=https://echo.example/demo", "https://echo.example/demo/"},
+		{"flag disables discovery", "https://echo.example", "--public-url=", ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			t.Setenv("ECHO_OBSERVATORY_PUBLIC_URL", test.environment)
+			flags := pflag.NewFlagSet("public-url", pflag.ContinueOnError)
+			flags.String("public-url", "", "")
+			if test.flag != "" {
+				require.NoError(t, flags.Parse([]string{test.flag}))
+			}
+			require.NoError(t, viper.BindPFlags(flags))
+			cfg, err := Load()
+			require.NoError(t, err)
+			assert.Equal(t, test.want, cfg.PublicURL)
+		})
+	}
+}
+
+func TestValidatePublicURL(t *testing.T) {
+	for _, value := range []string{
+		"", "https://echo.container.education", "https://echo.example/", "http://localhost:18880",
+		"http://127.0.0.1:8080/", "https://[2001:db8::1]:8443/", "http://[::1]/demo/v2/",
+		"https://echo.example/demo-v2", "https://xn--bcher-kva.example/",
+	} {
+		t.Run("valid/"+value, func(t *testing.T) {
+			cfg := &Config{HTTPPort: "8080", MaxRequestSize: 1024, PublicURL: value}
+			require.NoError(t, cfg.Validate())
+			want := value
+			if want != "" && !strings.HasSuffix(want, "/") {
+				want += "/"
+			}
+			assert.Equal(t, want, cfg.PublicURL)
+			require.NoError(t, cfg.Validate(), "normalization must be idempotent")
+		})
+	}
+	for _, value := range []string{
+		"/ui/", "//echo.example", "ftp://echo.example", "https:echo.example", "https:///path",
+		"https://user:secret@echo.example", "https://echo.example?", "https://echo.example/?secret=x",
+		"https://echo.example/#fragment", "https://echo.example/#", " https://echo.example", "https://echo.example/\nSitemap: https://evil.example/",
+		"https://echo.example/with space/", "https://echo.example/with\u00a0space/", "https://bad_host/", "https://-bad.example/",
+		"https://echo.example:0/", "https://echo.example:65536/", "https://echo.example:abc/", "https://echo.example:/",
+		"https://::1/", "https://[not-ip]/", "https://[127.0.0.1]/", "https://[fe80::1%25en0]/",
+		"https://echo.example/a/../", "https://echo.example/./", "https://echo.example//", "https://echo.example//demo/", "https://echo.example/demo//",
+		"https://echo.example/%2e%2e/", "https://echo.example/a%2fb/", "https://echo.example/a\\b/", "https://echo.example/a%5Cb/", "https://echo.example/%00/",
+	} {
+		t.Run("invalid/"+value, func(t *testing.T) {
+			cfg := &Config{HTTPPort: "8080", MaxRequestSize: 1024, PublicURL: value}
+			require.ErrorContains(t, cfg.Validate(), "public URL")
+		})
+	}
+}
+
+func TestLoadACMEAndQUICHostEnvironment(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	for name, value := range map[string]string{
+		"TLS": "true", "ACME_DOMAIN": "echo.container.education", "ACME_CACHE_DIR": "/data/acme",
+		"ACME_ACCEPT_TOS": "true", "ACME_STAGING": "true", "QUIC": "true", "QUIC_HOST": "quic-bind.example", "GRPC": "true", "GRPC_TLS": "true",
+	} {
+		t.Setenv("ECHO_OBSERVATORY_"+name, value)
+	}
+	cfg, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, "echo.container.education", cfg.ACMEDomain)
+	assert.Equal(t, "/data/acme", cfg.ACMECacheDir)
+	assert.True(t, cfg.ACMEAcceptTOS)
+	assert.True(t, cfg.ACMEStaging)
+	assert.Equal(t, "quic-bind.example", cfg.QUICHost)
+	assert.True(t, cfg.GRPCTLS)
+}
+
+func TestValidateACMESettings(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		change func(*Config)
+	}{
+		{"cache without domain", func(c *Config) { c.ACMEDomain = ""; c.ACMEAcceptTOS = false }},
+		{"terms without domain", func(c *Config) { c.ACMEDomain = ""; c.ACMECacheDir = "" }},
+		{"staging without domain", func(c *Config) { c.ACMEDomain = ""; c.ACMECacheDir = ""; c.ACMEAcceptTOS = false; c.ACMEStaging = true }},
+		{"HTTPS disabled", func(c *Config) { c.TLS = false }},
+		{"only QUIC", func(c *Config) { c.TLS = false; c.QUIC = true }},
+		{"only gRPC TLS", func(c *Config) { c.TLS = false; c.GRPC = true; c.GRPCTLS = true }},
+		{"missing cache", func(c *Config) { c.ACMECacheDir = "" }},
+		{"empty cache", func(c *Config) { c.ACMECacheDir = " \t" }},
+		{"unaccepted terms", func(c *Config) { c.ACMEAcceptTOS = false }},
+		{"static certificate", func(c *Config) { c.TLSCertFile = "server.pem"; c.TLSKeyFile = "server.key" }},
+		{"client CA", func(c *Config) { c.TLSClientCAFile = "clients.pem" }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			cfg, err := Load()
+			require.NoError(t, err)
+			cfg.TLS, cfg.ACMEDomain, cfg.ACMECacheDir, cfg.ACMEAcceptTOS = true, "echo.container.education", "/data/acme", true
+			test.change(cfg)
+			require.Error(t, cfg.Validate())
+		})
+	}
+}
+
+func TestValidateACMEDomain(t *testing.T) {
+	for _, domain := range []string{
+		"localhost", "echo.localhost", "*.example.com", "127.0.0.1", "::1", "https://example.com", "example.com:443",
+		"example.com/path", "example.com.", "Example.com", "example..com", ".example.com", "-echo.example.com",
+		"echo-.example.com", "echo_observatory.example.com", " example.com", "example.com\n", "écho.example.com",
+		strings.Repeat("a", 64) + ".example.com", strings.Repeat(strings.Repeat("a", 63)+".", 4) + "com",
+	} {
+		t.Run(domain, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			cfg, err := Load()
+			require.NoError(t, err)
+			cfg.TLS, cfg.ACMEDomain, cfg.ACMECacheDir, cfg.ACMEAcceptTOS = true, domain, "/data/acme", true
+			require.Error(t, cfg.Validate())
+		})
+	}
+	for _, domain := range []string{"echo.container.education", "echo-1.example.com", "xn--bcher-kva.example"} {
+		t.Run(domain, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			cfg, err := Load()
+			require.NoError(t, err)
+			cfg.TLS, cfg.ACMEDomain, cfg.ACMECacheDir, cfg.ACMEAcceptTOS = true, domain, "/data/acme", true
+			require.NoError(t, cfg.Validate())
+		})
+	}
+}
+
+func TestValidateQUICHost(t *testing.T) {
+	for _, test := range []struct {
+		host  string
+		valid bool
+	}{
+		{"", true}, {"quic-bind.example", true}, {"localhost", true}, {"0.0.0.0", true}, {"::", true},
+		{"2001:db8::1", true}, {"fe80::1%eth0", true}, {"fe80::1%eth 0", false}, {"fe80::1%eth0\n", false}, {"quic.example.com", true}, {"QUIC.example.com.", true}, {"[::1]", false}, {"127.0.0.1:4433", false},
+		{"quic.example.com:4433", false}, {"https://example.com", false}, {"a/b", false}, {" ", false},
+		{"quic-bind.example\n", false}, {"bad_host", false}, {"-bad", false}, {"bad-", false},
+	} {
+		t.Run(test.host, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			cfg, err := Load()
+			require.NoError(t, err)
+			cfg.QUIC, cfg.QUICHost = true, test.host
+			if test.valid {
+				require.NoError(t, cfg.Validate())
+			} else {
+				require.Error(t, cfg.Validate())
+			}
+		})
+	}
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	cfg, err := Load()
+	require.NoError(t, err)
+	cfg.QUICHost = "quic-bind.example"
+	require.Error(t, cfg.Validate(), "a QUIC bind host must not silently enable QUIC")
+}
+
+func TestLoadQUICAdvertisement(t *testing.T) {
+	for _, tc := range []struct {
+		name, tls, quic, port string
+		valid                 bool
+	}{
+		{"standard mapping", "true", "true", "443", true},
+		{"custom mapping", "true", "true", "19443", true},
+		{"no advertisement", "false", "false", "", true},
+		{"requires HTTPS", "false", "true", "443", false},
+		{"requires QUIC", "true", "false", "443", false},
+		{"zero", "true", "true", "0", false},
+		{"noncanonical", "true", "true", "+443", false},
+		{"out of range", "true", "true", "65536", false},
+		{"header injection", "true", "true", "443\r\nX-Test: injected", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			t.Setenv("ECHO_OBSERVATORY_TLS", tc.tls)
+			t.Setenv("ECHO_OBSERVATORY_QUIC", tc.quic)
+			t.Setenv("ECHO_OBSERVATORY_QUIC_ADVERTISE_PORT", tc.port)
+			cfg, err := Load()
+			if tc.valid {
+				require.NoError(t, err)
+				assert.Equal(t, tc.port, cfg.QUICAdvertisePort)
+			} else {
+				require.Error(t, err)
+			}
 		})
 	}
 }
