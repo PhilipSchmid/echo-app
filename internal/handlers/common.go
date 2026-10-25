@@ -79,7 +79,7 @@ func extractIP(remoteAddr string) string {
 		// If splitting fails, it might be just an IP without port
 		// or a malformed address
 		if logrus.IsLevelEnabled(logrus.DebugLevel) {
-			logrus.Debugf("Failed to split host:port from %s: %v", remoteAddr, err)
+			logrus.Debugf("Failed to split host:port from %s", remoteAddr)
 		}
 		// Return the original address as fallback
 		return remoteAddr
