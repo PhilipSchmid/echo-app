@@ -8,7 +8,7 @@ registry path.
 
 | Setting | 1.x | 2.0+ |
 | --- | --- | --- |
-| Container image | `ghcr.io/philipschmid/echo-app:1.3.0` | `ghcr.io/philipschmid/echo-observatory:2.0.0` |
+| Container image | `ghcr.io/philipschmid/echo-app:1.3.0` | `ghcr.io/philipschmid/echo-observatory:2.0.0-pre.0` |
 | Executable | `echo-app` | `echo-observatory` |
 | Go module | `github.com/PhilipSchmid/echo-app` | `github.com/PhilipSchmid/echo-observatory/v2` |
 | Environment variables | `ECHO_APP_*` | `ECHO_OBSERVATORY_*` |

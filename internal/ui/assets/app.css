@@ -620,7 +620,7 @@ summary.listener-summary:hover { background:var(--surface-subtle); }
   .stack-fields { gap:12px 18px; }
   .workbench-grid { grid-template-columns:minmax(0,1fr); }
   .workbench-grid>.panel:first-child { border-right:0; border-bottom:1px solid var(--frame); }
-  
+
   .response-panel,.socket-log-panel { min-height:410px; border-radius:0; }
   .empty-state { min-height:280px; }
   .guide-intro h1 { font-size:30px; }
@@ -654,7 +654,7 @@ summary.listener-summary:hover { background:var(--surface-subtle); }
   .brand { gap:12px; }
   .brand-mark { width:48px; height:48px; }
   h1 { font-size:27px; }
-  
+
   .stack-heading { align-items:start; gap:12px; }
   .stack-heading h2 { font-size:21px; }
   .stack-heading .subtle-tag { padding:3px 7px; }
