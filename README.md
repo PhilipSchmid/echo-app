@@ -141,8 +141,8 @@ See [upgrading to 2.0](docs/migration-v2.md) for configuration and metrics chang
   and validation.
 - [Monitoring](docs/monitoring.md): private health endpoints, metric reference,
   and PromQL examples.
-- [Privacy and logging](docs/privacy.md): browser storage, diagnostic logs,
-  redaction limits, and public deployment responsibilities.
+- [Privacy](docs/privacy.md): request handling, browser storage, logging and
+  contact details.
 - [Kubernetes](docs/kubernetes.md): deployment, services, probes, and pod security.
 - [Development](docs/development.md): builds, tests, integration checks, and images.
 

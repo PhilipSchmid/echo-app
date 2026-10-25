@@ -13,15 +13,16 @@ Version 2.0 uses the `ECHO_OBSERVATORY_` prefix; see [upgrading from 1.x](migrat
 | `ECHO_OBSERVATORY_MESSAGE` | `--message` | Empty | Custom response message; maximum 1,024 bytes. |
 | `ECHO_OBSERVATORY_NODE` | `--node` | Empty | Node identifier included in responses. |
 | `ECHO_OBSERVATORY_LOG_LEVEL` | `--log-level` | `info` | Logging level: `trace`, `debug`, `info`, `warn` (`warning`), `error`, `fatal`, or `panic`. |
-| `ECHO_OBSERVATORY_PRINT_HTTP_REQUEST_HEADERS` | `--print-http-request-headers` | `false` | Include request headers in HTTP responses and diagnostic logs. |
-| `ECHO_OBSERVATORY_UNSAFE_HEADERS` | `--unsafe-headers` | `false` | Reveal sensitive header and debug metadata values. Use synthetic credentials only. |
+| `ECHO_OBSERVATORY_PRINT_HTTP_REQUEST_HEADERS` | `--print-http-request-headers` | `false` | Include request headers in HTTP responses and, at debug level, diagnostic logs. |
+| `ECHO_OBSERVATORY_UNSAFE_HEADERS` | `--unsafe-headers` | `false` | Reveal sensitive headers in returned HTTP diagnostics only. Use synthetic credentials only. |
 | `ECHO_OBSERVATORY_MAX_REQUEST_SIZE` | `--max-request-size` | `65536` | Incoming HTTP body / protocol message limit: 64 KiB. Oversized HTTP bodies return `413`; bodies are discarded after reading. |
 | `ECHO_OBSERVATORY_MAX_RESPONSE_SIZE` | `--max-response-size` | `65536` | Echo response / outgoing message limit: 64 KiB. Maximum 1 MiB; `0` selects the legacy 1 MiB ceiling. UI HTML/assets are excluded; transfer budgets still apply. |
 | `ECHO_OBSERVATORY_RESPONSE_CONTROLS` | `--response-controls` | `false` | Enable the bounded `status`, `delay`, and `size` query controls described in [Usage](usage.md). |
 
-Common credential headers are redacted by default using name matching, including
-password, passphrase, and credential names. This is not an exhaustive content
-filter; see [privacy and logging](privacy.md).
+Returned diagnostics redact common credential headers by default using name
+matching, including password, passphrase, and credential names. Server diagnostic
+logs always apply this filter, even with `--unsafe-headers`. It is not an
+exhaustive content filter; see [privacy and logging](privacy.md).
 `--unsafe-headers` does not enable HTTP header output by itself; also set
 `--print-http-request-headers` when needed.
 
@@ -134,6 +135,8 @@ default plaintext gRPC, and the admin listener remain unencrypted. See
 
 An optional background probe contributes to readiness. Requests to `/ready` read
 its cached result without making outbound calls.
+Probe state logs use fixed categories; debug diagnostics may include the
+configured target host or address.
 
 | Environment variable | Flag | Default | Behavior |
 | --- | --- | --- | --- |

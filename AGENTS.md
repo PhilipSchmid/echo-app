@@ -38,7 +38,7 @@ The application is designed for debugging, testing, and demonstrating various ne
 
 2. **Linting**
    - Code must pass `golangci-lint run --timeout 5m`
-   - All linters are enabled, including errcheck
+   - CI uses the default linter set with errcheck explicitly enabled
    - No unchecked error returns are allowed, even in tests
    - Use `_ =` prefix to explicitly ignore errors when appropriate
 
@@ -84,7 +84,7 @@ The application is designed for debugging, testing, and demonstrating various ne
 #### Starting Servers in Tests
 ```go
 go func() { _ = server.Start(ctx) }()  // Explicitly ignore error
-time.Sleep(100 * time.Millisecond)     // Wait for server to start
+require.Eventually(t, server.Ready, time.Second, 10*time.Millisecond)
 ```
 
 #### Shutting Down Servers
@@ -296,8 +296,8 @@ The application uses environment variables and command-line flags:
 ## Additional Notes
 
 - The codebase uses the internal/ directory to prevent external imports
-- Protocol buffers are in proto/ and compiled to internal/handlers/
-- TLS certificates are auto-generated using self-signed certs
+- Protocol buffers and their generated Go files are in proto/
+- TLS uses self-signed demo certificates by default, with supplied PEM files or opt-in ACME available
 - All servers support graceful shutdown with context cancellation
 - Connection limits are enforced to prevent resource exhaustion
 - Metrics follow Prometheus naming conventions

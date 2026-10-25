@@ -176,13 +176,15 @@ A plain HTTP response looks like this:
   "hostname": "demo-host",
   "listener": "HTTP",
   "source_ip": "127.0.0.1",
+  "ip_version": "IPv4",
   "http_version": "HTTP/1.1",
   "http_method": "GET",
   "http_endpoint": "/example",
   "http_host": "localhost:8080",
   "http_request_uri": "/example?item=42",
   "remote_addr": "127.0.0.1:54000",
-  "local_addr": "127.0.0.1:8080"
+  "local_addr": "127.0.0.1:8080",
+  "local_ip_version": "IPv4"
 }
 ```
 
@@ -196,16 +198,17 @@ in the optional header output and never replace the peer address.
 
 Enable header output with `--print-http-request-headers`. Authorization and
 cookie headers, and fields whose names contain secret, token, or key, are
-redacted by default. `--unsafe-headers` disables this redaction in responses and
-debug metadata logs; use it only with synthetic credentials. HTTP diagnostic
-responses use `Cache-Control: no-store`.
+redacted by default. `--unsafe-headers` disables this redaction only in returned
+HTTP diagnostics; use it only with synthetic credentials. Server diagnostic logs
+always redact common credential headers, including in unsafe mode. HTTP
+diagnostic responses use `Cache-Control: no-store`.
 
 ### Privacy and logging
 
 Use synthetic data. Request and connection metadata may appear in application,
 proxy, or hosting logs; the header-name filter is not exhaustive. See
-[Privacy and logging](privacy.md) for payload handling, session-only browser
-preferences, redaction limits, transport security, and deployment notice duties.
+[Privacy](privacy.md) for request handling, browser preferences, logging and
+contact details.
 
 ## IPv4 and IPv6
 
@@ -360,7 +363,9 @@ returns `503`. Probe results are cached in the background, so `/ready` does not
 make outbound calls. A listener failure terminates the process. External
 dependency failures affect readiness, not liveness.
 
-The gRPC listener exposes reflection and the standard health service:
+The gRPC listener exposes reflection and the standard health service. These
+examples use a bare-binary listener without `--grpc-tls`; deployment profiles
+use TLS instead, so remove `-plaintext` and supply the appropriate CA options.
 
 ```bash
 grpcurl -plaintext localhost:50051 list

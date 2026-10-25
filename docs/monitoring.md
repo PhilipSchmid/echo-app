@@ -4,8 +4,8 @@
 
 The dedicated admin listener serves these endpoints. Its default port is
 `3000/TCP`; keep it reachable only from your monitoring and management network.
-The Connect page gives each endpoint its own curl/wget example. It does not
-fetch the admin listener from the browser.
+These endpoints are documented for operators and are not advertised or fetched
+by the public UI.
 
 | Endpoint | Purpose | Response |
 | --- | --- | --- |
