@@ -2,14 +2,19 @@ package health
 
 import (
 	"context"
+	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/metrics"
 	probing "github.com/prometheus-community/pro-bing"
 	"github.com/sirupsen/logrus"
 )
@@ -79,7 +84,9 @@ func (c *Checker) run(ctx context.Context) {
 func (c *Checker) checkOnce(parent context.Context) {
 	ctx, cancel := context.WithTimeout(parent, c.probe.Timeout)
 	defer cancel()
+	start := time.Now()
 	err := c.check(ctx)
+	metrics.RecordExternalProbe(err == nil, time.Since(start).Seconds())
 	if err != nil {
 		if c.setExternalReady(false, err.Error()) {
 			c.logExternalReadinessChange(false, err)
@@ -92,9 +99,16 @@ func (c *Checker) checkOnce(parent context.Context) {
 }
 
 func (c *Checker) logExternalReadinessChange(ready bool, err error) {
+	target := c.probe.Target
+	if probeType := strings.ToLower(c.probe.Type); probeType == "http" || probeType == "https" {
+		target = "invalid HTTP target"
+		if parsed, parseErr := url.Parse(c.probe.Target); parseErr == nil && parsed.Host != "" {
+			target = parsed.Host
+		}
+	}
 	entry := logrus.WithFields(logrus.Fields{
 		"probe_type": c.probe.Type,
-		"target":     c.probe.Target,
+		"target":     target,
 	})
 	if ready {
 		entry.Info("external readiness probe is ready")
@@ -122,17 +136,40 @@ func (c *Checker) check(ctx context.Context) error {
 func (c *Checker) checkHTTP(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, c.probe.HTTPMethod, c.probe.Target, nil)
 	if err != nil {
-		return err
+		return errors.New("invalid HTTP readiness request")
 	}
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return err
+		return httpProbeError(err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != c.probe.HTTPExpectedStatus {
-		return fmt.Errorf("expected HTTP status %d from %s, got %d", c.probe.HTTPExpectedStatus, c.probe.Target, resp.StatusCode)
+		return fmt.Errorf("expected HTTP status %d, got %d", c.probe.HTTPExpectedStatus, resp.StatusCode)
 	}
 	return nil
+}
+
+func httpProbeError(err error) error {
+	// Client and redirect errors can include credentials or complete target URLs.
+	var dnsError *net.DNSError
+	var tlsError *tls.CertificateVerificationError
+	var networkError net.Error
+	switch {
+	case errors.Is(err, context.Canceled):
+		return errors.New("HTTP readiness request canceled")
+	case errors.Is(err, context.DeadlineExceeded):
+		return errors.New("HTTP readiness request timed out")
+	case errors.As(err, &dnsError):
+		return errors.New("HTTP readiness DNS lookup failed")
+	case errors.As(err, &tlsError):
+		return errors.New("HTTP readiness TLS certificate verification failed")
+	case errors.Is(err, syscall.ECONNREFUSED):
+		return errors.New("HTTP readiness connection refused")
+	case errors.As(err, &networkError) && networkError.Timeout():
+		return errors.New("HTTP readiness request timed out")
+	default:
+		return errors.New("HTTP readiness request failed")
+	}
 }
 
 func (c *Checker) checkTCP(ctx context.Context) error {
@@ -231,6 +268,20 @@ func (c *Checker) IsReady() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.ready && c.healthy && c.externalProbeReady
+}
+
+// IsHealthy reports process liveness independently of readiness dependencies.
+func (c *Checker) IsHealthy() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.healthy
+}
+
+// ExternalProbeStatus reports cached probe configuration and observed readiness.
+func (c *Checker) ExternalProbeStatus() (enabled, ready bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.probe.Enabled(), c.externalProbeChecked && c.externalProbeReady
 }
 
 // HealthHandler returns 200 only while the app process considers itself live.
