@@ -53,3 +53,33 @@ func TestKnownRequestMethodsArePreserved(t *testing.T) {
 	}
 	assert.ElementsMatch(t, methods, seen)
 }
+
+func TestObservatoryMetricNames(t *testing.T) {
+	RequestsTotal.Reset()
+	RequestDuration.Reset()
+	ErrorsTotal.Reset()
+	ActiveConnections.Reset()
+	t.Cleanup(func() {
+		RequestsTotal.Reset()
+		RequestDuration.Reset()
+		ErrorsTotal.Reset()
+		ActiveConnections.Reset()
+	})
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(RequestsTotal, RequestDuration, ErrorsTotal, ActiveConnections)
+	RecordRequest("HTTP", "GET", "/", 0.01)
+	RecordError("HTTP", "test")
+	ConnectionOpened("TCP")
+	families, err := registry.Gather()
+	require.NoError(t, err)
+	names := make([]string, 0, len(families))
+	for _, family := range families {
+		names = append(names, family.GetName())
+	}
+	assert.ElementsMatch(t, []string{
+		"echo_observatory_requests_total",
+		"echo_observatory_request_duration_seconds",
+		"echo_observatory_errors_total",
+		"echo_observatory_active_connections",
+	}, names)
+}
