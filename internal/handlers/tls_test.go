@@ -18,6 +18,7 @@ func TestGetTLSConfig(t *testing.T) {
 
 	// Verify config has certificates
 	assert.Len(t, config.Certificates, 1)
+	assert.Nil(t, config.GetCertificate, "the default must not install a networked certificate provider")
 
 	// Verify minimum TLS version
 	assert.Equal(t, uint16(tls.VersionTLS12), config.MinVersion)
