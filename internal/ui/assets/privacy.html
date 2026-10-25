@@ -30,11 +30,11 @@
     <div class="privacy-grid">
       <section class="privacy-card" aria-labelledby="privacy-requests">
         <h2 id="privacy-requests">Your requests</h2>
-        <p>Your IP address, URL, headers and any data you send reach this server. Responses show connection and request metadata. The app keeps no persistent request history.</p>
+        <p>Your IP address, URL, headers and data you send are processed to provide diagnostics and protect the service. The app keeps no persistent request history. Where the GDPR applies, we rely on legitimate interests in providing and securing the service.</p>
       </section>
       <section class="privacy-card" aria-labelledby="privacy-logs">
         <h2 id="privacy-logs">Logs &amp; redaction</h2>
-        <p>App logs can contain IPs, paths, browser details and technical metadata, but exclude request and message bodies. {{if .Unsafe}}Credential redaction is disabled on this instance.{{else if .Headers}}Common credential headers are redacted by default.{{else}}Request headers are not included in responses on this instance.{{end}} Redaction is not an exhaustive filter. Privacy cannot be guaranteed.</p>
+        <p>Request and message bodies are excluded from app logs. Common credential headers are always redacted in diagnostic logs. {{if .Unsafe}}Response credential redaction is disabled on this instance.{{else if .Headers}}Common credential headers are also redacted in responses.{{else}}Request headers are not included in responses on this instance.{{end}} Redaction is not exhaustive; use sample data.</p>
       </section>
       <section class="privacy-card" aria-labelledby="privacy-browser">
         <h2 id="privacy-browser">Cookies &amp; browser storage</h2>
@@ -42,12 +42,19 @@
         <p>Fonts and assets load from this service. GitHub receives a request only when you follow an external link.</p>
       </section>
       <section class="privacy-card" aria-labelledby="privacy-operator">
-        <h2 id="privacy-operator">Operator &amp; retention</h2>
-        <p>The organisation running this instance controls hosting, log retention and data rights requests. Obtain those details from its operator before sending personal data. Use HTTPS to encrypt the connection.</p>
-        <p>Privacy contact for echo.container.education: <a href="mailto:privacy@container.education">privacy@container.education</a>. For self-hosted instances, contact your operator.</p>
+        <h2 id="privacy-operator">Public demo &amp; your rights</h2>
+        <p>Philip Schmid operates echo.container.education. Contact <a href="mailto:privacy@container.education">privacy@container.education</a> for access, correction, deletion or other data rights. You may also complain to your data-protection authority. Other installations have their own operators.</p>
+      </section>
+      <section class="privacy-card" aria-labelledby="privacy-retention">
+        <h2 id="privacy-retention">Retention</h2>
+        <p>The public demo disables routine request diagnostics. Infrastructure keeps operational logs for seven days; errors can include hostnames, paths and connection information. Aggregate metrics may remain for about 15 days. Request bodies and workbench history are not saved by the app.</p>
+      </section>
+      <section class="privacy-card" aria-labelledby="privacy-recipients">
+        <h2 id="privacy-recipients">Processing &amp; protection</h2>
+        <p>The demo runs in Germany. Hosting and operational providers can process technical data in the United States under recognized privacy safeguards. We do not sell data or use it for advertising. Use HTTPS; privacy cannot be guaranteed.</p>
       </section>
     </div>
-    <p class="privacy-details"><a class="example-link" href="https://github.com/philipschmid/echo-observatory/blob/main/docs/privacy.md">Technical details &amp; operator guidance on GitHub <span aria-hidden="true">↗</span></a></p>
+    <p class="privacy-details"><a class="example-link" href="https://github.com/philipschmid/echo-observatory/blob/main/docs/privacy.md">Full privacy notice on GitHub <span aria-hidden="true">↗</span></a></p>
   </main>
   {{template "footer" .}}
 </body>
