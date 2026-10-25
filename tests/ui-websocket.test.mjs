@@ -304,7 +304,8 @@ test("responses and socket messages announce concise results without reading pay
 test("response metadata distinguishes trusted client addresses from the socket hop", () => {
   for (const forwarded of [false, true]) {
     const page = fixture();
-    const data = { source_ip: "2001:db8::42", ip_version: "IPv6", remote_addr: "[2001:db8::42]:40500", local_addr: "[2001:db8::43]:443" };
+    const client = "2001:db8a:1234:5678:9abc:def0:1234:5678";
+    const data = { source_ip: client, ip_version: "IPv6", http_host: "[" + client + "]:8443", remote_addr: "[" + client + "]:40500", local_addr: "[2001:db8::43]:443" };
     if (forwarded) Object.assign(data, { socket_peer_ip: "172.16.0.2", socket_peer_ip_version: "IPv4", socket_peer_addr: "172.16.0.2:50000", socket_local_addr: "172.16.0.3:8443", socket_local_ip_version: "IPv4" });
     page.context.showResponse({ status: 200, statusText: "OK", headers: new Headers({ "Content-Type": "application/json" }) },
       { text: JSON.stringify(data), bytes: 100, truncated: false }, 12, { method: "GET" }, true);
@@ -313,12 +314,22 @@ test("response metadata distinguishes trusted client addresses from the socket h
     assert.equal(summary[forwarded ? "Client IP" : "Socket peer IP"], data.source_ip);
     assert.equal(summary[forwarded ? "Client IP family" : "IP family on this hop"], "IPv6");
     const details = rows("connection-metadata");
+    for (const id of ["response-metadata", "connection-metadata"]) {
+      for (const row of page.$(id).children) {
+        const [label, value] = row.children;
+        const address = /^(Client IP|Socket peer IP|Host|Client address|Destination address|Remote socket|Local socket)$/.test(label.textContent);
+        assert.equal(row.className === "metadata-address", address, label.textContent);
+        assert.equal(value.className === "address-value", address, label.textContent);
+      }
+    }
+    assert.equal(details.Host, data.http_host);
     if (forwarded) {
       assert.equal(details["Client address"], data.remote_addr);
       assert.equal(details["Destination address"], data.local_addr);
-      assert.equal(details["Socket peer"], data.socket_peer_addr);
-      assert.equal(details["Socket peer IP family"], "IPv4");
-      assert.equal(details["App socket"], data.socket_local_addr);
+      assert.equal(details["Socket peer"], undefined);
+      assert.equal(details["Socket peer IP family"], undefined);
+      assert.equal(details["App socket"], undefined);
+      assert.match(page.$("response-body").textContent, /"socket_peer_addr": "172\.16\.0\.2:50000"/);
     } else {
       assert.equal(details["Remote socket"], data.remote_addr);
       assert.equal(details["Local socket"], data.local_addr);

@@ -86,6 +86,8 @@ func TestStackRendersObservedLayersForEachHTTPTransport(t *testing.T) {
 			assert.NotContains(t, stack, `data-stack-layer="link"`)
 			assert.NotContains(t, stack, "Network access")
 			assert.NotContains(t, stack, "Not exposed")
+			assert.NotContains(t, stack, "Client → gateway:")
+			assert.NotContains(t, stack, "app-connection")
 			assert.Len(t, regexp.MustCompile(`data-stack-layer="`).FindAllString(stack, -1), 4)
 			page := response.Body.String()
 			visitIndex, stackIndex := strings.Index(page, `<section class="visit-panel"`), strings.Index(page, `<section id="connection-stack"`)

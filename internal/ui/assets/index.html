@@ -31,7 +31,7 @@
         <div class="visit-heading"><span class="instance-label"><span class="status-dot"></span>This page request</span><a id="refresh-visit" class="button quiet" href="./">Refresh</a></div>
         <h2 id="visit-title" class="visit-request-line"><span>{{.Request.HTTPMethod}}</span><code>{{.Request.HTTPRequestURI}}</code></h2>
         <dl class="visit-metadata">
-          <div class="visit-peer"><dt>{{if .Request.SocketPeerIP}}Client IP{{else}}Socket peer IP{{end}}</dt><dd><span>{{.Request.SourceIP}}</span><span class="badge neutral ip-family" title="{{if .Request.SocketPeerIP}}Original client IP family from a trusted PROXY protocol peer{{else}}IP family received by this server{{end}}">{{if .Request.IPVersion}}{{.Request.IPVersion}}{{else}}Unknown IP family{{end}}</span></dd></div>
+          <div class="visit-peer"><dt>{{if .Request.SocketPeerIP}}Client IP{{else}}Socket peer IP{{end}}</dt><dd><span class="address-value">{{.Request.SourceIP}}</span><span class="badge neutral ip-family" title="{{if .Request.SocketPeerIP}}IP family used by the client{{else}}IP family received by this server{{end}}">{{if .Request.IPVersion}}{{.Request.IPVersion}}{{else}}Unknown IP family{{end}}</span></dd></div>
           <div><dt>HTTP protocol</dt><dd>{{.Request.HTTPVersion}}</dd></div>
           <div><dt>Server hostname</dt><dd>{{.Request.Hostname}}</dd></div>
           <div><dt>Listener</dt><dd>{{.Request.Listener}}</dd></div>
@@ -82,11 +82,13 @@
         </article>
         <article class="stack-layer stack-transport" data-stack-layer="transport" aria-labelledby="stack-transport-title">
           <div class="stack-identity"><span class="stack-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16l-4-4M20 17H4l4 4"/><path d="m4 7 4 4m12 6-4-4"/></svg></span><div><h3 id="stack-transport-title">Transport</h3><p>{{.Stack.Transport}}</p></div></div>
-          <div class="stack-content"><dl class="stack-fields"><div><dt>{{if .Request.SocketPeerIP}}Client port{{else}}Peer port{{end}}</dt><dd>{{if .Stack.PeerPort}}{{.Stack.PeerPort}}{{else}}Not observed{{end}}</dd></div><div><dt>{{if .Request.SocketPeerIP}}Destination port{{else}}Server port{{end}}</dt><dd>{{if .Stack.LocalPort}}{{.Stack.LocalPort}}{{else}}Not observed{{end}}</dd></div>{{if .Request.SocketPeerIP}}<div><dt>Socket peer port</dt><dd>{{if .Stack.SocketPeerPort}}{{.Stack.SocketPeerPort}}{{else}}Not observed{{end}}</dd></div><div><dt>App socket port</dt><dd>{{if .Stack.SocketLocalPort}}{{.Stack.SocketLocalPort}}{{else}}Not observed{{end}}</dd></div>{{end}}</dl></div>
+          <div class="stack-content"><dl class="stack-fields"><div><dt>{{if .Request.SocketPeerIP}}Client port{{else}}Peer port{{end}}</dt><dd>{{if .Stack.PeerPort}}{{.Stack.PeerPort}}{{else}}Not observed{{end}}</dd></div><div><dt>{{if .Request.SocketPeerIP}}Destination port{{else}}Server port{{end}}</dt><dd>{{if .Stack.LocalPort}}{{.Stack.LocalPort}}{{else}}Not observed{{end}}</dd></div></dl></div>
         </article>
         <article class="stack-layer stack-internet" data-stack-layer="internet" aria-labelledby="stack-internet-title">
           <div class="stack-identity"><span class="stack-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/></svg></span><div><h3 id="stack-internet-title">Internet</h3><p>{{if .Request.IPVersion}}{{.Request.IPVersion}}{{else}}IP family unknown{{end}}</p></div></div>
-          <div class="stack-content"><dl class="stack-fields"><div><dt>{{if .Request.SocketPeerIP}}Client IP{{else}}Socket peer IP{{end}}</dt><dd>{{if .Request.SourceIP}}{{.Request.SourceIP}}{{else}}Not observed{{end}}</dd></div><div><dt>{{if .Request.SocketPeerIP}}Destination IP{{else}}Server IP{{end}}</dt><dd>{{if .Stack.LocalIP}}{{.Stack.LocalIP}}{{else}}Not observed{{end}}</dd></div>{{if .Request.SocketPeerIP}}<div><dt>Socket peer IP</dt><dd>{{.Request.SocketPeerIP}} <span class="badge neutral ip-family">{{.Request.SocketPeerIPVersion}}</span></dd></div><div><dt>App socket IP</dt><dd>{{if .Stack.SocketLocalIP}}{{.Stack.SocketLocalIP}} <span class="badge neutral ip-family">{{.Request.SocketLocalIPVersion}}</span>{{else}}Not observed{{end}}</dd></div>{{end}}</dl></div>
+          <div class="stack-content">
+            <dl class="stack-fields"><div><dt>{{if .Request.SocketPeerIP}}Client IP{{else}}Socket peer IP{{end}}</dt><dd><span class="address-value">{{if .Request.SourceIP}}{{.Request.SourceIP}}{{else}}Not observed{{end}}</span></dd></div><div><dt>{{if .Request.SocketPeerIP}}Destination IP{{else}}Server IP{{end}}</dt><dd><span class="address-value">{{if .Stack.LocalIP}}{{.Stack.LocalIP}}{{else}}Not observed{{end}}</span></dd></div></dl>
+          </div>
         </article>
       </div>
     </section>
