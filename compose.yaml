@@ -1,0 +1,33 @@
+# Standard exposed ports; certificates work offline without ACME.
+services:
+  echo-observatory:
+    image: echo-observatory:local
+    build: .
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 35s
+    ports:
+      - "80:8080/tcp"
+      - "443:8443/tcp"
+      - "443:4433/udp"
+      - "9090:9090/tcp"
+      - "50051:50051/tcp"
+      - "127.0.0.1:3000:3000/tcp"
+      - "[::1]:3000:3000/tcp"
+    environment:
+      ECHO_OBSERVATORY_HTTP_ADVERTISE_PORT: "80"
+      ECHO_OBSERVATORY_TLS_ADVERTISE_PORT: "443"
+      ECHO_OBSERVATORY_TCP_ADVERTISE_PORT: "9090"
+      ECHO_OBSERVATORY_GRPC_ADVERTISE_PORT: "50051"
+      ECHO_OBSERVATORY_H2C: "true"
+      ECHO_OBSERVATORY_TLS: "true"
+      ECHO_OBSERVATORY_TCP: "true"
+      ECHO_OBSERVATORY_GRPC: "true"
+      ECHO_OBSERVATORY_GRPC_TLS: "true"
+      ECHO_OBSERVATORY_QUIC: "true"
+      ECHO_OBSERVATORY_QUIC_ADVERTISE_PORT: "443"
+
+networks:
+  default:
+    enable_ipv6: true

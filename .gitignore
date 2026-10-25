@@ -1,6 +1,7 @@
 # Binary
+/echo-observatory
+# Ignore the existing local 1.x binary too.
 /echo-app
-echo-app
 
 # Build artifacts
 /build/
@@ -61,3 +62,6 @@ __debug_bin
 *.key
 *.crt
 *.csr
+
+# Optional local ACME account keys and certificate cache
+/.acme/

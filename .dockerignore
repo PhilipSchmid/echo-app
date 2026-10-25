@@ -1,13 +1,16 @@
 .git/
 .github/
 build/
-echo-app
+/tmp/
+/echo-observatory
+/echo-app
 *.log
 coverage.*
 .env*
 *.pem
 *.key
 *.crt
+.acme/
 README.md
 LICENSE
 CODEOWNER

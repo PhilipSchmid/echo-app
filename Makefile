@@ -9,7 +9,7 @@ SHELL := /bin/bash
 
 # Variables
 APP_NAME := echo-observatory
-DOCKER_IMAGE := ghcr.io/philipschmid/$(APP_NAME)
+DOCKER_IMAGE := ghcr.io/philipschmid/echo-observatory
 PROTO_FILES := proto/echo.proto
 GO_FILES := $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 GO_PACKAGES := $(shell go list ./... | grep -v /vendor/)
@@ -25,7 +25,7 @@ RED := \033[0;31m
 NC := \033[0m # No Color
 
 # Version information
-VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+VERSION := $(shell git describe --tags --exclude 'v0.*' --exclude 'v1.*' --always --dirty 2>/dev/null || echo "dev")
 BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
@@ -57,10 +57,8 @@ help: ## Show this help message
 
 # Development targets
 .PHONY: dev
-dev: ## DEV: Run the application with file watching (requires entr)
-	@command -v entr >/dev/null 2>&1 || { printf "$(RED)Error: entr is not installed. Install it with: brew install entr$(NC)\n"; exit 1; }
-	@printf "$(BLUE)Starting development mode with file watching...$(NC)\n"
-	@find . -name "*.go" | entr -r make run
+dev: ## DEV: Rebuild and restart on Go or UI changes with Air
+	@go run github.com/air-verse/air@v1.67.4 -c .air.toml
 
 .PHONY: proto
 proto: ## DEV: Generate protobuf files
@@ -126,6 +124,10 @@ build-all: ## BUILD: Build for all platforms
 	@ls -la $(BUILD_DIR)/
 
 # Testing targets
+.PHONY: test-ui
+test-ui: ## TEST: Test browser client helpers (requires Node.js 22+)
+	@node --test tests/ui-*.test.mjs
+
 .PHONY: test
 test: ## TEST: Run unit tests with coverage
 	@printf "$(BLUE)Running unit tests...$(NC)\n"
@@ -228,13 +230,16 @@ debug: ## RUN: Run with delve debugger (requires dlv)
 run-docker: ## RUN: Run the application in Docker
 	@printf "$(BLUE)Running $(APP_NAME) in Docker...$(NC)\n"
 	docker run -it --rm \
-		-p 8080:8080 \
-		-p 8443:8443 \
+		-p 80:8080 \
+		-p 443:8443 \
 		-p 9090:9090 \
 		-p 50051:50051 \
-		-p 4433:4433/udp \
-		-p 3000:3000 \
+		-p 443:4433/udp \
+		-p 127.0.0.1:3000:3000 \
 		-e ECHO_OBSERVATORY_TLS=true \
+		-e ECHO_OBSERVATORY_H2C=true \
+		-e ECHO_OBSERVATORY_GRPC_TLS=true \
+		-e ECHO_OBSERVATORY_QUIC_ADVERTISE_PORT=443 \
 		-e ECHO_OBSERVATORY_TCP=true \
 		-e ECHO_OBSERVATORY_GRPC=true \
 		-e ECHO_OBSERVATORY_QUIC=true \
