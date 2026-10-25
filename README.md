@@ -1,31 +1,32 @@
-# echo-app — Multi-protocol network diagnostics
+# Echo Observatory — Multi-protocol network diagnostics
 
-[![CI](https://github.com/philipschmid/echo-app/actions/workflows/ci.yaml/badge.svg)](https://github.com/philipschmid/echo-app/actions/workflows/ci.yaml) [![Docker](https://github.com/philipschmid/echo-app/actions/workflows/docker.yaml/badge.svg)](https://github.com/philipschmid/echo-app/actions/workflows/docker.yaml) [![Release](https://github.com/philipschmid/echo-app/actions/workflows/release.yaml/badge.svg)](https://github.com/philipschmid/echo-app/actions/workflows/release.yaml)
+[![CI](https://github.com/philipschmid/echo-observatory/actions/workflows/ci.yaml/badge.svg)](https://github.com/philipschmid/echo-observatory/actions/workflows/ci.yaml) [![Docker](https://github.com/philipschmid/echo-observatory/actions/workflows/docker.yaml/badge.svg)](https://github.com/philipschmid/echo-observatory/actions/workflows/docker.yaml) [![Release](https://github.com/philipschmid/echo-observatory/actions/workflows/release.yaml/badge.svg)](https://github.com/philipschmid/echo-observatory/actions/workflows/release.yaml)
 
 A Go service for testing network paths, proxies, and load balancers. Connect over
 HTTP, HTTPS, HTTP/3, TCP, or gRPC to inspect the receiving server and request.
-WebSocket connections echo text and binary messages.
+WebSocket connections echo text and binary messages. IPv4 and IPv6 requests
+report the observed IP family beside the socket peer address in the UI and JSON.
 
-## Connect to echo-app
+## Connect to Echo Observatory
 
 ```mermaid
 %%{init: {"themeVariables": {"fontFamily": "Arial", "edgeLabelBackground": "#f5f8fe"}, "flowchart": {"nodeSpacing": 24, "rankSpacing": 48, "padding": 18}}}%%
 flowchart TB
-    accTitle: echo-app connection map
-    accDescr: HTTP/1.1 and HTTP/2.0 clients use HTTP port 8080 or HTTPS port 8443. Plain HTTP/2.0 requires --h2c. WebSocket uses HTTP/1.1 on either port. HTTP/3 uses UDP 4433, TCP clients use 9090, gRPC clients use 50051, and Prometheus and Kubernetes probes use the admin listener on 3000.
+    accTitle: Echo Observatory connection map
+    accDescr: HTTP/1.1 and HTTP/2.0 clients use exposed HTTP port 80 or HTTPS port 443. Plain HTTP/2.0 requires --h2c. WebSocket uses HTTP/1.1 on either port, and the browser UI is available at /ui/. HTTP/3 uses UDP 443, TCP clients use 9090, gRPC clients use 50051, and Prometheus and Kubernetes probes use the admin listener on 3000.
 
     web("<b>HTTP / WebSocket</b><br/>curl · browser · proxy")
     socket("<b>TCP</b><br/>nc · socket clients")
     rpc("<b>gRPC</b><br/>grpcurl · SDKs")
     ops("<b>Operations</b><br/>Prometheus · Kubernetes")
 
-    subgraph app["echo-app"]
-        http("<b>HTTP</b><br/>8080 / TCP<br/>HTTP/1.1 · HTTP/2.0<br/>/ · /ws<br/>HTTP/2.0 needs --h2c")
-        https("<b>HTTPS</b><br/>8443 / TCP<br/>HTTP/1.1 · HTTP/2.0<br/>/ · /ws<br/>Optional")
-        quic("<b>HTTP/3</b><br/>4433 / UDP<br/>HTTP/3 · QUIC<br/>HTTP requests only<br/>Optional")
-        tcp("<b>TCP</b><br/>9090 / TCP<br/>JSON metadata<br/>Close after response<br/>Optional")
-        grpc("<b>gRPC</b><br/>50051 / TCP<br/>Echo · reflection<br/>Health Check · Watch<br/>Optional")
-        admin("<b>Admin</b><br/>3000 / TCP<br/>/metrics<br/>/health · /ready<br/>Enabled by default")
+    subgraph app["Echo Observatory"]
+        http("<b>HTTP</b><br/>80 / TCP<br/>HTTP/1.1 · HTTP/2.0<br/>/ · /ws · /ui/<br/>HTTP/2.0 needs --h2c")
+        https("<b>HTTPS</b><br/>443 / TCP<br/>HTTP/1.1 · HTTP/2.0<br/>/ · /ws · /ui/<br/>JSON metadata")
+        quic("<b>HTTP/3</b><br/>443 / UDP<br/>HTTP/3 · QUIC<br/>/ · /ui/<br/>JSON metadata")
+        tcp("<b>TCP</b><br/>9090 / TCP<br/>JSON metadata<br/>Close after response<br/>Native listener")
+        grpc("<b>gRPC</b><br/>50051 / TCP<br/>Echo · reflection<br/>Health Check · Watch<br/>TLS in profiles")
+        admin("<b>Admin</b><br/>3000 / TCP<br/>/metrics<br/>/health · /ready<br/>Private listener")
     end
 
     web --> http
@@ -43,35 +44,33 @@ flowchart TB
     linkStyle default stroke:#819bc1,stroke-width:1.5px;
 ```
 
-HTTP and admin listeners are enabled by default; the others are opt-in.
-WebSocket upgrades use HTTP/1.1 on `/ws`. Ports are configurable.
+The map shows the standard exposed deployment ports.
+The embedded UI uses `/ui/` on HTTP, HTTPS and HTTP/3; `/` returns JSON.
+WebSocket upgrades use HTTP/1.1 on `/ws`. gRPC stays on its own port.
+For public deployments, set `--public-url` to enable [search discovery](docs/usage.md#search-discovery).
 
 ## Quick start
 
-Run the default HTTP and admin listeners, published only on localhost:
+Build and start the on-prem profile:
 
 ```bash
-docker run --rm --read-only --cap-drop=ALL --security-opt=no-new-privileges \
-  -p 127.0.0.1:8080:8080 -p 127.0.0.1:3000:3000 \
-  ghcr.io/philipschmid/echo-app:main
+docker compose up --build -d
 ```
 
-In another terminal:
+Open [localhost/ui/](http://localhost/ui/) to inspect your request and its network
+layers, or [Workbench](http://localhost/ui/workbench/) to test HTTP and WebSocket.
+HTTPS and HTTP/3 use a self-signed demo certificate until you supply
+trusted certificates; see [usage](docs/usage.md#use-certificates-and-mutual-tls).
 
 ```bash
-curl -sS http://localhost:8080/
+curl -sS http://localhost/
+curl -sk https://localhost/   # Demo certificate only.
 curl -fsS http://localhost:3000/ready
 ```
 
-The image runs as UID/GID `65532`. The `main` tag follows the main branch; pin a
-version or digest for repeatable deployments.
-
-To build locally with Go 1.26 or newer:
-
-```bash
-make build-quick
-./echo-app --tls --tcp --grpc --quic
-```
+The container runs as UID/GID `65532`, with a read-only filesystem and all
+capabilities dropped. Admin port 3000 is published only on loopback.
+For binary builds and unprivileged development ports, see [development](docs/development.md).
 
 ## Example response
 
@@ -80,21 +79,26 @@ reverse proxy returned this HTTPS response (abridged):
 
 ```json
 {
-  "hostname": "echo-app-demo",
+  "hostname": "echo-observatory-demo",
   "listener": "TLS",
-  "source_ip": "172.21.0.3",
+  "source_ip": "172.17.0.1",
+  "ip_version": "IPv4",
   "http_version": "HTTP/2.0",
   "http_method": "GET",
   "http_host": "echo.example.test",
   "http_request_uri": "/checkout?test=42",
-  "remote_addr": "172.21.0.3:46186",
-  "local_addr": "172.21.0.2:8443",
+  "remote_addr": "172.17.0.1:56536",
+  "local_addr": "172.17.0.2:18443",
   "tls_version": "TLS 1.3",
-  "tls_server_name": "echo-app-demo",
+  "tls_server_name": "localhost",
   "tls_negotiated_protocol": "h2",
   "headers": {
-    "Authorization": ["[REDACTED]"],
-    "X-Forwarded-For": ["172.21.0.1"]
+    "Authorization": [
+      "[REDACTED]"
+    ],
+    "X-Forwarded-For": [
+      "127.0.0.1"
+    ]
   }
 }
 ```
@@ -105,30 +109,46 @@ the forwarded client address stays in a header and `Authorization` is redacted.
 
 ## Endpoints at a glance
 
-| Listener | Default port | Connect to | Enable |
+| Listener | Exposed port | Internal default | Connect to |
 | --- | --- | --- | --- |
-| HTTP | `8080/TCP` | JSON metadata; `/ws` for WebSocket echo | Always on; optional `--h2c` |
-| HTTPS | `8443/TCP` | JSON metadata; `/ws` for WSS | `--tls` |
-| HTTP/3 | `4433/UDP` | Any path except `/ws` | `--quic` |
-| TCP | `9090/TCP` | One JSON metadata response followed by EOF | `--tcp` |
-| gRPC | `50051/TCP` | `echo.EchoService/Echo`, standard Health, reflection | `--grpc`; optional `--grpc-tls` |
-| Admin | `3000/TCP` | `/metrics`, `/health`, `/ready` | On by default; `--metrics=false` disables it |
+| HTTP | `80/TCP` | `8080/TCP` | JSON; `/ws` for WebSocket; `/ui/` for the UI |
+| HTTPS | `443/TCP` | `8443/TCP` | JSON; `/ws` for WSS; `/ui/` for the UI |
+| HTTP/3 | `443/UDP` | `4433/UDP` | JSON; `/ui/` for the UI; no WebSocket |
+| TCP | `9090/TCP` | `9090/TCP` | One JSON metadata response followed by EOF |
+| gRPC | `50051/TCP` | `50051/TCP` | Echo, standard Health and reflection; TLS in deployment profiles |
+| Admin | **Private** `3000/TCP` | `3000/TCP` | `/metrics`, `/health`, `/ready` |
 
-## Version plan
+The [Compose](compose.yaml) and [Kubernetes](docs/kubernetes.md) profiles use
+these exposed ports and enable all echo listeners.
+The bare binary starts only HTTP and admin by default; other listeners remain
+opt-in. All bind ports are configurable. Existing 1.x image paths are unchanged.
 
-Version 1.3.0 is the final planned 1.x release. The browser UI, automatic
-certificate management, and related major changes are planned for 2.0.0+.
+## Version 2.0
+
+Version 2.0 adds the browser UI, automatic certificate management, and the
+renamed executable. Images starting with 2.0.0 use
+`ghcr.io/philipschmid/echo-observatory`;
+existing 1.x images remain at `ghcr.io/philipschmid/echo-app`.
+See [upgrading to 2.0](docs/migration-v2.md) for configuration and metrics changes.
 
 ## Guides
 
-- [Usage](docs/usage.md): connection examples, response controls,
+- [Usage](docs/usage.md): browser UI, connection examples, response controls,
   certificates, WebSocket, health checks, and metrics.
 - [Configuration](docs/configuration.md): flags, environment variables, defaults,
   and validation.
+- [Monitoring](docs/monitoring.md): private health endpoints, metric reference,
+  and PromQL examples.
+- [Privacy and logging](docs/privacy.md): browser storage, diagnostic logs,
+  redaction limits, and public deployment responsibilities.
 - [Kubernetes](docs/kubernetes.md): deployment, services, probes, and pod security.
 - [Development](docs/development.md): builds, tests, integration checks, and images.
 
+Runs on-premises and offline too: use the default self-signed certificate or
+supply your own PEM certificate and key. ACME is optional.
+
 Keep the admin listener private. Common credential headers are redacted by default;
-`--unsafe-headers` disables that protection.
+`--unsafe-headers` disables that protection. Use synthetic data and review the
+[privacy guidance](docs/privacy.md) before operating a public instance.
 
 [Apache 2.0 license](LICENSE).

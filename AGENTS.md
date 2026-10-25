@@ -1,10 +1,10 @@
-# Agent Instructions for echo-app
+# Agent Instructions for echo-observatory
 
-This document contains instructions for AI coding assistants working on the echo-app repository.
+This document contains instructions for AI coding assistants working on the echo-observatory repository.
 
 ## Project Overview
 
-echo-app is a multi-protocol echo server written in Go that supports:
+echo-observatory is a multi-protocol echo server written in Go that supports:
 - HTTP/HTTPS (with TLS)
 - TCP
 - gRPC
@@ -56,7 +56,7 @@ The application is designed for debugging, testing, and demonstrating various ne
 
 ```
 .
-├── cmd/echo-app/          # Main application entry point
+├── cmd/echo-observatory/          # Main application entry point
 ├── internal/
 │   ├── config/            # Configuration management
 │   ├── handlers/          # Protocol handlers (HTTP, TCP, gRPC, QUIC)
@@ -137,12 +137,12 @@ Follow the Conventional Commits specification:
 feat: add configurable request body size limit
 
 Add configurable maximum request body size limit to prevent resource
-exhaustion attacks via large request payloads. Default is 10MB.
+exhaustion attacks via large request payloads. Default is 64 KiB.
 
 Configuration:
-- Environment variable: ECHO_APP_MAX_REQUEST_SIZE
+- Environment variable: ECHO_OBSERVATORY_MAX_REQUEST_SIZE
 - Command-line flag: --max-request-size
-- Default: 10485760 bytes (10MB)
+- Default: 65536 bytes (64 KiB)
 ```
 
 ```
@@ -281,16 +281,17 @@ gofmt -w .
 
 The application uses environment variables and command-line flags:
 
-- `ECHO_APP_MESSAGE`: Custom message to echo back
-- `ECHO_APP_NODE`: Node identifier
-- `ECHO_APP_HTTP_PORT`: HTTP port (default: 8080)
-- `ECHO_APP_TLS_PORT`: TLS port (default: 8443)
-- `ECHO_APP_TCP_PORT`: TCP port (default: 9090)
-- `ECHO_APP_GRPC_PORT`: gRPC port (default: 50051)
-- `ECHO_APP_QUIC_PORT`: QUIC port (default: 4433)
-- `ECHO_APP_METRICS_PORT`: Metrics port (default: 3000)
-- `ECHO_APP_MAX_REQUEST_SIZE`: Max request body size (default: 10MB)
-- `ECHO_APP_LOG_LEVEL`: Log level (debug, info, warn, error)
+- `ECHO_OBSERVATORY_MESSAGE`: Custom message to echo back
+- `ECHO_OBSERVATORY_NODE`: Node identifier
+- `ECHO_OBSERVATORY_HTTP_PORT`: HTTP port (default: 8080)
+- `ECHO_OBSERVATORY_TLS_PORT`: TLS port (default: 8443)
+- `ECHO_OBSERVATORY_TCP_PORT`: TCP port (default: 9090)
+- `ECHO_OBSERVATORY_GRPC_PORT`: gRPC port (default: 50051)
+- `ECHO_OBSERVATORY_QUIC_PORT`: QUIC port (default: 4433)
+- `ECHO_OBSERVATORY_METRICS_PORT`: Metrics port (default: 3000)
+- `ECHO_OBSERVATORY_MAX_REQUEST_SIZE`: Max request body size (default: 64 KiB)
+- `ECHO_OBSERVATORY_MAX_RESPONSE_SIZE`: Max echo response size (default: 64 KiB)
+- `ECHO_OBSERVATORY_LOG_LEVEL`: Log level (debug, info, warn, error)
 
 ## Additional Notes
 

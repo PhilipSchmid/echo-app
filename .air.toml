@@ -1,0 +1,25 @@
+root = "."
+tmp_dir = "tmp/air"
+env_files = []
+
+[build]
+cmd = "go build -o ./tmp/air/echo-observatory ./cmd/echo-observatory"
+entrypoint = ["./tmp/air/echo-observatory"]
+args_bin = [
+  "--http-port=18880", "--tls-port=18843", "--quic-port=18843",
+  "--tcp-port=19990", "--grpc-port=15051", "--metrics-port=13300",
+  "--h2c", "--tls", "--tcp", "--grpc", "--grpc-tls", "--quic",
+  "--quic-advertise-port=18843", "--response-controls", "--print-http-request-headers",
+]
+include_ext = ["go", "html", "css", "js", "json", "svg", "png", "woff2"]
+include_file = ["go.mod", "go.sum"]
+exclude_dir = [".git", ".acme", "build", "tmp", "vendor"]
+exclude_regex = ["_test\\.go$"]
+exclude_unchanged = true
+delay = 250
+stop_on_error = true
+send_interrupt = true
+kill_delay = "5s"
+
+[misc]
+clean_on_exit = true
