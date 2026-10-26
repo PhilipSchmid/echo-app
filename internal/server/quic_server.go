@@ -146,9 +146,10 @@ func (s *QUICServer) Start(ctx context.Context) error {
 	packet = protectPacketConn(packet.(*net.UDPConn), s.protection)
 	transport := &quic.Transport{Conn: packet, ConnContext: s.connectionContext, VerifySourceAddress: func(net.Addr) bool { return s.protection != nil }}
 	listener, err := transport.ListenEarly(http3.ConfigureTLSConfig(tlsConfig), &quic.Config{
-		MaxIncomingStreams:   maxQUICStreams,
-		HandshakeIdleTimeout: 5 * time.Second,
-		MaxIdleTimeout:       30 * time.Second,
+		MaxIncomingStreams:      maxQUICStreams,
+		HandshakeIdleTimeout:    5 * time.Second,
+		MaxIdleTimeout:          30 * time.Second,
+		DisablePathMTUDiscovery: s.cfg.QUICDisablePMTUD,
 	})
 	if err != nil {
 		_ = transport.Close()

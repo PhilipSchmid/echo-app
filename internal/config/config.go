@@ -45,6 +45,7 @@ type Config struct {
 	TCP                    bool
 	GRPC                   bool
 	QUIC                   bool
+	QUICDisablePMTUD       bool
 	Metrics                bool
 	HTTPPort               string
 	HTTPAdvertisePort      string
@@ -93,6 +94,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("tcp", false)
 	viper.SetDefault("grpc", false)
 	viper.SetDefault("quic", false)
+	viper.SetDefault("quic-disable-path-mtu-discovery", false)
 	viper.SetDefault("metrics", true)
 	viper.SetDefault("http-port", "8080")
 	viper.SetDefault("http-advertise-port", "")
@@ -146,6 +148,7 @@ func Load() (*Config, error) {
 		TCP:               viper.GetBool("tcp"),
 		GRPC:              viper.GetBool("grpc"),
 		QUIC:              viper.GetBool("quic"),
+		QUICDisablePMTUD:  viper.GetBool("quic-disable-path-mtu-discovery"),
 		Metrics:           viper.GetBool("metrics"),
 		HTTPPort:          viper.GetString("http-port"),
 		HTTPAdvertisePort: viper.GetString("http-advertise-port"),

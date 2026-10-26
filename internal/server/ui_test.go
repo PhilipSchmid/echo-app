@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -22,7 +23,19 @@ import (
 )
 
 func TestHTTP3ReusesProtectedConnectionForAllUIPagesAndAssets(t *testing.T) {
+	for _, reducedMTU := range []bool{false, true} {
+		name := "default"
+		if reducedMTU {
+			name = "reduced MTU"
+		}
+		t.Run(name, func(t *testing.T) { testHTTP3UIConnection(t, reducedMTU) })
+	}
+}
+
+func testHTTP3UIConnection(t *testing.T, reducedMTU bool) {
+	t.Helper()
 	fixture := newTLSFixture(t)
+	fixture.cfg.QUICDisablePMTUD = reducedMTU
 	fixture.cfg.UI, fixture.cfg.TLSClientCAFile, fixture.cfg.PublicURL = true, "", "https://localhost/"
 	guard, err := protection.NewGuard(protection.Options{
 		Enabled: true, RequestRate: 20, PeerRate: 5, IngressRate: 256 << 10, EgressRate: 1 << 20, DailyEgress: 1 << 30,
@@ -47,6 +60,55 @@ func TestHTTP3ReusesProtectedConnectionForAllUIPagesAndAssets(t *testing.T) {
 		require.NoError(t, srv.Shutdown(ctx))
 		require.ErrorIs(t, <-done, http.ErrServerClosed)
 	})
+	target := srv.packet.LocalAddr().String()
+	var largest atomic.Int32
+	if reducedMTU {
+		// Allow one successful large probe, then model a path whose MTU decreases.
+		relay, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+		require.NoError(t, err)
+		backend, err := net.ResolveUDPAddr("udp4", target)
+		require.NoError(t, err)
+		relayDone := make(chan error, 1)
+		go func() {
+			buffer := make([]byte, 65536)
+			var client *net.UDPAddr
+			allowedProbe := false
+			for {
+				n, from, err := relay.ReadFromUDP(buffer)
+				if err != nil {
+					relayDone <- err
+					return
+				}
+				to := backend
+				if from.String() == backend.String() {
+					to = client
+					if int32(n) > largest.Load() {
+						largest.Store(int32(n))
+					}
+					if n > 1280 {
+						if allowedProbe {
+							continue
+						}
+						allowedProbe = true
+					}
+				} else {
+					client = from
+				}
+				if to == nil {
+					continue
+				}
+				if _, err := relay.WriteToUDP(buffer[:n], to); err != nil {
+					relayDone <- err
+					return
+				}
+			}
+		}()
+		t.Cleanup(func() {
+			require.NoError(t, relay.Close())
+			require.ErrorIs(t, <-relayDone, net.ErrClosed)
+		})
+		target = relay.LocalAddr().String()
+	}
 	var dials atomic.Int32
 	transport := &http3.Transport{
 		TLSClientConfig:    &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: fixture.roots, ServerName: "localhost"},
@@ -69,7 +131,7 @@ func TestHTTP3ReusesProtectedConnectionForAllUIPagesAndAssets(t *testing.T) {
 		"/ui/presets.js", "/ui/highlight.js", "/ui/terminal.js", "/ui/privacy.js", "/ui/app.css", "/ui/logo.svg", "/ui/favicon.svg",
 		"/ui/nunito-latin.woff2", "/ui/sometype-mono-latin.woff2", "/robots.txt", "/sitemap.xml",
 	} {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+srv.packet.LocalAddr().String()+path, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+target+path, nil)
 		require.NoError(t, err)
 		response, err := client.Do(req)
 		require.NoError(t, err, path)
@@ -95,6 +157,10 @@ func TestHTTP3ReusesProtectedConnectionForAllUIPagesAndAssets(t *testing.T) {
 		}
 	}
 	require.Equal(t, int32(1), dials.Load(), "every response must use the same QUIC connection")
+	if reducedMTU {
+		require.Positive(t, largest.Load())
+		require.LessOrEqual(t, largest.Load(), int32(1280), "the workaround must also suppress larger probes")
+	}
 }
 
 func TestUIRoutesPreserveEchoAndWebSocket(t *testing.T) {
