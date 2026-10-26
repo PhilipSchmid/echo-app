@@ -55,6 +55,7 @@ func TestDeploymentPortsStayConsistent(t *testing.T) {
 		require.True(t, ok)
 		assert.ElementsMatch(t, []string{"80:8080/tcp", "443:8443/tcp", "443:4433/udp", "9090:9090/tcp", "50051:50051/tcp", "127.0.0.1:3000:3000/tcp", "[::1]:3000:3000/tcp"}, service.Ports)
 		assertAdvertisedPorts(t, service.Environment)
+		assert.Equal(t, "false", service.Environment["echo_observatory_protection"], "self-hosted examples must not inherit public-demo quotas")
 		assert.Equal(t, "true", service.Environment["echo_observatory_grpc_tls"])
 		assert.True(t, service.ReadOnly)
 		assert.Equal(t, []string{"ALL"}, service.CapDrop)
@@ -75,6 +76,7 @@ func TestDeploymentPortsStayConsistent(t *testing.T) {
 			require.NoError(t, cfg.ReadConfig(strings.NewReader(document)))
 			if cfg.GetString("kind") == "ConfigMap" {
 				assertAdvertisedPorts(t, cfg.GetStringMapString("data"))
+				assert.Equal(t, "false", cfg.GetStringMapString("data")["echo_observatory_protection"], "keep self-hosted defaults with the pinned prerelease too")
 			}
 			if cfg.GetString("kind") != "Service" {
 				continue

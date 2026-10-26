@@ -111,7 +111,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("log-level", "info")
 	viper.SetDefault("max-request-size", 65536)
 	viper.SetDefault("max-response-size", 65536)
-	viper.SetDefault("protection", true)
+	viper.SetDefault("protection", false)
 	viper.SetDefault("request-rate", 20)
 	viper.SetDefault("peer-request-rate", 5)
 	viper.SetDefault("ingress-bytes-per-second", 262144)

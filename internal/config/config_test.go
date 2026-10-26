@@ -26,6 +26,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 	assert.Equal(t, "", cfg.Message)
 	assert.Equal(t, "", cfg.Node)
 	assert.False(t, cfg.PrintHeaders)
+	assert.False(t, cfg.UnsafeHeaders)
 	assert.False(t, cfg.ResponseControls)
 	assert.True(t, cfg.UI)
 	assert.Empty(t, cfg.PublicURL)
@@ -40,12 +41,18 @@ func TestLoad_DefaultValues(t *testing.T) {
 	assert.False(t, cfg.ACMEAcceptTOS)
 	assert.False(t, cfg.ACMEStaging)
 	assert.False(t, cfg.TLS)
+	assert.False(t, cfg.H2C)
 	assert.False(t, cfg.TCP)
 	assert.False(t, cfg.GRPC)
 	assert.False(t, cfg.QUIC)
 	assert.False(t, cfg.QUICDisablePMTUD)
 	assert.True(t, cfg.Metrics)
 	assert.Equal(t, "8080", cfg.HTTPPort)
+	assert.Empty(t, cfg.HTTPAdvertisePort)
+	assert.Empty(t, cfg.TLSAdvertisePort)
+	assert.Empty(t, cfg.TCPAdvertisePort)
+	assert.Empty(t, cfg.GRPCAdvertisePort)
+	assert.Empty(t, cfg.QUICAdvertisePort)
 	assert.Equal(t, "8443", cfg.TLSPort)
 	assert.Equal(t, "9090", cfg.TCPPort)
 	assert.Equal(t, "50051", cfg.GRPCPort)
@@ -55,9 +62,13 @@ func TestLoad_DefaultValues(t *testing.T) {
 	assert.Equal(t, int64(65536), cfg.MaxRequestSize)
 	assert.Equal(t, int64(65536), cfg.MaxResponseSize)
 	assert.Equal(t, protection.Options{
-		Enabled: true, RequestRate: 20, PeerRate: 5,
+		Enabled: false, RequestRate: 20, PeerRate: 5,
 		IngressRate: 262144, EgressRate: 1048576, DailyEgress: 1073741824,
 	}, cfg.Protection)
+	assert.Equal(t, ExternalReadinessProbe{
+		Type: "none", Interval: 10 * time.Second, Timeout: 2 * time.Second,
+		HTTPMethod: "GET", HTTPExpectedStatus: 200,
+	}, cfg.ExternalReadinessProbe)
 	assert.Equal(t, logrus.InfoLevel, cfg.LogLevel)
 }
 
@@ -86,9 +97,11 @@ func TestQUICPathMTUEnvironmentAndFlagPrecedence(t *testing.T) {
 	}
 }
 
+
 func TestLoad_Protection(t *testing.T) {
 	viper.Reset()
 	t.Cleanup(viper.Reset)
+	t.Setenv("ECHO_OBSERVATORY_PROTECTION", "true")
 	t.Setenv("ECHO_OBSERVATORY_REQUEST_RATE", "2.5")
 	t.Setenv("ECHO_OBSERVATORY_PEER_REQUEST_RATE", "0")
 	t.Setenv("ECHO_OBSERVATORY_INGRESS_BYTES_PER_SECOND", "1024")
@@ -110,6 +123,42 @@ func TestLoad_Protection(t *testing.T) {
 	cfg, err = Load()
 	require.NoError(t, err)
 	assert.False(t, cfg.Protection.Enabled)
+}
+
+func TestProtectionOptInEnvironmentAndFlagPrecedence(t *testing.T) {
+	for _, test := range []struct {
+		name, environment string
+		flags             []string
+		want              bool
+	}{
+		{"self-hosted defaults", "", nil, false},
+		{"public deployment environment", "true", nil, true},
+		{"flag enables", "false", []string{"--protection"}, true},
+		{"flag disables", "true", []string{"--protection=false"}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			t.Setenv("ECHO_OBSERVATORY_PROTECTION", test.environment)
+			flags := pflag.NewFlagSet("protection", pflag.ContinueOnError)
+			flags.Bool("protection", false, "")
+			require.NoError(t, flags.Parse(test.flags))
+			require.NoError(t, viper.BindPFlags(flags))
+			cfg, err := Load()
+			require.NoError(t, err)
+			assert.Equal(t, test.want, cfg.Protection.Enabled)
+			assert.Equal(t, int64(65536), cfg.MaxRequestSize)
+			assert.Equal(t, int64(65536), cfg.MaxResponseSize)
+			guard, err := protection.NewGuard(cfg.Protection)
+			require.NoError(t, err)
+			defer func() { require.NoError(t, guard.Close()) }()
+			if test.want {
+				assert.NotNil(t, guard)
+			} else {
+				assert.Nil(t, guard, "self-hosted defaults must not apply public-demo quotas")
+			}
+		})
+	}
 }
 
 func TestProxyProtocolEnvironmentAndFlagPrecedence(t *testing.T) {

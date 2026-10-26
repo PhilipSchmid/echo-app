@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func main() {
+func defineFlags() {
 	pflag.Bool("response-controls", false, "Enable bounded status, delay and size query controls")
 	pflag.Bool("ui", true, "Enable the browser interface at /ui/ on HTTP, HTTPS and HTTP/3")
 	pflag.String("public-url", "", "Public service base URL for UI search discovery; empty disables indexing")
@@ -29,8 +29,8 @@ func main() {
 	// Define command-line flags
 	pflag.String("message", "", "Custom message")
 	pflag.String("node", "", "Node name")
-	pflag.Bool("print-http-request-headers", false, "Print HTTP request headers")
-	pflag.Bool("unsafe-headers", false, "Include sensitive values in diagnostic headers")
+	pflag.Bool("print-http-request-headers", false, "Include request headers in responses and debug logs; redact credentials by default")
+	pflag.Bool("unsafe-headers", false, "Reveal sensitive header values in returned diagnostics only")
 	pflag.String("tls-cert-file", "", "PEM server certificate for HTTPS, QUIC and TLS-enabled gRPC")
 	pflag.String("tls-key-file", "", "PEM private key for the server certificate")
 	pflag.String("tls-client-ca-file", "", "PEM client CA bundle; require and verify client certificates")
@@ -45,7 +45,7 @@ func main() {
 	pflag.Bool("grpc", false, "Enable gRPC server")
 	pflag.Bool("quic", false, "Enable QUIC server")
 	pflag.Bool("quic-disable-path-mtu-discovery", false, "Keep QUIC packets at the conservative initial size on networks that drop larger UDP packets")
-	pflag.Bool("metrics", true, "Enable metrics server")
+	pflag.Bool("metrics", true, "Enable the admin listener (/metrics, /health, /ready); keep its port private")
 	pflag.String("http-port", "8080", "HTTP server port")
 	pflag.String("http-advertise-port", "", "Reachable HTTP port shown in connection examples; empty uses the bind port")
 	pflag.String("tls-advertise-port", "", "Reachable HTTPS port shown in connection examples; empty uses the bind port")
@@ -57,24 +57,27 @@ func main() {
 	pflag.String("quic-port", "4433", "QUIC server port")
 	pflag.String("quic-host", "", "QUIC bind hostname or IP; empty binds all interfaces")
 	pflag.String("quic-advertise-port", "", "Advertise this reachable public UDP port via HTTPS Alt-Svc; empty disables discovery")
-	pflag.String("metrics-port", "3000", "Metrics server port")
+	pflag.String("metrics-port", "3000", "Admin HTTP listener port")
 	pflag.String("log-level", "info", "Log level (debug, info, warn, error)")
 	pflag.Int64("max-request-size", 65536, "Maximum request body or message size in bytes")
 	pflag.Int64("max-response-size", 65536, "Maximum echo response size in bytes (0 uses the legacy 1 MiB cap)")
-	pflag.Bool("protection", true, "Enable shared public listener rate and transfer budgets")
-	pflag.Float64("request-rate", 20, "Global operations and new connections per second (independent buckets)")
-	pflag.Float64("peer-request-rate", 5, "Operations and new connections per second per client address (0 disables)")
-	pflag.Int64("ingress-bytes-per-second", 262144, "Shared public ingress byte rate")
-	pflag.Int64("egress-bytes-per-second", 1048576, "Shared public egress byte rate")
-	pflag.Int64("daily-egress-bytes", 1073741824, "Public outbound byte allowance per UTC day")
-	pflag.String("transfer-state-file", "", "Private file preserving the daily budget across restarts; empty uses memory")
+	pflag.Bool("protection", false, "Enable shared listener rate and transfer budgets for a public deployment")
+	pflag.Float64("request-rate", 20, "Global operations and new connections per second with --protection (independent buckets)")
+	pflag.Float64("peer-request-rate", 5, "Per-client operations and new connections per second with --protection (0 disables peer limits)")
+	pflag.Int64("ingress-bytes-per-second", 262144, "Shared ingress bytes per second with --protection")
+	pflag.Int64("egress-bytes-per-second", 1048576, "Shared egress bytes per second with --protection")
+	pflag.Int64("daily-egress-bytes", 1073741824, "Outbound byte allowance per UTC day with --protection")
+	pflag.String("transfer-state-file", "", "Private daily-budget file with --protection; empty uses memory and resets on restart")
 	pflag.String("external-readiness-probe-type", "none", "External readiness probe type: none, http, tcp, or icmp")
 	pflag.String("external-readiness-probe-target", "", "External readiness probe target URL, host:port, or host/IP")
 	pflag.Duration("external-readiness-probe-interval", 10*time.Second, "External readiness probe interval")
 	pflag.Duration("external-readiness-probe-timeout", 2*time.Second, "External readiness probe timeout")
 	pflag.String("external-readiness-http-method", "GET", "HTTP method for external readiness HTTP probes")
 	pflag.Int("external-readiness-http-expected-status", 200, "Expected HTTP status for external readiness HTTP probes")
+}
 
+func main() {
+	defineFlags()
 	// Parse the flags
 	pflag.Parse()
 
