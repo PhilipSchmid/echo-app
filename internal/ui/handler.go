@@ -64,6 +64,7 @@ func NewHandler(cfg *config.Config, listener string, sources ...handlers.Certifi
 		GRPC             bool   `json:"grpc"`
 		GRPCTLS          bool   `json:"grpc_tls"`
 		QUIC             bool   `json:"quic"`
+		HTTP3IPv4Only    bool   `json:"http3_ipv4_only,omitempty"`
 		HTTPPort         string `json:"http_port"`
 		TLSPort          string `json:"tls_port"`
 		TCPPort          string `json:"tcp_port"`
@@ -78,7 +79,8 @@ func NewHandler(cfg *config.Config, listener string, sources ...handlers.Certifi
 	}{
 		H2C: cfg.H2C, TLS: cfg.TLS, TCP: cfg.TCP, GRPC: cfg.GRPC, GRPCTLS: cfg.GRPCTLS,
 		QUIC: cfg.QUIC, HTTPPort: advertisedPort(cfg.HTTPAdvertisePort, cfg.HTTPPort), TLSPort: advertisedPort(cfg.TLSAdvertisePort, cfg.TLSPort),
-		TCPPort: advertisedPort(cfg.TCPAdvertisePort, cfg.TCPPort), GRPCPort: advertisedPort(cfg.GRPCAdvertisePort, cfg.GRPCPort), QUICPort: advertisedPort(cfg.QUICAdvertisePort, cfg.QUICPort),
+		HTTP3IPv4Only: cfg.QUIC && cfg.UIHTTP3IPv4Only,
+		TCPPort:       advertisedPort(cfg.TCPAdvertisePort, cfg.TCPPort), GRPCPort: advertisedPort(cfg.GRPCAdvertisePort, cfg.GRPCPort), QUICPort: advertisedPort(cfg.QUICAdvertisePort, cfg.QUICPort),
 		PrintHeaders: cfg.PrintHeaders, UnsafeHeaders: cfg.UnsafeHeaders, ResponseControls: cfg.ResponseControls,
 		DemoCertificate: cfg.TLSCertFile == "" && cfg.ACMEDomain == "", MaxRequestSize: cfg.MaxRequestSize,
 		MaxResponseSize: cfg.MaxResponseSize,

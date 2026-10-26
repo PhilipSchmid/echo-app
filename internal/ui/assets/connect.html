@@ -47,6 +47,16 @@
     <template id="h2c-hint-template"><aside class="protocol-hint" aria-label="Cleartext HTTP/2 client requirements"><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/></svg></span><div><h3>Cleartext HTTP/2</h3><p>Look for <code>HTTP2</code> in <code>curl --version</code>. Use the <code>curl · h2c</code> tab for <code>--http2-prior-knowledge</code>; GNU wget uses HTTP/1.1.</p></div></aside></template>
     <template id="http2-hint-template"><aside class="protocol-hint" aria-label="HTTPS protocol negotiation"><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/></svg></span><div><h3>Check the negotiated protocol</h3><p>Look for <code>HTTP2</code> in <code>curl --version</code>. <code>--http2</code> may fall back to HTTP/1.1; check <code>http_version</code> in the response. GNU wget uses HTTP/1.1.</p></div></aside></template>
     <template id="http3-hint-template"><aside class="protocol-hint" aria-label="HTTP/3 client requirements"><span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/></svg></span><div><h3>HTTP/3 client requirements</h3><p>Look for <code>HTTP3</code> in <code>curl --version</code>. <code>--http3-only</code> needs a reachable UDP listener and does not fall back to TCP.</p></div></aside></template>
+    <template id="http3-ipv4-hint-template">
+      <aside class="protocol-hint http3-ipv4-hint" aria-label="HTTP/3 network availability and client requirements">
+        <span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a17 17 0 0 1 0 18 17 17 0 0 1 0-18"/></svg></span>
+        <div>
+          <div class="http3-hint-heading"><h3>IPv4 only</h3><span class="http3-hint-badge">Hosting limit</span></div>
+          <p>Our hosting provider does not yet support IPv6 for UDP.</p>
+          <p class="http3-client-check">Look for <code>HTTP3</code> in <code>curl --version</code>. <code>--http3-only</code> needs a reachable UDP listener and does not fall back to TCP.</p>
+        </div>
+      </aside>
+    </template>
     <template id="terminal-command-template"><div class="code-panel" data-code-block><div class="code-toolbar"><div class="code-caption"><div class="code-title"><svg class="terminal-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 6 5 5-5 5m9 1h7"/></svg><span data-command-label></span></div></div><button class="button code-copy" type="button" data-copy-state="idle"><svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="copy-glyph" d="M8 8h12v12H8zM16 8V4H4v12h4"/><path class="check-glyph" d="m5 12 4 4L19 6"/></svg><span data-copy-label>Copy</span></button></div><div class="shell-code"><span class="terminal-prompt" aria-hidden="true">$</span><pre class="command-preview" role="region" tabindex="0"></pre></div><p class="code-status" data-copy-status role="status" aria-live="polite" aria-atomic="true"></p></div></template>
   </main>
   {{template "footer" .}}

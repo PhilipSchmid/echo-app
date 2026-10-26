@@ -24,8 +24,9 @@ function render(settings) {
   const nodes = new Map([["listener-cards", new Node("div")]]);
   const calls = [];
   for (const [, id, content] of html.matchAll(/<template\b[^>]*\bid="([^"]+-hint-template)"[^>]*>([\s\S]*?)<\/template>/g)) {
-    assert.match(content, /<aside\b[^>]*class="protocol-hint"/);
-    const hint = new Node("aside", "protocol-hint", content);
+    const classes = content.match(/<aside\b[^>]*class="([^"]+)"/)[1];
+    assert.ok(classes.split(" ").includes("protocol-hint"));
+    const hint = new Node("aside", classes, content);
     hint.templateID = id;
     nodes.set(id, { content: { firstElementChild: hint } });
   }
@@ -90,5 +91,21 @@ test("listener cards and commands use the same advertised ports and page address
     const call = calls.find((entry) => entry.name === name);
     assert.equal(call.settings, settings);
     assert.equal(call.base.href, "https://echo.test/prefix/");
+  }
+});
+
+test("the IPv4-only provider hint is opt-in and scoped to the enabled HTTP/3 example", () => {
+  const settings = { ...ports, tls: true, quic: true, http3_ipv4_only: true };
+  const { card } = render(settings);
+  const hint = card("HTTP/3").querySelector(".http3-ipv4-hint");
+  assert.equal(hint.templateID, "http3-ipv4-hint-template");
+  assert.match(hint.textContent, /<h3>IPv4 only<\/h3>/);
+  assert.match(hint.textContent, /Our hosting provider does not yet support IPv6 for UDP\./);
+  assert.match(hint.textContent, /class="http3-client-check"/);
+  assert.match(hint.textContent, /<code>curl --version<\/code>/);
+  assert.equal(descendants(card("HTTP/3")).filter((node) => node.className.split(" ").includes("protocol-hint")).length, 1);
+  for (const name of ["HTTP", "HTTPS", "TCP", "gRPC"]) assert.equal(card(name).querySelector(".http3-ipv4-hint"), null);
+  for (const override of [{ http3_ipv4_only: undefined }, { http3_ipv4_only: false }, { http3_ipv4_only: "true" }, { quic: false }]) {
+    assert.equal(render({ ...settings, ...override }).card("HTTP/3").querySelector(".http3-ipv4-hint"), null);
   }
 });

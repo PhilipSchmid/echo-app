@@ -553,6 +553,14 @@ summary.listener-summary:hover { background:var(--surface-subtle); }
 .help-icon svg { width:18px; height:18px; }
 .protocol-hint h3 { color:var(--pastel-blue-ink); font-size:var(--text-content); margin-bottom:5px; }
 .protocol-hint p { color:var(--text); font-size:var(--text-content); line-height:1.7; }
+.http3-ipv4-hint { grid-template-columns:40px minmax(0,1fr); gap:16px; padding:20px; border-radius:20px; background:linear-gradient(140deg,color-mix(in srgb,var(--pastel-mint) 48%,var(--surface)),var(--surface-alt)); box-shadow:var(--clay-shadow); }
+.http3-ipv4-hint .help-icon { width:40px; height:40px; border-radius:14px; color:var(--pastel-mint-ink); background:var(--pastel-mint); }
+.http3-ipv4-hint .help-icon svg { width:22px; height:22px; }
+.http3-hint-heading { display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px; margin-bottom:8px; }
+.http3-ipv4-hint h3 { margin:0; color:var(--pastel-mint-ink); font-size:var(--text-body); line-height:1.5; }
+.http3-hint-badge { padding:3px 9px; border:1px solid var(--clay-border); border-radius:9px; color:var(--muted); background:var(--surface); font-size:var(--text-label); font-weight:600; line-height:1.5; }
+.http3-ipv4-hint p { max-width:72ch; }
+.http3-ipv4-hint .http3-client-check { margin-top:14px; padding-top:14px; border-top:1px solid var(--clay-border); color:var(--muted); }
 .certificate-link { display:inline-flex; align-items:center; min-height:44px; margin-top:12px; font-size:var(--text-content); font-weight:600; }
 .connection-help { margin-top:24px; border:1px solid var(--clay-border); border-radius:18px; background:var(--surface); box-shadow:var(--clay-shadow); scroll-margin-top:20px; }
 .connection-help>summary { min-height:76px; padding:18px 22px; gap:12px; font-size:var(--text-body); }
@@ -656,6 +664,9 @@ summary.listener-summary:hover { background:var(--surface-subtle); }
   .listener-summary { padding:18px 16px; gap:10px; }
   .listener-identity { flex-direction:column; align-items:start; gap:6px; }
   .listener-body { padding:18px 16px; }
+  .http3-ipv4-hint { grid-template-columns:32px minmax(0,1fr); gap:10px; padding:14px; border-radius:16px; }
+  .http3-ipv4-hint .help-icon { width:32px; height:32px; border-radius:11px; }
+  .http3-ipv4-hint .help-icon svg { width:18px; height:18px; }
   .public-connection .panel-heading { align-items:start; }
 }
 @media(max-width:440px) {

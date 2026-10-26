@@ -23,6 +23,7 @@ import (
 func defineFlags() {
 	pflag.Bool("response-controls", false, "Enable bounded status, delay and size query controls")
 	pflag.Bool("ui", true, "Enable the browser interface at /ui/ on HTTP, HTTPS and HTTP/3")
+	pflag.Bool("ui-http3-ipv4-only", false, "Show an IPv4-only hosting-provider notice in HTTP/3 connection examples; informational only")
 	pflag.String("public-url", "", "Public service base URL for UI search discovery; empty disables indexing")
 	pflag.Bool("proxy-protocol", false, "Require trusted PROXY protocol headers on public TCP listeners")
 	pflag.String("proxy-trusted-cidrs", "", "Comma-separated CIDRs allowed to supply PROXY protocol headers")
