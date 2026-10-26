@@ -1,0 +1,31 @@
+name: Update Grafana dashboard
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grafana-dashboard
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: grafana
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Validate source and queries
+        run: make test-grafana test-grafana-promql
+      - name: Update dashboard
+        run: make grafana-deploy
+        env:
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+          GRAFANA_DATASOURCE_UID: ${{ vars.GRAFANA_DATASOURCE_UID }}
+          GRAFANA_FOLDER_UID: ${{ vars.GRAFANA_FOLDER_UID }}
+          GRAFANA_ORG_ID: ${{ vars.GRAFANA_ORG_ID }}
+          GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}

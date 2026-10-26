@@ -79,6 +79,9 @@ jobs:
       - name: Test browser client
         run: make test-ui
 
+      - name: Validate Grafana dashboard and PromQL
+        run: make test-grafana test-grafana-promql
+
       - name: Run tests with race detector
         run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
 
