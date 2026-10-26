@@ -54,21 +54,28 @@ func testHTTP3UIConnection(t *testing.T, reducedMTU bool) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("HTTP/3 listener did not bind")
 	}
+	var relay *net.UDPConn
+	var relayDone chan error
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		require.NoError(t, srv.Shutdown(ctx))
-		require.ErrorIs(t, <-done, http.ErrServerClosed)
+		// Keep the relay open until the server's graceful-close exchange completes.
+		assert.NoError(t, srv.Shutdown(ctx))
+		if relay != nil {
+			assert.NoError(t, relay.Close())
+			assert.ErrorIs(t, <-relayDone, net.ErrClosed)
+		}
+		assert.ErrorIs(t, <-done, http.ErrServerClosed)
 	})
 	target := srv.packet.LocalAddr().String()
 	var largest atomic.Int32
 	if reducedMTU {
 		// Allow one successful large probe, then model a path whose MTU decreases.
-		relay, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+		relay, err = net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 		require.NoError(t, err)
 		backend, err := net.ResolveUDPAddr("udp4", target)
 		require.NoError(t, err)
-		relayDone := make(chan error, 1)
+		relayDone = make(chan error, 1)
 		go func() {
 			buffer := make([]byte, 65536)
 			var client *net.UDPAddr
@@ -103,10 +110,6 @@ func testHTTP3UIConnection(t *testing.T, reducedMTU bool) {
 				}
 			}
 		}()
-		t.Cleanup(func() {
-			require.NoError(t, relay.Close())
-			require.ErrorIs(t, <-relayDone, net.ErrClosed)
-		})
 		target = relay.LocalAddr().String()
 	}
 	var dials atomic.Int32
