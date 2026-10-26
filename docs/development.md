@@ -185,7 +185,8 @@ run it only when publication is intended.
 The image workflow publishes branch/SHA tags after checks pass. The release
 workflow owns version tags and stable `latest`; both test an image before publication.
 Prereleases publish only their full version tag, leaving stable aliases alone.
-Use `2.0.0-pre.1` for the prerelease; `latest` is reserved for stable releases.
+Pin `2.0.0` or an image digest for repeatable deployments; `latest` follows the
+most recent stable release.
 Starting with 2.0.0, releases use `ghcr.io/philipschmid/echo-observatory`.
 Legacy 1.x tags retain `ghcr.io/philipschmid/echo-app`.
 
