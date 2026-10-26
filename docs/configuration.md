@@ -63,6 +63,7 @@ needed for a test.
 | `ECHO_OBSERVATORY_QUIC_ADVERTISE_PORT` | `--quic-advertise-port` | empty | Public UDP port advertised in HTTPS `Alt-Svc` responses. Requires HTTPS and QUIC; set only to a reachable mapped port. Deployment profiles use `443`. |
 | `ECHO_OBSERVATORY_QUIC_PORT` | `--quic-port` | `4433` | HTTP/3 port, over UDP. |
 | `ECHO_OBSERVATORY_QUIC_HOST` | `--quic-host` | Empty | Optional QUIC bind IP or hostname; empty binds to all available interfaces. |
+| `ECHO_OBSERVATORY_QUIC_DISABLE_PATH_MTU_DISCOVERY` | `--quic-disable-path-mtu-discovery` | `false` | Keep outgoing QUIC packets at the conservative initial size instead of increasing it after probes. Use on paths that intermittently drop larger UDP packets. |
 | `ECHO_OBSERVATORY_METRICS` | `--metrics` | `true` | Enable the admin listener with `/metrics`, `/health`, and `/ready`. |
 | `ECHO_OBSERVATORY_METRICS_PORT` | `--metrics-port` | `3000` | Admin HTTP port, over TCP. |
 
@@ -235,6 +236,12 @@ These limits reduce
 resource use but do not guarantee availability under a denial-of-service attack.
 With protection enabled, QUIC uses Retry address validation and charges at least
 64 ingress bytes per datagram to bound floods of tiny packets.
+
+Path MTU discovery is enabled by default. If HTTP/3 connects but response bodies
+stall on a network with a reduced or changing UDP packet limit, set
+`--quic-disable-path-mtu-discovery`. This keeps outgoing packets at quic-go's
+initial size (currently 1280 bytes), at the cost of some packet overhead. It does
+not change HTTP/1.1, HTTP/2, TLS verification, or the transfer budgets.
 
 ## Deployment ports
 

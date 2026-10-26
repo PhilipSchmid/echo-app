@@ -43,6 +43,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 	assert.False(t, cfg.TCP)
 	assert.False(t, cfg.GRPC)
 	assert.False(t, cfg.QUIC)
+	assert.False(t, cfg.QUICDisablePMTUD)
 	assert.True(t, cfg.Metrics)
 	assert.Equal(t, "8080", cfg.HTTPPort)
 	assert.Equal(t, "8443", cfg.TLSPort)
@@ -58,6 +59,31 @@ func TestLoad_DefaultValues(t *testing.T) {
 		IngressRate: 262144, EgressRate: 1048576, DailyEgress: 1073741824,
 	}, cfg.Protection)
 	assert.Equal(t, logrus.InfoLevel, cfg.LogLevel)
+}
+
+func TestQUICPathMTUEnvironmentAndFlagPrecedence(t *testing.T) {
+	for _, test := range []struct {
+		name, environment string
+		flags             []string
+		want              bool
+	}{
+		{"environment", "true", nil, true},
+		{"flag enables", "false", []string{"--quic-disable-path-mtu-discovery"}, true},
+		{"flag disables", "true", []string{"--quic-disable-path-mtu-discovery=false"}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			t.Setenv("ECHO_OBSERVATORY_QUIC_DISABLE_PATH_MTU_DISCOVERY", test.environment)
+			flags := pflag.NewFlagSet("quic", pflag.ContinueOnError)
+			flags.Bool("quic-disable-path-mtu-discovery", false, "")
+			require.NoError(t, flags.Parse(test.flags))
+			require.NoError(t, viper.BindPFlags(flags))
+			cfg, err := Load()
+			require.NoError(t, err)
+			assert.Equal(t, test.want, cfg.QUICDisablePMTUD)
+		})
+	}
 }
 
 func TestLoad_Protection(t *testing.T) {

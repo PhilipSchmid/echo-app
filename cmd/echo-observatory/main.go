@@ -44,6 +44,7 @@ func main() {
 	pflag.Bool("tcp", false, "Enable TCP server")
 	pflag.Bool("grpc", false, "Enable gRPC server")
 	pflag.Bool("quic", false, "Enable QUIC server")
+	pflag.Bool("quic-disable-path-mtu-discovery", false, "Keep QUIC packets at the conservative initial size on networks that drop larger UDP packets")
 	pflag.Bool("metrics", true, "Enable metrics server")
 	pflag.String("http-port", "8080", "HTTP server port")
 	pflag.String("http-advertise-port", "", "Reachable HTTP port shown in connection examples; empty uses the bind port")
