@@ -166,7 +166,7 @@ See [upgrading to 2.0](docs/migration-v2.md) for configuration and metrics chang
 - [Monitoring](docs/monitoring.md): private health endpoints, metric reference,
   and PromQL examples.
 - [Grafana dashboard](dashboards/README.md): portable operations dashboard,
-  import instructions and automated updates.
+  import instructions and a manual update target.
 - [Privacy](https://echo.container.education/ui/privacy/): the public demo's data
   handling and contact details. Self-hosted operators can review
   [privacy and logging](docs/usage.md#privacy-and-logging).

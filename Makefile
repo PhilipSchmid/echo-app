@@ -128,19 +128,21 @@ build-all: ## BUILD: Build for all platforms
 test-ui: ## TEST: Test browser client helpers (requires Node.js 22+)
 	@node --test tests/ui-*.test.mjs
 
-.PHONY: grafana-build test-grafana test-grafana-promql grafana-deploy
+.PHONY: grafana-build grafana-update test-grafana test-grafana-promql
 grafana-build: ## DEV: Regenerate the portable Grafana dashboard JSON
 	@node dashboards/echo-observatory.mjs
 
-test-grafana: ## TEST: Validate Grafana source, layout, metric coverage and deployment behavior
+grafana-update: grafana-build ## MAINT: Build and validate the dashboard for manual Grafana import
+	@$(MAKE) test-grafana test-grafana-promql
+	@printf '\nReady to import: %s/dashboards/echo-observatory.json\n' "$(CURDIR)"
+	@printf 'In Grafana: New > Import > upload JSON > keep UID echo-observatory > Import (Overwrite).\n'
+
+test-grafana: ## TEST: Validate Grafana source, layout, metric references and update workflow
 	@node --test tests/grafana.test.mjs
 
 test-grafana-promql: ## TEST: Check dashboard PromQL and calculation fixtures (requires Docker)
 	@set -o pipefail; node scripts/grafana.mjs rules | docker run --rm -i --network none --entrypoint /bin/promtool prom/prometheus:v3.13.3 check rules /dev/stdin
 	@set -o pipefail; node scripts/grafana.mjs rule-tests | docker run --rm -i --network none --entrypoint /bin/promtool prom/prometheus:v3.13.3 test rules /dev/stdin
-
-grafana-deploy: ## MAINT: Update Grafana using GRAFANA_URL, GRAFANA_TOKEN and GRAFANA_DATASOURCE_UID
-	@node scripts/grafana.mjs deploy
 
 .PHONY: test
 test: ## TEST: Run unit tests with coverage
