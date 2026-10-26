@@ -110,7 +110,10 @@ func TestPageShowsObservedIPFamilyWithoutTrustingForwardedClaims(t *testing.T) {
 			if label == "" {
 				label = "Unknown IP family"
 			}
-			assert.Contains(t, response.Body.String(), "IP family received by this server\">"+label+"</span>")
+			assert.Contains(t, response.Body.String(), `<span class="badge neutral ip-family">`+label+`</span>`)
+			badge := regexp.MustCompile(`<span class="badge neutral ip-family"([^>]*)>`).FindStringSubmatch(response.Body.String())
+			require.Len(t, badge, 2)
+			assert.Empty(t, badge[1], "the visible family label needs no tooltip or extra tab stop")
 			assert.NotContains(t, response.Body.String(), "IP version used for this request.")
 		})
 	}

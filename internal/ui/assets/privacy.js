@@ -1,3 +1,4 @@
-import { initTheme } from "./common.js";
+import { initTheme, initTooltips } from "./common.js";
 
 initTheme();
+initTooltips();

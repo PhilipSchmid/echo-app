@@ -1,4 +1,4 @@
-import { $, baseURLs, previewLimit, element, copy, setCopyLabel, initTheme, initServiceStatus, requestURL, curlCommand } from "./common.js";
+import { $, baseURLs, previewLimit, element, copy, setCopyLabel, initTheme, initTooltips, initDisclosureHelp, initServiceStatus, requestURL, curlCommand } from "./common.js";
 import { getPreset } from "./presets.js";
 import { enhanceSelect } from "./controls.js";
 import { renderCode } from "./highlight.js";
@@ -7,16 +7,7 @@ import { createHeaderEditor } from "./headers.js";
 const { uiBase, serviceBase } = baseURLs(import.meta.url);
 const destinationHelp = $("request-destination-help");
 $("request-destination-address").textContent = serviceBase.href;
-destinationHelp.querySelector("summary").title = "Requests go to " + serviceBase.href + ". Paths stay within this address.";
-destinationHelp.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") { destinationHelp.open = false; event.stopPropagation(); }
-});
-destinationHelp.addEventListener("focusout", (event) => {
-  if (!destinationHelp.contains(event.relatedTarget)) destinationHelp.open = false;
-});
-document.addEventListener("pointerdown", (event) => {
-  if (!destinationHelp.contains(event.target)) destinationHelp.open = false;
-});
+initDisclosureHelp(destinationHelp.querySelector("summary"));
 let config = null;
 let responseCopy = "";
 let socket = null;
@@ -360,6 +351,7 @@ function applyExample(settings) {
   $("config-status").textContent = preset.title + " loaded. Review the sample, then choose Send request.";
 }
 initTheme();
+initTooltips();
 const methodControl = enhanceSelect($("method"));
 const headerEditor = createHeaderEditor($("request-headers"), $("add-header"), requestEdited);
 updateMethod(); updateCommand();

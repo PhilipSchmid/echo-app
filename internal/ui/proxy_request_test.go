@@ -54,7 +54,12 @@ func TestPageShowsClientIdentityAndPreservesRawJSON(t *testing.T) {
 	assert.Equal(t, "172.16.0.2:50000", visit.SocketPeerAddr)
 	assert.Equal(t, "172.16.0.3:8443", visit.SocketLocalAddr)
 	assert.Contains(t, response.Body.String(), `<dt>Client IP</dt>`)
-	assert.Contains(t, response.Body.String(), `IP family used by the client">IPv6</span>`)
+	assert.Contains(t, response.Body.String(), `<span class="badge neutral ip-family">IPv6</span>`)
+	badge := regexp.MustCompile(`<span class="badge neutral ip-family"([^>]*)>`).FindStringSubmatch(response.Body.String())
+	assert.Len(t, badge, 2)
+	if len(badge) == 2 {
+		assert.Empty(t, badge[1], "the visible family label needs no tooltip or extra tab stop")
+	}
 	pageWithoutJSON := regexp.MustCompile(`(?s)<pre id="visit-body"[^>]*>.*?</pre>`).ReplaceAllString(response.Body.String(), "")
 	for _, hidden := range []string{"Gateway", "gateway", "PROXY protocol", "App connection", "app-connection", "172.16.0.2", "172.16.0.3"} {
 		assert.NotContains(t, pageWithoutJSON, hidden)

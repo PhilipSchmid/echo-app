@@ -1,4 +1,4 @@
-import { $, baseURLs, copy, initTheme, initServiceStatus, legacyWorkbenchURL } from "./common.js";
+import { $, baseURLs, copy, initTheme, initTooltips, initServiceStatus, legacyWorkbenchURL } from "./common.js";
 import { renderCode } from "./highlight.js";
 import { initCertificateDetails } from "./certificate.js";
 
@@ -11,6 +11,7 @@ function redirectLegacy() {
 window.addEventListener("hashchange", redirectLegacy);
 if (!redirectLegacy()) {
   initTheme();
+  initTooltips();
   initCertificateDetails(uiBase);
   renderCode($("visit-body"), $("visit-body").textContent, "json");
   $("copy-visit").disabled = false;

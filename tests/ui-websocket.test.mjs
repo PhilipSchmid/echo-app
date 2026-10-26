@@ -56,7 +56,7 @@ function fixture(settings) {
     element: (tag, classes, text) => new Node(tag, classes, text),
     renderCode: (node, text) => { node.textContent = text; },
     requestURL: (path, base) => new URL(path, base), createHeaderEditor: () => ({ read: () => new Headers(), set() {} }), curlCommand: () => "curl",
-    initTheme() {}, enhanceSelect() {}, copy() {}, setCopyLabel() {}, getPreset() {},
+    initTheme() {}, initTooltips() {}, initDisclosureHelp() {}, enhanceSelect() {}, copy() {}, setCopyLabel() {}, getPreset() {},
     initServiceStatus: () => settings ? Promise.resolve(settings) : new Promise(() => {}),
     document: { addEventListener() {} },
     window: { location: { href: "http://echo.test/ui/workbench/" }, addEventListener() {}, setTimeout() {}, clearTimeout() {} }

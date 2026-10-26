@@ -12,6 +12,7 @@ function themeFixture(t, { saved = null, dark = true, blocked = false } = {}) {
   const root = { dataset: {} };
   const toggle = {
     hidden: true,
+    dataset: {},
     setAttribute: (key, value) => attributes.set(key, value),
     getAttribute: (key) => attributes.get(key),
     addEventListener: (name, callback) => listeners.set(name, callback)
@@ -39,7 +40,8 @@ test("theme toggle follows the system until the visitor chooses a theme", (t) =>
   const fixture = themeFixture(t);
   assert.equal(fixture.root.dataset.theme, "system");
   assert.equal(fixture.attributes.get("aria-checked"), "true");
-  assert.equal(fixture.toggle.title, "Switch to light theme");
+  assert.equal(fixture.toggle.dataset.tooltip, "Switch to light theme");
+  assert.equal(Object.hasOwn(fixture.toggle, "title"), false);
   assert.equal(fixture.toggle.hidden, false);
   assert.deepEqual(fixture.writes, [], "Opening the page must not save a preference");
   fixture.changeSystem(false);
@@ -52,7 +54,7 @@ test("theme toggle follows the system until the visitor chooses a theme", (t) =>
   assert.equal(fixture.attributes.get("aria-checked"), "true");
   fixture.click();
   assert.equal(fixture.root.dataset.theme, "light");
-  assert.equal(fixture.toggle.title, "Switch to dark theme");
+  assert.equal(fixture.toggle.dataset.tooltip, "Switch to dark theme");
 });
 
 test("saved theme survives navigation and takes precedence over system preference", (t) => {
