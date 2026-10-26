@@ -62,7 +62,7 @@ test('configuration tables remove metric identity before merging by deployment l
 });
 
 test('current values and interval totals are never misleading trend graphs', () => {
-  assert.equal(panels.filter((panel) => panel.type !== 'row').length, 33);
+  assert.equal(panels.filter((panel) => panel.type !== 'row').length, 32);
   for (const panel of panels) for (const target of panel.targets ?? []) {
     if (panel.type === 'bargauge' || panel.type === 'table' || panel.type === 'stat') assert.equal(target.instant, true, panel.title);
     if (target.expr.includes('increase(')) {

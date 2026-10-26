@@ -116,47 +116,6 @@
   },
   "panels": [
     {
-      "id": 1,
-      "type": "text",
-      "title": "Operations overview",
-      "description": "Current values first, activity over time below, and selected-period comparisons in the expandable sections.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 0,
-        "w": 24,
-        "h": 4
-      },
-      "targets": [],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "noValue": "No samples",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#8AB8F8",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "mode": "markdown",
-        "content": "### Echo Observatory · Operations\n**Current state** is shown in cards and tables. Trend charts show rates or changing resource use; comparison bars cover the selected time range. Admin traffic is excluded from demand. Use **Inspect → Data** for exact values or CSV."
-      }
-    },
-    {
       "id": 2,
       "type": "stat",
       "title": "Readiness",
@@ -167,7 +126,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 4,
+        "y": 0,
         "w": 4,
         "h": 4
       },
@@ -233,7 +192,7 @@
       },
       "gridPos": {
         "x": 4,
-        "y": 4,
+        "y": 0,
         "w": 4,
         "h": 4
       },
@@ -296,7 +255,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 4,
+        "y": 0,
         "w": 4,
         "h": 4
       },
@@ -359,7 +318,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 4,
+        "y": 0,
         "w": 4,
         "h": 4
       },
@@ -422,7 +381,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 4,
+        "y": 0,
         "w": 4,
         "h": 4
       },
@@ -485,7 +444,7 @@
       },
       "gridPos": {
         "x": 20,
-        "y": 4,
+        "y": 0,
         "w": 4,
         "h": 4
       },
@@ -548,7 +507,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 8,
+        "y": 4,
         "w": 24,
         "h": 7
       },
@@ -775,7 +734,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 15,
+        "y": 11,
         "w": 12,
         "h": 8
       },
@@ -854,7 +813,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 15,
+        "y": 11,
         "w": 12,
         "h": 8
       },
@@ -964,7 +923,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 23,
+        "y": 19,
         "w": 12,
         "h": 8
       },
@@ -1091,7 +1050,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 23,
+        "y": 19,
         "w": 12,
         "h": 8
       },
@@ -1176,7 +1135,7 @@
           },
           "gridPos": {
             "x": 0,
-            "y": 32,
+            "y": 28,
             "w": 24,
             "h": 7
           },
@@ -1257,7 +1216,7 @@
           },
           "gridPos": {
             "x": 0,
-            "y": 39,
+            "y": 35,
             "w": 12,
             "h": 7
           },
@@ -1332,7 +1291,7 @@
           },
           "gridPos": {
             "x": 12,
-            "y": 39,
+            "y": 35,
             "w": 12,
             "h": 7
           },
@@ -1407,7 +1366,7 @@
           },
           "gridPos": {
             "x": 0,
-            "y": 46,
+            "y": 42,
             "w": 12,
             "h": 7
           },
@@ -1482,7 +1441,7 @@
           },
           "gridPos": {
             "x": 12,
-            "y": 46,
+            "y": 42,
             "w": 12,
             "h": 7
           },
@@ -1557,7 +1516,7 @@
           },
           "gridPos": {
             "x": 0,
-            "y": 53,
+            "y": 49,
             "w": 12,
             "h": 7
           },
@@ -1632,7 +1591,7 @@
           },
           "gridPos": {
             "x": 12,
-            "y": 53,
+            "y": 49,
             "w": 12,
             "h": 8
           },
@@ -1711,7 +1670,7 @@
           },
           "gridPos": {
             "x": 0,
-            "y": 61,
+            "y": 57,
             "w": 24,
             "h": 8
           },
@@ -1782,7 +1741,7 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 31,
+        "y": 27,
         "w": 24,
         "h": 1
       }
@@ -1804,7 +1763,7 @@
           },
           "gridPos": {
             "x": 0,
-            "y": 70,
+            "y": 66,
             "w": 24,
             "h": 7
           },
@@ -2044,7 +2003,7 @@
           },
           "gridPos": {
             "x": 0,
-            "y": 77,
+            "y": 73,
             "w": 12,
             "h": 7
           },
@@ -2120,7 +2079,7 @@
           },
           "gridPos": {
             "x": 12,
-            "y": 77,
+            "y": 73,
             "w": 12,
             "h": 8
           },
@@ -2199,7 +2158,7 @@
           },
           "gridPos": {
             "x": 0,
-            "y": 85,
+            "y": 81,
             "w": 12,
             "h": 8
           },
@@ -2278,7 +2237,7 @@
           },
           "gridPos": {
             "x": 12,
-            "y": 85,
+            "y": 81,
             "w": 12,
             "h": 7
           },
@@ -2354,7 +2313,7 @@
           },
           "gridPos": {
             "x": 0,
-            "y": 93,
+            "y": 89,
             "w": 24,
             "h": 7
           },
@@ -2454,7 +2413,7 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 69,
+        "y": 65,
         "w": 24,
         "h": 1
       }
@@ -2476,7 +2435,7 @@
           },
           "gridPos": {
             "x": 0,
-            "y": 101,
+            "y": 97,
             "w": 24,
             "h": 7
           },
@@ -2626,7 +2585,7 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 100,
+        "y": 96,
         "w": 24,
         "h": 1
       }
@@ -2648,7 +2607,7 @@
           },
           "gridPos": {
             "x": 0,
-            "y": 109,
+            "y": 105,
             "w": 12,
             "h": 8
           },
@@ -2739,7 +2698,7 @@
           },
           "gridPos": {
             "x": 12,
-            "y": 109,
+            "y": 105,
             "w": 12,
             "h": 8
           },
@@ -2818,7 +2777,7 @@
           },
           "gridPos": {
             "x": 0,
-            "y": 117,
+            "y": 113,
             "w": 24,
             "h": 7
           },
@@ -2886,7 +2845,7 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 108,
+        "y": 104,
         "w": 24,
         "h": 1
       }
@@ -2908,7 +2867,7 @@
           },
           "gridPos": {
             "x": 0,
-            "y": 125,
+            "y": 121,
             "w": 12,
             "h": 7
           },
@@ -2989,7 +2948,7 @@
           },
           "gridPos": {
             "x": 12,
-            "y": 125,
+            "y": 121,
             "w": 12,
             "h": 7
           },
@@ -3064,7 +3023,7 @@
           },
           "gridPos": {
             "x": 0,
-            "y": 132,
+            "y": 128,
             "w": 24,
             "h": 8
           },
@@ -3135,7 +3094,7 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 124,
+        "y": 120,
         "w": 24,
         "h": 1
       }
