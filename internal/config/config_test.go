@@ -29,6 +29,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 	assert.False(t, cfg.UnsafeHeaders)
 	assert.False(t, cfg.ResponseControls)
 	assert.True(t, cfg.UI)
+	assert.False(t, cfg.UIHTTP3IPv4Only)
 	assert.Empty(t, cfg.PublicURL)
 	assert.False(t, cfg.ProxyProtocol)
 	assert.Empty(t, cfg.ProxyTrustedCIDRs)
@@ -97,6 +98,21 @@ func TestQUICPathMTUEnvironmentAndFlagPrecedence(t *testing.T) {
 	}
 }
 
+func TestHTTP3IPv4NoticeEnvironmentAndFlag(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	t.Setenv("ECHO_OBSERVATORY_UI_HTTP3_IPV4_ONLY", "true")
+	cfg, err := Load()
+	require.NoError(t, err)
+	assert.True(t, cfg.UIHTTP3IPv4Only)
+	flags := pflag.NewFlagSet("ui", pflag.ContinueOnError)
+	flags.Bool("ui-http3-ipv4-only", false, "")
+	require.NoError(t, flags.Parse([]string{"--ui-http3-ipv4-only=false"}))
+	require.NoError(t, viper.BindPFlags(flags))
+	cfg, err = Load()
+	require.NoError(t, err)
+	assert.False(t, cfg.UIHTTP3IPv4Only)
+}
 
 func TestLoad_Protection(t *testing.T) {
 	viper.Reset()

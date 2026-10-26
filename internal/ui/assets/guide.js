@@ -77,7 +77,10 @@ function renderListeners(settings) {
       const body = element("div", "listener-body");
       body.append(element("p", "listener-description", description));
       const hint = name === "HTTP" && settings.h2c ? "h2c" : name === "HTTPS" ? "http2" : name === "HTTP/3" ? "http3" : "";
-      if (hint) body.append($(hint + "-hint-template").content.firstElementChild.cloneNode(true));
+      if (hint) {
+        const template = hint === "http3" && settings.http3_ipv4_only === true ? "http3-ipv4" : hint;
+        body.append($(template + "-hint-template").content.firstElementChild.cloneNode(true));
+      }
       body.append(commandPicker(directCommands(name, settings, serviceBase), name));
       if (name === "HTTPS" || name === "HTTP/3" || (name === "gRPC" && settings.grpc_tls)) {
         const help = element("a", "certificate-link", "Certificate details →");

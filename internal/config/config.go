@@ -29,6 +29,7 @@ type Config struct {
 	UnsafeHeaders          bool
 	ResponseControls       bool
 	UI                     bool
+	UIHTTP3IPv4Only        bool
 	PublicURL              string
 	ProxyProtocol          bool
 	ProxyTrustedCIDRs      []string
@@ -78,6 +79,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("unsafe-headers", false)
 	viper.SetDefault("response-controls", false)
 	viper.SetDefault("ui", true)
+	viper.SetDefault("ui-http3-ipv4-only", false)
 	viper.SetDefault("public-url", "")
 	viper.SetDefault("proxy-protocol", false)
 	viper.SetDefault("proxy-trusted-cidrs", "")
@@ -133,6 +135,7 @@ func Load() (*Config, error) {
 		UnsafeHeaders:     viper.GetBool("unsafe-headers"),
 		ResponseControls:  viper.GetBool("response-controls"),
 		UI:                viper.GetBool("ui"),
+		UIHTTP3IPv4Only:   viper.GetBool("ui-http3-ipv4-only"),
 		PublicURL:         viper.GetString("public-url"),
 		ProxyProtocol:     viper.GetBool("proxy-protocol"),
 		TLSCertFile:       viper.GetString("tls-cert-file"),

@@ -53,3 +53,28 @@ func TestCertificateInsightsLiveInsideRequestSecurity(t *testing.T) {
 		}
 	}
 }
+
+func TestHTTP3IPv4NoticeIsExplicitDeploymentMetadata(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		quic, notice bool
+		want         bool
+	}{
+		{"default", true, false, false},
+		{"provider limitation", true, true, true},
+		{"disabled listener", false, true, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			NewHandler(&config.Config{QUIC: test.quic, UIHTTP3IPv4Only: test.notice}, "HTTP").ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/ui/config.json", nil))
+			require.Equal(t, http.StatusOK, response.Code)
+			var settings map[string]any
+			require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
+			if test.want {
+				require.Equal(t, true, settings["http3_ipv4_only"])
+			} else {
+				require.NotContains(t, settings, "http3_ipv4_only")
+			}
+		})
+	}
+}
