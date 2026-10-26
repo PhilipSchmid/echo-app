@@ -7,6 +7,9 @@ The dedicated admin listener serves these endpoints. Its default port is
 These endpoints are documented for operators and are not advertised or fetched
 by the public UI.
 
+The [Grafana dashboard](../dashboards/README.md) provides a portable operations
+view with importable JSON, query tests and a repeatable API update workflow.
+
 | Endpoint | Purpose | Response |
 | --- | --- | --- |
 | `/health` | Process liveness | `200 healthy`, or `503 unhealthy` |
@@ -54,6 +57,15 @@ their first event.
 | `echo_observatory_daily_egress_reserved_bytes` | Gauge | Bytes charged to the current budget day, including durable reservations not yet sent and unused leases lost on restart. |
 | `echo_observatory_daily_egress_remaining_bytes` | Gauge | Unreserved daily allowance; excludes unused bytes already in the current durable lease. |
 | `echo_observatory_daily_egress_persistent` | Gauge | `1` when quota state survives restarts; otherwise `0`. |
+| `echo_observatory_rate_limit_tokens_per_second` | Gauge | Configured token refill by fixed `bucket`: `operations`, `connections`, `ingress`, `egress`, `peer_operations`, `peer_connections`. Transfer buckets use bytes; other buckets use operations/connections. Peer values apply per client group. |
+| `echo_observatory_rate_limit_burst_tokens` | Gauge | Maximum burst capacity for each bucket, in the same units as refill. |
+| `echo_observatory_rate_limit_available_tokens` | Gauge | Refilled token availability at scrape time. Peer buckets report the minimum across groups active within the last ten minutes, without identities; they are absent when peer limiting is disabled. |
+| `echo_observatory_rate_limit_consumed_tokens_total` | Counter | Global tokens charged by the four non-peer buckets. Connection tokens can be charged before peer checks; egress tokens represent conservative reservations. These are not completed requests or provider-billed bytes. |
+| `echo_observatory_rate_limit_bucket_rejections_total` | Counter | Attempts rejected for insufficient global bucket tokens. Excludes peer, concurrency, daily allowance and state rejections; use `rejections_total` for the complete view. |
+| `echo_observatory_rate_limit_tracked_peers` | Gauge | Recently active IPv4 address / IPv6 `/64` groups, without identity labels. |
+| `echo_observatory_rate_limit_peer_capacity` | Gauge | Maximum retained client groups, currently `4096`; `0` when peer limiting is disabled. |
+| `echo_observatory_tls_certificate_not_before_timestamp_seconds` | Gauge | Unix validity start of the last ordinary server leaf certificate observed. No series until observed. No certificate identity labels. |
+| `echo_observatory_tls_certificate_not_after_timestamp_seconds` | Gauge | Unix expiry of that certificate. Updated when a renewed certificate is selected; excludes temporary ACME challenge certificates. |
 | `echo_observatory_listener_up` | Gauge | `1` while a configured listener runs, `0` before binding or after stopping. Disabled listeners are absent. `listener`. |
 | `echo_observatory_healthy` | Gauge | Process liveness, `1` or `0`, matching `/health`. |
 | `echo_observatory_ready` | Gauge | Combined traffic readiness, `1` or `0`, matching `/ready`. |
@@ -105,6 +117,23 @@ the shared guard for this process. Durable reservations
 are conservative, so the reserved gauge can exceed successfully sent transport
 bytes. The in-memory allowance resets on restart; durable state survives it.
 Separate replicas have separate budgets.
+
+Rate-pressure metrics are absent when protection is disabled. A scrape computes
+current refill without changing admission state, performing network requests or
+retaining client groups. Peer headroom is a minimum, not a sum or an identified
+client. Short bursts may happen between scrapes, so compare headroom with
+rejection counters. All rate-pressure labels use a fixed set of bucket names.
+The configured rates and bursts make it possible to tune the existing
+[protection options](configuration.md#abuse-protection);
+the dashboard does not change them automatically.
+
+Certificate dates work with ACME, supplied PEM files and the generated demo
+certificate. HTTPS, TLS gRPC and HTTP/3 share the configured certificate. A
+scrape only reads the observation; it never triggers issuance or renewal. No
+series is emitted before a certificate is observed, and an unsuccessful
+selection preserves the previous observation. Expiry alone does not prove trust,
+hostname validity, chain validity or renewal success. Builds before these
+metrics were introduced leave their dashboard panels empty.
 
 gRPC call metrics cover the unary and streaming interceptors. Header validation,
 malformed method names and unary message-decoding failures occur before those

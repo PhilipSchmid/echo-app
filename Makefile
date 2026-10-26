@@ -128,6 +128,20 @@ build-all: ## BUILD: Build for all platforms
 test-ui: ## TEST: Test browser client helpers (requires Node.js 22+)
 	@node --test tests/ui-*.test.mjs
 
+.PHONY: grafana-build test-grafana test-grafana-promql grafana-deploy
+grafana-build: ## DEV: Regenerate the portable Grafana dashboard JSON
+	@node dashboards/echo-observatory.mjs
+
+test-grafana: ## TEST: Validate Grafana source, layout, metric coverage and deployment behavior
+	@node --test tests/grafana.test.mjs
+
+test-grafana-promql: ## TEST: Check dashboard PromQL and calculation fixtures (requires Docker)
+	@set -o pipefail; node scripts/grafana.mjs rules | docker run --rm -i --network none --entrypoint /bin/promtool prom/prometheus:v3.13.3 check rules /dev/stdin
+	@set -o pipefail; node scripts/grafana.mjs rule-tests | docker run --rm -i --network none --entrypoint /bin/promtool prom/prometheus:v3.13.3 test rules /dev/stdin
+
+grafana-deploy: ## MAINT: Update Grafana using GRAFANA_URL, GRAFANA_TOKEN and GRAFANA_DATASOURCE_UID
+	@node scripts/grafana.mjs deploy
+
 .PHONY: test
 test: ## TEST: Run unit tests with coverage
 	@printf "$(BLUE)Running unit tests...$(NC)\n"

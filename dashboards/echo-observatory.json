@@ -1,0 +1,5053 @@
+{
+  "uid": "echo-observatory",
+  "title": "Echo Observatory · Operations",
+  "description": "Portable operational dashboard for Echo Observatory 2.x. Standard Grafana panels and Prometheus only; no provider-specific metrics or plugins.",
+  "id": null,
+  "version": 1,
+  "schemaVersion": 39,
+  "editable": true,
+  "tags": [
+    "echo-observatory",
+    "network",
+    "prometheus"
+  ],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "graphTooltip": 1,
+  "links": [
+    {
+      "title": "Metric reference",
+      "type": "link",
+      "targetBlank": true,
+      "url": "https://github.com/PhilipSchmid/echo-observatory/blob/main/docs/monitoring.md"
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "label": "Metrics source",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "options": [],
+        "refresh": 1
+      },
+      {
+        "name": "job",
+        "label": "Job",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "query": {
+          "query": "label_values(echo_observatory_ready, job)",
+          "refId": "variable-job"
+        },
+        "definition": "label_values(echo_observatory_ready, job)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "sort": 1,
+        "skipUrlSync": false
+      },
+      {
+        "name": "instance",
+        "label": "Instance",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "query": {
+          "query": "label_values(echo_observatory_ready{job=~\"$job\"}, instance)",
+          "refId": "variable-instance"
+        },
+        "definition": "label_values(echo_observatory_ready{job=~\"$job\"}, instance)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "sort": 1,
+        "skipUrlSync": false
+      },
+      {
+        "name": "listener",
+        "label": "Listener",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "query": {
+          "query": "label_values({__name__=~\"echo_observatory_listener_up|echo_observatory_requests_total|echo_observatory_active_connections\",job=~\"$job\",instance=~\"$instance\"}, listener)",
+          "refId": "variable-listener"
+        },
+        "definition": "label_values({__name__=~\"echo_observatory_listener_up|echo_observatory_requests_total|echo_observatory_active_connections\",job=~\"$job\",instance=~\"$instance\"}, listener)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "sort": 1,
+        "skipUrlSync": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Operations overview",
+      "description": "Start with readiness and demand; expand protocol, protection and runtime sections for diagnostics.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      },
+      "targets": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No samples",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8AB8F8",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Your service, at a glance\nHealth, demand and resource use across every listener. Filter by **Job**, **Instance** or **Listener**. Demand excludes admin traffic. Expand the sections below for protocol, protection and runtime details.\n\nUse **Inspect → Data** on any chart for a table or CSV. Empty panels show unavailable or not-yet-observed metrics, never fabricated zeroes."
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Readiness",
+      "description": "Ready instances / selected instances with readiness samples. This is not a scrape-availability check; inspect Scrape health below.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}) / count(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"})",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "No samples",
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#E49CB3",
+                "value": null
+              },
+              {
+                "color": "#83CDBB",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Request rate",
+      "description": "Completed echo/UI HTTP requests, TCP sessions and gRPC calls. Admin traffic excluded; long-lived sessions count when they finish. This is not a visitor count.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum((rate(echo_observatory_requests_total{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\"}[$__rate_interval])))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "noValue": "No samples",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#8AB8F8"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8AB8F8",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Requests",
+      "description": "Estimated increase over the selected interval, adjusted for counter resets. Streaming sessions count at completion; not unique users.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(echo_observatory_requests_total{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\"}[$__range]))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No samples",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#8AB8F8"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8AB8F8",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Connections",
+      "description": "Physical accepted transport connections. WebSocket logical sessions excluded to avoid double counting. Admin connections excluded.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum(echo_observatory_active_connections{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\",listener!=\"WebSocket\"})",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No samples",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#8AB8F8"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8AB8F8",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Egress rate",
+      "description": "Successfully sent socket bytes, including TLS/QUIC framing. Not provider-billed traffic: excludes network headers, retransmissions and infrastructure traffic.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum((rate(echo_observatory_transport_bytes_total{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\",direction=\"sent\"}[$__rate_interval])))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "noValue": "No samples",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#83CDBB"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8AB8F8",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Process RAM",
+      "description": "Resident memory summed across selected processes. Includes the Go heap and other process memory, not total VM/container usage.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum((process_resident_memory_bytes{job=~\"$job\",instance=~\"$instance\"} and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range])))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "No samples",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#C3ACEA"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8AB8F8",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Demand by listener",
+      "description": "Completed operations per second. WebSocket and streaming RPCs count at the end of the session. Listener filter applies.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (listener) ((rate(echo_observatory_requests_total{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\"}[$__rate_interval])))",
+          "legendFormat": "{{listener}}",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "noValue": "No samples",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8AB8F8",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "HTTP handler latency",
+      "description": "Combined HTTP p50 / p95, in seconds. Includes configured demo delays and unsuccessful outcomes. Excludes admin, raw TCP, WebSocket sessions and gRPC lifetimes. Sparse traffic makes percentiles approximate.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.5, sum by (le) ((rate(echo_observatory_request_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener=~\"HTTP|H2C|TLS|QUIC\",endpoint!=\"/ws\"}[$__rate_interval]))))",
+          "legendFormat": "p50",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by (le) ((rate(echo_observatory_request_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener=~\"HTTP|H2C|TLS|QUIC\",endpoint!=\"/ws\"}[$__rate_interval]))))",
+          "legendFormat": "p95",
+          "instant": false,
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No samples",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8AB8F8",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8AB8F8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#83CDBB"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    6,
+                    4
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "HTTP outcomes",
+      "description": "Actual HTTP statuses, including intentionally requested errors; 4xx/5xx do not necessarily indicate application faults. Canceled/panic outcomes have no final status. Admin excluded.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (status_code) ((rate(echo_observatory_http_responses_total{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\"}[$__rate_interval])))",
+          "legendFormat": "{{status_code}}",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "noValue": "No samples",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8AB8F8",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Application failures & rejected work",
+      "description": "Internal application failures and admission rejections are separate from deliberate test statuses. No samples means no matching event series yet. Listener filter applies.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (error_type) ((rate(echo_observatory_errors_total{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\"}[$__rate_interval])))",
+          "legendFormat": "Failure · {{error_type}}",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (reason) ((rate(echo_observatory_rejections_total{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\"}[$__rate_interval])))",
+          "legendFormat": "Rejected · {{reason}}",
+          "instant": false,
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "No samples",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8AB8F8",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "row",
+      "title": "01 · Availability & connections",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Liveness & readiness",
+      "description": "Per instance. 1 = healthy/ready, 0 = unhealthy/not ready. A missing scrape is a gap, not a healthy zero. Listener selection does not apply.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "echo_observatory_healthy{job=~\"$job\",instance=~\"$instance\"}",
+          "legendFormat": "{{instance}} · live",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}",
+          "legendFormat": "{{instance}} · ready",
+          "instant": false,
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No samples",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8AB8F8",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          },
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "table",
+      "title": "Scrape health",
+      "description": "Prometheus up: 1 = last scrape succeeded, 0 = failed. Restricted to targets with Echo readiness samples in the selected range. No match is not healthy. Some managed stores do not publish scrape metadata.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 25,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "(up{job=~\"$job\",instance=~\"$instance\"} and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range]))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "refId": "A",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No samples",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Scrape failed",
+                  "color": "#E49CB3"
+                },
+                "1": {
+                  "text": "Scrape OK",
+                  "color": "#83CDBB"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8AB8F8",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      },
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "job",
+                "instance",
+                "Value"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value": "Scrape status"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Configured listener state",
+      "description": "1 = running, 0 = stopped. Disabled listeners have no series. H2C is the shared HTTP/1.1 + h2c server when enabled; it is not a second physical HTTP listener.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "echo_observatory_listener_up{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\"}",
+          "legendFormat": "{{instance}} · {{listener}}",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No samples",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8AB8F8",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          },
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Connections & logical sessions",
+      "description": "Transport connections by listener. WebSocket is a separate logical session category over HTTP/TLS: compare the lines, do not sum them.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 32,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (listener) (echo_observatory_active_connections{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\"})",
+          "legendFormat": "{{listener}}",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No samples",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8AB8F8",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Work in flight",
+      "description": "Running HTTP handlers and gRPC calls, including upgraded WebSocket and streaming lifetimes. Not queued work. Admin excluded.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 32,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (listener) (echo_observatory_requests_in_flight{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\"})",
+          "legendFormat": "{{listener}}",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No samples",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8AB8F8",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "row",
+      "title": "02 · Requests, protocols & payloads",
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 19,
+          "type": "timeseries",
+          "title": "Route activity",
+          "description": "Rates by bounded route label, never raw URLs or query strings. Arbitrary echo paths share other. Includes the UI; admin excluded.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 40,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (endpoint) ((rate(echo_observatory_requests_total{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\"}[$__rate_interval])))",
+              "legendFormat": "{{endpoint}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 20,
+          "type": "timeseries",
+          "title": "New connections",
+          "description": "Accepted connections per second; compare transport and logical WebSocket lines independently to avoid double counting.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 40,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (listener) ((rate(echo_observatory_connections_total{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\"}[$__rate_interval])))",
+              "legendFormat": "{{listener}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "cps",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 21,
+          "type": "timeseries",
+          "title": "HTTP latency by listener",
+          "description": "p95 handler duration by HTTP listener. Excludes admin, raw TCP, gRPC and WebSocket session lifetimes. Includes configured demo delays.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 48,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.95, sum by (le, listener) ((rate(echo_observatory_request_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener=~\"HTTP|H2C|TLS|QUIC\",endpoint!=\"/ws\"}[$__rate_interval]))))",
+              "legendFormat": "{{listener}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 22,
+          "type": "timeseries",
+          "title": "TCP session duration",
+          "description": "p50/p95 duration of native TCP metadata sessions. This includes writing the response and closing, not network round-trip latency.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 48,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.5, sum by (le) ((rate(echo_observatory_request_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener=\"TCP\"}[$__rate_interval]))))",
+              "legendFormat": "p50",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.95, sum by (le) ((rate(echo_observatory_request_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener=\"TCP\"}[$__rate_interval]))))",
+              "legendFormat": "p95",
+              "instant": false,
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "A"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#8AB8F8"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "B"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#83CDBB"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 23,
+          "type": "timeseries",
+          "title": "HTTP protocol adoption",
+          "description": "Completed HTTP requests by negotiated protocol. Includes UI requests, excludes admin; not unique connections.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 56,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (protocol) ((rate(echo_observatory_http_protocol_requests_total{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\"}[$__rate_interval])))",
+              "legendFormat": "{{protocol}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 24,
+          "type": "timeseries",
+          "title": "IPv4 & IPv6 request activity",
+          "description": "HTTP requests by observed client IP family. No addresses are stored in these labels. This is request activity, not unique visitors.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 8,
+            "y": 56,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (ip_version) ((rate(echo_observatory_http_protocol_requests_total{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\"}[$__rate_interval])))",
+              "legendFormat": "{{ip_version}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 25,
+          "type": "timeseries",
+          "title": "HTTP response bodies",
+          "description": "HTTP body bytes only, excluding headers, encryption and WebSocket frames. Compare with the transport chart below; do not add the two measurements.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 16,
+            "y": 56,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (listener) ((rate(echo_observatory_http_response_bytes_total{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\"}[$__rate_interval])))",
+              "legendFormat": "{{listener}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 26,
+          "type": "timeseries",
+          "title": "Transport throughput",
+          "description": "Socket traffic by listener and direction, including TLS/QUIC framing. Excludes IP/TCP/UDP headers, retransmissions and infrastructure traffic; not a billing meter.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 64,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (listener, direction) ((rate(echo_observatory_transport_bytes_total{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\"}[$__rate_interval])))",
+              "legendFormat": "{{listener}} · {{direction}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 27,
+          "type": "timeseries",
+          "title": "Transport data in range",
+          "description": "Estimated sent / received bytes over the selected time range, adjusted for counter resets. Admin excluded; not billed data.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 64,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (direction) (increase(echo_observatory_transport_bytes_total{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\",listener!=\"Metrics\"}[$__range]))",
+              "legendFormat": "{{direction}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 28,
+          "type": "timeseries",
+          "title": "gRPC outcomes",
+          "description": "Completed unary/streaming RPCs by method and final status, including echo, health and reflection. Listener selection does not apply: these series have no listener label.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 72,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (method, code) ((rate(echo_observatory_grpc_responses_total{job=~\"$job\",instance=~\"$instance\"}[$__rate_interval])))",
+              "legendFormat": "{{method}} · {{code}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 29,
+          "type": "timeseries",
+          "title": "gRPC call & session lifetime",
+          "description": "p50/p95 seconds by RPC method. Streaming values include the entire session and are not per-message latency. Listener selection does not apply.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 72,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.5, sum by (le, method) ((rate(echo_observatory_request_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\",listener=\"gRPC\"}[$__rate_interval]))))",
+              "legendFormat": "{{method}} · p50",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.95, sum by (le, method) ((rate(echo_observatory_request_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\",listener=\"gRPC\"}[$__rate_interval]))))",
+              "legendFormat": "{{method}} · p95",
+              "instant": false,
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 30,
+          "type": "timeseries",
+          "title": "WebSocket messages",
+          "description": "Complete text/binary messages received and echoed; control frames excluded. Listener selection does not apply: WebSocket counters have direction/type labels only.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 80,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (direction, message_type) ((rate(echo_observatory_websocket_messages_total{job=~\"$job\",instance=~\"$instance\"}[$__rate_interval])))",
+              "legendFormat": "{{direction}} · {{message_type}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 31,
+          "type": "timeseries",
+          "title": "WebSocket payload throughput",
+          "description": "Message payload bytes; excludes WebSocket framing and control traffic. Compare sent/received, not total transport bytes. Listener selection does not apply.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 80,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (direction, message_type) ((rate(echo_observatory_websocket_message_bytes_total{job=~\"$job\",instance=~\"$instance\"}[$__rate_interval])))",
+              "legendFormat": "{{direction}} · {{message_type}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 32,
+      "type": "row",
+      "title": "03 · Protection & daily allowance",
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 33,
+          "type": "table",
+          "title": "Protection configuration",
+          "description": "Per instance: enabled, persistent reservations and daily allowance. 0 enabled = protection disabled; 0 persistent = in-memory accounting. Job/Instance filters apply; Listener does not.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 89,
+            "w": 12,
+            "h": 7
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "echo_observatory_protection_enabled{job=~\"$job\",instance=~\"$instance\"}",
+              "legendFormat": "Enabled",
+              "instant": true,
+              "range": false,
+              "refId": "A",
+              "format": "table"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "echo_observatory_daily_egress_persistent{job=~\"$job\",instance=~\"$instance\"}",
+              "legendFormat": "Persistent",
+              "instant": true,
+              "range": false,
+              "refId": "B",
+              "format": "table"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "echo_observatory_daily_egress_limit_bytes{job=~\"$job\",instance=~\"$instance\"}",
+              "legendFormat": "Daily limit",
+              "instant": true,
+              "range": false,
+              "refId": "C",
+              "format": "table"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Daily limit"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm"
+          },
+          "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "exclude": {
+                  "names": [
+                    "__name__"
+                  ]
+                }
+              }
+            },
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "include": {
+                  "names": [
+                    "job",
+                    "instance",
+                    "Value #A",
+                    "Value #B",
+                    "Value #C"
+                  ]
+                }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "renameByName": {
+                  "Value #A": "Enabled",
+                  "Value #B": "Persistent",
+                  "Value #C": "Daily limit"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 34,
+          "type": "timeseries",
+          "title": "Daily allowance remaining",
+          "description": "Per protected instance, for its current UTC budget day. 100% = unreserved allowance intact. Reservations can exceed bytes actually sent; restarts may lose unused leases. Each replica has its own budget. Not a provider billing cap.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 89,
+            "w": 12,
+            "h": 7
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(echo_observatory_daily_egress_remaining_bytes{job=~\"$job\",instance=~\"$instance\"} and on(job, instance) (echo_observatory_protection_enabled{job=~\"$job\",instance=~\"$instance\"} == 1)) / on(job, instance) clamp_min(echo_observatory_daily_egress_limit_bytes{job=~\"$job\",instance=~\"$instance\"}, 1)",
+              "legendFormat": "{{instance}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              },
+              "max": 1
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 35,
+          "type": "timeseries",
+          "title": "Reserved & unreserved bytes",
+          "description": "Current UTC budget day, not the dashboard interval. Disabled protection is omitted. Durable reservations are charged before all bytes are sent and survive restart.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 96,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(echo_observatory_daily_egress_reserved_bytes{job=~\"$job\",instance=~\"$instance\"} and on(job, instance) (echo_observatory_protection_enabled{job=~\"$job\",instance=~\"$instance\"} == 1))",
+              "legendFormat": "{{instance}} · reserved",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(echo_observatory_daily_egress_remaining_bytes{job=~\"$job\",instance=~\"$instance\"} and on(job, instance) (echo_observatory_protection_enabled{job=~\"$job\",instance=~\"$instance\"} == 1))",
+              "legendFormat": "{{instance}} · unreserved",
+              "instant": false,
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 36,
+          "type": "timeseries",
+          "title": "Rejected work by listener",
+          "description": "Rejected operations/connections, grouped by bounded reason. No samples means no rejection series yet; waiting for capacity is backpressure, not a rejection.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 96,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (listener, reason) ((rate(echo_observatory_rejections_total{job=~\"$job\",instance=~\"$instance\",listener=~\"$listener\"}[$__rate_interval])))",
+              "legendFormat": "{{listener}} · {{reason}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 88,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 37,
+      "type": "row",
+      "title": "04 · Rate-limit pressure",
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 38,
+          "type": "timeseries",
+          "title": "Operation & connection headroom",
+          "description": "Fraction of global burst tokens currently available. 100% = full; near 0% = little burst capacity. Sampled snapshots can miss short bursts; rejection counters retain them. Limits are per process, shared across listeners.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 105,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "echo_observatory_rate_limit_available_tokens{job=~\"$job\",instance=~\"$instance\",bucket=~\"operations|connections\"} / echo_observatory_rate_limit_burst_tokens{job=~\"$job\",instance=~\"$instance\",bucket=~\"operations|connections\"}",
+              "legendFormat": "{{instance}} · {{bucket}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              },
+              "max": 1
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 39,
+          "type": "timeseries",
+          "title": "Transfer headroom",
+          "description": "Remaining ingress/egress burst capacity, in percent. Refills at the configured bytes/second rate. This is short-term rate capacity, separate from the daily allowance.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 105,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "echo_observatory_rate_limit_available_tokens{job=~\"$job\",instance=~\"$instance\",bucket=~\"ingress|egress\"} / echo_observatory_rate_limit_burst_tokens{job=~\"$job\",instance=~\"$instance\",bucket=~\"ingress|egress\"}",
+              "legendFormat": "{{instance}} · {{bucket}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              },
+              "max": 1
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 40,
+          "type": "timeseries",
+          "title": "Charged operations & sustained limits",
+          "description": "Solid lines: global tokens consumed per second; dashed: configured refill. Operations include HTTP requests, RPCs and WebSocket messages. Connections are charged before expensive handshakes and may later fail peer admission. Bursts can temporarily exceed refill.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 113,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(rate(echo_observatory_rate_limit_consumed_tokens_total{job=~\"$job\",instance=~\"$instance\",bucket=~\"operations|connections\"}[$__rate_interval]))",
+              "legendFormat": "{{instance}} · {{bucket}} · charged",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "echo_observatory_rate_limit_tokens_per_second{job=~\"$job\",instance=~\"$instance\",bucket=~\"operations|connections\"}",
+              "legendFormat": "{{instance}} · {{bucket}} · limit",
+              "instant": false,
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "B"
+                },
+                "properties": [
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        6,
+                        4
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 41,
+          "type": "timeseries",
+          "title": "Charged bytes & sustained limits",
+          "description": "Solid: ingress received / egress reserved bytes per second. Dashed: configured refill. Reservations are conservative and can exceed successfully sent bytes. Bursts can exceed refill temporarily; not billed traffic.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 113,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(rate(echo_observatory_rate_limit_consumed_tokens_total{job=~\"$job\",instance=~\"$instance\",bucket=~\"ingress|egress\"}[$__rate_interval]))",
+              "legendFormat": "{{instance}} · {{bucket}} · charged",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "echo_observatory_rate_limit_tokens_per_second{job=~\"$job\",instance=~\"$instance\",bucket=~\"ingress|egress\"}",
+              "legendFormat": "{{instance}} · {{bucket}} · limit",
+              "instant": false,
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "B"
+                },
+                "properties": [
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        6,
+                        4
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 42,
+          "type": "timeseries",
+          "title": "Peer headroom · lowest observed",
+          "description": "Minimum token fraction across client groups seen in the last 10 minutes. Each line may represent a different group over time. 100% when no recent groups remain; unavailable when peer limits are disabled. No addresses or identities are exported.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 121,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "echo_observatory_rate_limit_available_tokens{job=~\"$job\",instance=~\"$instance\",bucket=~\"peer_operations|peer_connections\"} / echo_observatory_rate_limit_burst_tokens{job=~\"$job\",instance=~\"$instance\",bucket=~\"peer_operations|peer_connections\"}",
+              "legendFormat": "{{instance}} · {{bucket}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              },
+              "max": 1
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 43,
+          "type": "timeseries",
+          "title": "Peer tracking capacity",
+          "description": "Recently active IPv4 address / IPv6 /64 groups divided by the bounded 4096-entry capacity. Inactive groups are ignored at scrape time. Near capacity, LRU eviction can reset a peer burst; tune protection with this in mind.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 121,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "echo_observatory_rate_limit_tracked_peers{job=~\"$job\",instance=~\"$instance\"} / clamp_min(echo_observatory_rate_limit_peer_capacity{job=~\"$job\",instance=~\"$instance\"}, 1)",
+              "legendFormat": "{{instance}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              },
+              "max": 1
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 44,
+          "type": "timeseries",
+          "title": "Global bucket rejections",
+          "description": "Insufficient global tokens, by bucket. Counts failed admission attempts, not rejected bytes. Excludes peer limits, concurrency caps and daily quota; use the rejection-reasons chart for the complete view.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 129,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(rate(echo_observatory_rate_limit_bucket_rejections_total{job=~\"$job\",instance=~\"$instance\"}[$__rate_interval]))",
+              "legendFormat": "{{instance}} · {{bucket}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 45,
+          "type": "table",
+          "title": "Configured rate & burst",
+          "description": "Per instance and bucket. Operations/connections use tokens; ingress/egress use bytes. Peer values apply to each client group. No rate metrics are exported when protection is disabled.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 129,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "echo_observatory_rate_limit_tokens_per_second{job=~\"$job\",instance=~\"$instance\"}",
+              "legendFormat": "",
+              "instant": true,
+              "range": false,
+              "refId": "A",
+              "format": "table"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "echo_observatory_rate_limit_burst_tokens{job=~\"$job\",instance=~\"$instance\"}",
+              "legendFormat": "",
+              "instant": true,
+              "range": false,
+              "refId": "B",
+              "format": "table"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm"
+          },
+          "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "exclude": {
+                  "names": [
+                    "__name__"
+                  ]
+                }
+              }
+            },
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "include": {
+                  "names": [
+                    "instance",
+                    "job",
+                    "bucket",
+                    "Value #A",
+                    "Value #B"
+                  ]
+                }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "renameByName": {
+                  "Value #A": "Tokens / second",
+                  "Value #B": "Burst tokens"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 104,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 46,
+      "type": "row",
+      "title": "05 · Server certificate",
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 47,
+          "type": "stat",
+          "title": "Time to expiry",
+          "description": "Minimum remaining validity across selected instances, based on the last ordinary server leaf certificate observed. Negative means expired. Not a renewal-success guarantee. No samples until a certificate is observed or when running a version without certificate metrics.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 138,
+            "w": 8,
+            "h": 4
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "min(echo_observatory_tls_certificate_not_after_timestamp_seconds{job=~\"$job\",instance=~\"$instance\"} - time())",
+              "legendFormat": "",
+              "instant": true,
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "noValue": "No samples",
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#E49CB3",
+                    "value": null
+                  },
+                  {
+                    "color": "#E9B989",
+                    "value": 604800
+                  },
+                  {
+                    "color": "#83CDBB",
+                    "value": 1209600
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "textMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
+        {
+          "id": 48,
+          "type": "stat",
+          "title": "Earliest expiry",
+          "description": "Expiry date of the last observed ordinary certificate, across selected instances. Uses client-local display time. Leaf expiry alone does not verify the trust chain, hostname or renewal service.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 8,
+            "y": 138,
+            "w": 8,
+            "h": 4
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "min(echo_observatory_tls_certificate_not_after_timestamp_seconds{job=~\"$job\",instance=~\"$instance\"}) * 1000",
+              "legendFormat": "",
+              "instant": true,
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "dateTimeAsIso",
+              "noValue": "No samples",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "#C3ACEA"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "textMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
+        {
+          "id": 49,
+          "type": "stat",
+          "title": "Valid from",
+          "description": "Most recent validity start across selected instances. A future time means the certificate is not yet valid. ACME challenge certificates are excluded.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 16,
+            "y": 138,
+            "w": 8,
+            "h": 4
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "max(echo_observatory_tls_certificate_not_before_timestamp_seconds{job=~\"$job\",instance=~\"$instance\"}) * 1000",
+              "legendFormat": "",
+              "instant": true,
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "dateTimeAsIso",
+              "noValue": "No samples",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "#8AB8F8"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "textMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
+        {
+          "id": 50,
+          "type": "timeseries",
+          "title": "Certificate validity remaining",
+          "description": "Seconds to leaf expiry per instance. An upward step after a handshake is consistent with a renewed certificate being selected. The same shared certificate serves HTTPS, TLS gRPC and HTTP/3. Values do not identify the issuer and do not prove trust or future renewal.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 142,
+            "w": 24,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "echo_observatory_tls_certificate_not_after_timestamp_seconds{job=~\"$job\",instance=~\"$instance\"} - time()",
+              "legendFormat": "{{instance}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 137,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 51,
+      "type": "row",
+      "title": "06 · Go runtime & scrape diagnostics",
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 52,
+          "type": "timeseries",
+          "title": "Resident memory & Go heap",
+          "description": "RSS, live heap and heap reserved from the OS, per process. These overlap: do not sum the lines. Does not include the host OS or other processes. Listener selection does not apply.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 151,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(process_resident_memory_bytes{job=~\"$job\",instance=~\"$instance\"} and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range]))",
+              "legendFormat": "{{instance}} · RSS",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(go_memstats_heap_alloc_bytes{job=~\"$job\",instance=~\"$instance\"} and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range]))",
+              "legendFormat": "{{instance}} · live heap",
+              "instant": false,
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(go_memstats_heap_sys_bytes{job=~\"$job\",instance=~\"$instance\"} and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range]))",
+              "legendFormat": "{{instance}} · heap reserved",
+              "instant": false,
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 53,
+          "type": "timeseries",
+          "title": "Process CPU · one core = 100%",
+          "description": "CPU fraction of one core: 100% = one full core. This is process CPU, not host CPU quota or throttling; multiple cores can exceed 100%. Listener selection does not apply.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 151,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(rate(process_cpu_seconds_total{job=~\"$job\",instance=~\"$instance\"}[$__rate_interval]) and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range]))",
+              "legendFormat": "{{instance}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 54,
+          "type": "timeseries",
+          "title": "Goroutines & OS threads",
+          "description": "Counts per process. Sustained growth without matching traffic may merit investigation; no universal threshold is assumed.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 159,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(go_goroutines{job=~\"$job\",instance=~\"$instance\"} and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range]))",
+              "legendFormat": "{{instance}} · goroutines",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(go_threads{job=~\"$job\",instance=~\"$instance\"} and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range]))",
+              "legendFormat": "{{instance}} · threads",
+              "instant": false,
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 55,
+          "type": "timeseries",
+          "title": "GC frequency & pause",
+          "description": "GC cycles per second on the left axis; mean stop-the-world pause per GC on the right. Empty pause series means no observed GC during that interval.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 8,
+            "y": 159,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(rate(go_gc_duration_seconds_count{job=~\"$job\",instance=~\"$instance\"}[$__rate_interval]) and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range]))",
+              "legendFormat": "{{instance}} · cycles/s",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(rate(go_gc_duration_seconds_sum{job=~\"$job\",instance=~\"$instance\"}[$__rate_interval]) and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range])) / (rate(go_gc_duration_seconds_count{job=~\"$job\",instance=~\"$instance\"}[$__rate_interval]) and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range]))",
+              "legendFormat": "{{instance}} · mean pause",
+              "instant": false,
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "B"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "right"
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        6,
+                        4
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 56,
+          "type": "timeseries",
+          "title": "Process uptime",
+          "description": "Seconds since process start, per instance. Resets on restart; this is not service availability over the selected period.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 16,
+            "y": 159,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "time() - (process_start_time_seconds{job=~\"$job\",instance=~\"$instance\"} and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range]))",
+              "legendFormat": "{{instance}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 57,
+          "type": "timeseries",
+          "title": "File descriptor use",
+          "description": "Open descriptors divided by the process limit, where supported by the operating system. A missing series is unavailable, not zero. High sustained use can indicate connection pressure or leaked files.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 167,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(process_open_fds{job=~\"$job\",instance=~\"$instance\"} and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range])) / clamp_min((process_max_fds{job=~\"$job\",instance=~\"$instance\"} and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range])), 1)",
+              "legendFormat": "{{instance}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 58,
+          "type": "timeseries",
+          "title": "Scrape duration",
+          "description": "Prometheus scrape duration, where the datasource publishes it. No samples means unavailable, not a zero-cost scrape. Listener selection does not apply.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 8,
+            "y": 167,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(scrape_duration_seconds{job=~\"$job\",instance=~\"$instance\"} and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range]))",
+              "legendFormat": "{{instance}} · duration",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 59,
+          "type": "timeseries",
+          "title": "Exporter errors",
+          "description": "Exporter metric gathering/encoding errors per second, where available. No samples is not a zero-error guarantee; also inspect Scrape health.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 16,
+            "y": 167,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(rate(promhttp_metric_handler_errors_total{job=~\"$job\",instance=~\"$instance\"}[$__rate_interval]) and on(job, instance) max_over_time(echo_observatory_ready{job=~\"$job\",instance=~\"$instance\"}[$__range]))",
+              "legendFormat": "{{instance}} · {{cause}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 150,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 60,
+      "type": "row",
+      "title": "07 · Optional external readiness dependency",
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 61,
+          "type": "timeseries",
+          "title": "Dependency readiness",
+          "description": "Only exists when an external readiness dependency is configured. 1 = ready, 0 = pending/failing. No samples normally means no dependency is configured.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 176,
+            "w": 8,
+            "h": 7
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "echo_observatory_external_probe_ready{job=~\"$job\",instance=~\"$instance\"}",
+              "legendFormat": "{{instance}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              },
+              "max": 1
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 62,
+          "type": "timeseries",
+          "title": "Background probe results",
+          "description": "Actual background checks by result. Scraping and readiness requests do not trigger additional outbound checks.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 8,
+            "y": 176,
+            "w": 8,
+            "h": 7
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (result) ((rate(echo_observatory_external_probe_checks_total{job=~\"$job\",instance=~\"$instance\"}[$__rate_interval])))",
+              "legendFormat": "{{result}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 63,
+          "type": "timeseries",
+          "title": "Background probe latency",
+          "description": "p95 duration of actual dependency checks, in seconds. No samples when no probe is configured or no checks have been observed.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "gridPos": {
+            "x": 16,
+            "y": 176,
+            "w": 8,
+            "h": 7
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.95, sum by (le, instance) ((rate(echo_observatory_external_probe_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\"}[$__rate_interval]))))",
+              "legendFormat": "{{instance}}",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "noValue": "No samples",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8AB8F8",
+                    "value": null
+                  }
+                ]
+              },
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "never",
+                "spanNulls": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 175,
+        "w": 24,
+        "h": 1
+      }
+    }
+  ]
+}
