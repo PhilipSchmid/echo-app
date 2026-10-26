@@ -1,21 +1,19 @@
 {{define "footer"}}
   <footer class="site-footer">
-    <div class="footer-copy">
-      <span class="footer-brand brand-name">{{template "wordmark"}}</span>
-      <nav aria-label="Project links">
-        <a class="footer-source" href="https://github.com/philipschmid/echo-observatory"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.226 17.284c-2.965-.36-5.054-2.493-5.054-5.256 0-1.123.404-2.336 1.078-3.144-.292-.741-.247-2.314.09-2.965.898-.112 2.111.36 2.83 1.01.853-.269 1.752-.404 2.853-.404 1.1 0 1.999.135 2.807.382.696-.629 1.932-1.1 2.83-.988.315.606.36 2.179.067 2.942.72.854 1.101 2 1.101 3.167 0 2.763-2.089 4.852-5.098 5.234.763.494 1.28 1.572 1.28 2.807v2.336c0 .674.561 1.056 1.235.786 4.066-1.55 7.255-5.615 7.255-10.646C23.5 6.188 18.334 1 11.978 1 5.62 1 .5 6.188.5 12.545c0 4.986 3.167 9.12 7.435 10.669.606.225 1.19-.18 1.19-.786V20.63a2.9 2.9 0 0 1-1.078.224c-1.483 0-2.359-.808-2.987-2.313-.247-.607-.517-.966-1.034-1.033-.27-.023-.359-.135-.359-.27 0-.27.45-.471.898-.471.652 0 1.213.404 1.797 1.235.45.651.921.943 1.483.943.561 0 .92-.202 1.437-.719.382-.381.674-.718.944-.943"/></svg>Source code</a>
-        <a class="footer-docs" href="https://github.com/philipschmid/echo-observatory/tree/main/docs"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 8h6m-6 4h6m-6 4h3"/></svg>Docs</a>
-        <a class="footer-privacy" href="{{if eq .Page.Path "/ui/"}}./privacy/{{else}}../privacy/{{end}}"{{if eq .Page.Path "/ui/privacy/"}} aria-current="page"{{end}}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></svg>Privacy</a>
-        <a class="footer-license" href="https://github.com/philipschmid/echo-observatory/blob/main/LICENSE" aria-label="Apache 2.0 license"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 4 4 7 8 9 4-2 8-5 8-9V6Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>Apache 2.0</a>
-      </nav>
+    <div class="footer-heading">
+      <div class="footer-scene" aria-hidden="true">
+        <img class="footer-observatory" src="{{if eq .Page.Path "/ui/"}}./logo.svg{{else}}../logo.svg{{end}}" alt="" width="128" height="117" loading="lazy">
+      </div>
+      <div class="footer-identity">
+        <span class="footer-brand brand-name">{{template "wordmark"}}</span>
+        <span class="footer-version"><span class="sr-only">Version </span>{{.Version}}</span>
+      </div>
     </div>
-    <div class="footer-scene" aria-hidden="true">
-      <span class="footer-hill footer-hill-back"></span>
-      <span class="footer-hill footer-hill-front"></span>
-      <span class="footer-ring"></span>
-      <span class="footer-orb footer-orb-lilac"></span>
-      <span class="footer-orb footer-orb-peach"></span>
-      <img class="footer-observatory" src="{{if eq .Page.Path "/ui/"}}./logo.svg{{else}}../logo.svg{{end}}" alt="" width="128" height="117" loading="lazy">
-    </div>
+    <nav aria-label="Project links">
+      <a class="footer-source" href="https://github.com/philipschmid/echo-observatory"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.226 17.284c-2.965-.36-5.054-2.493-5.054-5.256 0-1.123.404-2.336 1.078-3.144-.292-.741-.247-2.314.09-2.965.898-.112 2.111.36 2.83 1.01.853-.269 1.752-.404 2.853-.404 1.1 0 1.999.135 2.807.382.696-.629 1.932-1.1 2.83-.988.315.606.36 2.179.067 2.942.72.854 1.101 2 1.101 3.167 0 2.763-2.089 4.852-5.098 5.234.763.494 1.28 1.572 1.28 2.807v2.336c0 .674.561 1.056 1.235.786 4.066-1.55 7.255-5.615 7.255-10.646C23.5 6.188 18.334 1 11.978 1 5.62 1 .5 6.188.5 12.545c0 4.986 3.167 9.12 7.435 10.669.606.225 1.19-.18 1.19-.786V20.63a2.9 2.9 0 0 1-1.078.224c-1.483 0-2.359-.808-2.987-2.313-.247-.607-.517-.966-1.034-1.033-.27-.023-.359-.135-.359-.27 0-.27.45-.471.898-.471.652 0 1.213.404 1.797 1.235.45.651.921.943 1.483.943.561 0 .92-.202 1.437-.719.382-.381.674-.718.944-.943"/></svg>Source code</a>
+      <a class="footer-docs" href="https://github.com/philipschmid/echo-observatory/tree/main/docs"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 8h6m-6 4h6m-6 4h3"/></svg>Docs</a>
+      <a class="footer-privacy" href="{{if eq .Page.Path "/ui/"}}./privacy/{{else}}../privacy/{{end}}"{{if eq .Page.Path "/ui/privacy/"}} aria-current="page"{{end}}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></svg>Privacy</a>
+      <a class="footer-license" href="https://github.com/philipschmid/echo-observatory/blob/main/LICENSE" aria-label="Apache 2.0 license"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 4 4 7 8 9 4-2 8-5 8-9V6Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>Apache 2.0</a>
+    </nav>
   </footer>
 {{end}}

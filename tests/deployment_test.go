@@ -15,7 +15,7 @@ func TestDevWatcherIncludesEmbeddedAssets(t *testing.T) {
 	cfg := viper.New()
 	cfg.SetConfigFile("../.air.toml")
 	require.NoError(t, cfg.ReadInConfig())
-	assert.Equal(t, "go build -o ./tmp/air/echo-observatory ./cmd/echo-observatory", cfg.GetString("build.cmd"))
+	assert.Equal(t, "make build-quick APP_NAME=./tmp/air/echo-observatory", cfg.GetString("build.cmd"))
 	assert.Equal(t, []string{"./tmp/air/echo-observatory"}, cfg.GetStringSlice("build.entrypoint"))
 	for _, extension := range []string{"go", "html", "css", "js", "svg", "png", "woff2"} {
 		assert.Contains(t, cfg.GetStringSlice("build.include_ext"), extension)

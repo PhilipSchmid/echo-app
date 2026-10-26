@@ -15,7 +15,7 @@ GO_FILES := $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 GO_PACKAGES := $(shell go list ./... | grep -v /vendor/)
 COVERAGE_FILE := coverage.out
 BUILD_DIR := build
-LDFLAGS := -ldflags="-s -w"
+LDFLAGS = -ldflags="-s -w -X github.com/PhilipSchmid/echo-observatory/v2/internal/ui.version=$(VERSION)"
 
 # Colors for output
 BLUE := \033[0;34m
@@ -269,6 +269,7 @@ docker: ## DOCKER: Build Docker image for current platform
 	docker build \
 		--build-arg BUILD_DATE=$(BUILD_DATE) \
 		--build-arg VCS_REF=$(GIT_COMMIT) \
+		--build-arg VERSION=$(VERSION) \
 		--tag $(DOCKER_IMAGE):latest \
 		--tag $(DOCKER_IMAGE):$(VERSION) \
 		.
@@ -281,6 +282,7 @@ docker-multi: ## DOCKER: Build multi-platform Docker image
 		--platform linux/amd64,linux/arm64 \
 		--build-arg BUILD_DATE=$(BUILD_DATE) \
 		--build-arg VCS_REF=$(GIT_COMMIT) \
+		--build-arg VERSION=$(VERSION) \
 		--tag $(DOCKER_IMAGE):latest \
 		--tag $(DOCKER_IMAGE):$(VERSION) \
 		.
@@ -307,7 +309,7 @@ clean: ## MAINT: Clean build artifacts and test cache
 .PHONY: install
 install: build ## MAINT: Install the application to GOPATH/bin
 	@printf "$(BLUE)Installing $(APP_NAME)...$(NC)\n"
-	@go install ./cmd/echo-observatory
+	@go install $(LDFLAGS) ./cmd/echo-observatory
 	@printf "$(GREEN)✓ $(APP_NAME) installed to $(GOPATH)/bin$(NC)\n"
 
 .PHONY: uninstall

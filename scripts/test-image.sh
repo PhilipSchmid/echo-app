@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-image=${1:?usage: test-image.sh IMAGE}
+image=${1:?usage: test-image.sh IMAGE [EXPECTED_VERSION]}
+expected_version=${2:-}
 container=$(docker run -d --read-only --cap-drop=ALL --security-opt=no-new-privileges \
   -p 127.0.0.1::8080 -p 127.0.0.1::3000 "$image" --message=image-smoke)
 trap 'docker logs "$container"; docker rm -f "$container" >/dev/null' EXIT
@@ -19,5 +20,8 @@ curl -fsS --max-time 3 "http://127.0.0.1:$http_port/" | jq -e '.listener == "HTT
 test "$(curl -fsS --max-time 3 "http://127.0.0.1:$admin_port/health")" = healthy
 curl -fsS --max-time 3 "http://127.0.0.1:$admin_port/metrics" | grep echo_observatory_requests_total
 test "$(docker inspect --format '{{.Config.User}}' "$container")" = 65532:65532
+if [ -n "$expected_version" ]; then
+  curl -fsS --max-time 3 "http://127.0.0.1:$http_port/ui/" | grep -F "Version </span>$expected_version</span>" >/dev/null
+fi
 docker stop --timeout 10 "$container" >/dev/null
 test "$(docker inspect --format '{{.State.ExitCode}}' "$container")" = 0

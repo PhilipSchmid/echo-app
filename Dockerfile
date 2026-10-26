@@ -8,6 +8,7 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG BUILD_DATE
 ARG VCS_REF
+ARG VERSION=dev
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -23,7 +24,7 @@ RUN go mod download
 COPY . .
 
 # Compile the application to a binary with all dependencies included
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -a -o /echo-observatory ./cmd/echo-observatory
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w -X github.com/PhilipSchmid/echo-observatory/v2/internal/ui.version=${VERSION}" -a -o /echo-observatory ./cmd/echo-observatory
 
 # Non-root runtime image.
 FROM scratch AS final

@@ -147,8 +147,8 @@ opt-in. All bind ports are configurable. Existing 1.x image paths are unchanged.
 
 ## Version 2
 
-Use [v2.1.0](https://github.com/PhilipSchmid/echo-observatory/releases/tag/v2.1.0)
-for a stable release. Pin `ghcr.io/philipschmid/echo-observatory:2.1.0` for
+Use [v2.1.1](https://github.com/PhilipSchmid/echo-observatory/releases/tag/v2.1.1)
+for a stable release. Pin `ghcr.io/philipschmid/echo-observatory:2.1.1` for
 repeatable container deployments.
 
 Version 2.1 adds the [Grafana operations dashboard](dashboards/README.md),

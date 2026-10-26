@@ -3,7 +3,7 @@ tmp_dir = "tmp/air"
 env_files = []
 
 [build]
-cmd = "go build -o ./tmp/air/echo-observatory ./cmd/echo-observatory"
+cmd = "make build-quick APP_NAME=./tmp/air/echo-observatory"
 entrypoint = ["./tmp/air/echo-observatory"]
 args_bin = [
   "--http-port=18880", "--tls-port=18843", "--quic-port=18843",

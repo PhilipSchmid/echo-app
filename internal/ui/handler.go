@@ -20,6 +20,7 @@ var pageTemplates = template.Must(template.ParseFS(assets, "assets/*.html"))
 
 type pageView struct {
 	Page         pageMetadata
+	Version      string
 	Request      handlers.HTTPResponse
 	Stack        stackDetails
 	JSON         string
@@ -41,6 +42,7 @@ func renderPage(filename string, view pageView) renderedPage {
 
 // NewHandler reflects page requests and serves the embedded interface and public settings.
 func NewHandler(cfg *config.Config, listener string, sources ...handlers.CertificateSource) http.Handler {
+	buildVersion := applicationVersion()
 	var certificateSource handlers.CertificateSource
 	if len(sources) > 0 {
 		certificateSource = sources[0]
@@ -54,7 +56,7 @@ func NewHandler(cfg *config.Config, listener string, sources ...handlers.Certifi
 		}
 		filename := strings.TrimSuffix(strings.TrimPrefix(page.Path, "/ui/"), "/") + ".html"
 		pages[page.Path] = renderPage(filename, pageView{
-			Page: metadataFor(page.Path, cfg.PublicURL), Headers: cfg.PrintHeaders, Unsafe: cfg.UnsafeHeaders, Certificates: cfg.TLS || cfg.QUIC || cfg.GRPCTLS,
+			Page: metadataFor(page.Path, cfg.PublicURL), Version: buildVersion, Headers: cfg.PrintHeaders, Unsafe: cfg.UnsafeHeaders, Certificates: cfg.TLS || cfg.QUIC || cfg.GRPCTLS,
 		})
 	}
 	settings, _ := json.Marshal(struct {
@@ -155,7 +157,7 @@ func NewHandler(cfg *config.Config, listener string, sources ...handlers.Certifi
 		if page.Path != "" {
 			rendered := pages[r.URL.Path]
 			if filename == "assets/index.html" {
-				view := pageView{Page: page, Headers: cfg.PrintHeaders, Unsafe: cfg.UnsafeHeaders, Certificates: cfg.TLS || cfg.QUIC || cfg.GRPCTLS}
+				view := pageView{Page: page, Version: buildVersion, Headers: cfg.PrintHeaders, Unsafe: cfg.UnsafeHeaders, Certificates: cfg.TLS || cfg.QUIC || cfg.GRPCTLS}
 				request := handlers.NewHTTPResponse(r, cfg, listener)
 				// HEAD describes the corresponding GET representation without sending it.
 				if r.Method == http.MethodHead {
