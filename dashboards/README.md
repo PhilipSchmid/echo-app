@@ -8,14 +8,15 @@ listener. No extra Grafana plugins, cloud account or application changes are
 needed for the existing 2.0 metrics. New certificate and rate-pressure panels
 require a build containing those metrics; older builds leave them empty.
 
-The dashboard opens with readiness, request activity, connections, traffic and
-process memory. Expand the sections for protocol breakdowns, rate limiting,
-certificate validity, runtime diagnostics and optional dependency checks.
+The dashboard opens with current readiness, demand, connections and memory,
+plus an instance table showing scrape health, liveness and process uptime.
+Expand the sections for protocols, protection, certificates, runtime resources
+and optional dependency checks.
+
 Job and Instance select the deployment. Listener filters listener-labelled
-charts; gRPC outcome, WebSocket message, protection and runtime panels have no
-listener label and retain the selected instances. Every panel explains its
-units and limits in its information tooltip. Grafana's **Inspect → Data** offers
-a table and CSV export.
+panels; gRPC outcomes, WebSocket messages, protection and runtime panels have no
+listener label and retain the selected instances. Each panel explains its units
+and limits in its information tooltip. **Inspect → Data** offers a table or CSV.
 
 ## Scraping
 
@@ -36,74 +37,64 @@ Prometheus-compatible managed service works too.
 
 ## Update from source
 
-Edit [echo-observatory.mjs](echo-observatory.mjs), regenerate the importable JSON,
-and run the checks:
+Edit [echo-observatory.mjs](echo-observatory.mjs), then run:
 
 ```bash
-make grafana-build
-make test-grafana test-grafana-promql
+make grafana-update
 ```
 
-The source uses small helpers to keep units, spacing and panel options
-consistent. Node.js 22+ runs the generator and tests. Docker runs the pinned
-Prometheus `promtool` image for syntax checks and calculation fixtures; it needs
-no network access after the image is available locally. Normal CI runs both.
-Check generated JSON into Git alongside the source.
+This regenerates the JSON, validates its structure and queries, runs calculation
+fixtures, and prints the import file location. It does not contact Grafana or
+change a hosted dashboard.
 
-For API updates, set `GRAFANA_URL`, `GRAFANA_DATASOURCE_UID` and `GRAFANA_TOKEN`
-in your environment or secret manager, then run:
+In Grafana, choose **New → Import**, upload `echo-observatory.json`, keep the UID
+`echo-observatory`, and select **Import (Overwrite)**. Keep the existing folder
+and select the same Prometheus datasource. Reusing the UID updates the existing
+dashboard and preserves its URL. Move useful Grafana UI edits into the source
+before the next import.
 
-```bash
-make grafana-deploy
-```
+Node.js 22+ runs the generator and structural tests. Docker runs the pinned
+Prometheus `promtool` image for syntax and calculation checks; no container
+network access is needed after the image is available locally. Check the source
+and generated JSON into Git together. CI validates them without deployment
+credentials or dashboard-writing access.
 
-Use a Grafana service account with permission to read the selected datasource
-and read/write this dashboard or its folder. Do not store its token in Git or
-pass it as a command-line argument. HTTPS is required except on loopback for
-local development; normal TLS verification stays enabled.
-
-The updater uses the stable UID `echo-observatory`, preserves the existing folder
-and checks the saved revision. Concurrent edits return a conflict rather than
-being overwritten silently. Re-running updates the same dashboard. Set
-`GRAFANA_FOLDER_UID` to choose a folder explicitly, and `GRAFANA_ORG_ID` if your
-Grafana API authentication needs an organization selector. Keep local UI edits
-in the source before the next update.
-
-The **Update Grafana dashboard** GitHub Actions workflow provides the same update
-as a manual action. Configure a `grafana` environment with the variables above
-and `GRAFANA_TOKEN` as an environment secret. Add required reviewers if updates
-need approval. It validates before deploying and never runs on pull requests.
-Some managed Grafana accounts allow dashboard imports but do not expose service
-account tokens. Use JSON import there; the API workflow needs an authorized token
-and does not extract or reuse browser session cookies.
-An offline installation can provision the JSON through Grafana's normal file
-provisioning instead; no API token or GitHub Actions is required.
+For generation alone use `make grafana-build`. The individual checks are
+`make test-grafana` and `make test-grafana-promql`. An offline installation can
+also use Grafana's normal file provisioning with the same JSON.
 
 ## Reading the panels
 
-- Request counts describe operations, not unique visitors. Streaming sessions
-  count when they finish. Admin traffic is excluded from demand panels.
-- HTTP status codes include intentional test responses. Use application
-  failures and rejection reasons to investigate actual faults or admission
-  limits. HTTP latency includes requested demo delays; gRPC and TCP durations
-  are shown separately.
+- Current state belongs in cards, tables or gauges. Listener/dependency state
+  uses timelines; rates, latency and resource growth use time-series charts.
+  Process uptime is an elapsed value in the instance table, not a rising line.
+- Operations include HTTP requests, native TCP metadata sessions and gRPC calls.
+  Streams count when they finish. They are not unique visitors. HTTP route
+  comparisons exclude TCP and RPC operations; arbitrary paths share `other`.
+- Protocol, IP-family, RPC outcome and transferred-data bars cover the selected
+  interval. They are reset-aware estimates, queried once at its end. HTTP
+  outcomes use bounded status classes; deliberate 4xx/5xx tests are separate
+  from recorded error events. Handler percentiles are bucket estimates, not
+  network round-trip measurements, and include requested demo delays.
 - Transport bytes include TLS/QUIC framing but exclude some network overhead.
-  They are not a provider billing meter. Daily quota panels describe each
-  process's conservative reservations for its current budget day.
-- Full token buckets mean burst headroom is available. Low headroom and rising
-  rejection counters indicate pressure. A short burst may disappear between
-  scrapes; use both charts. Charged-token rates can exceed sustained refill
-  temporarily because bursts are allowed. Peer headroom is the lowest remaining
-  fraction across recently active groups, without exporting identities.
-- Certificate panels show the last ordinary server leaf certificate observed.
-  ACME challenges are ignored. An expiry increase after selection can indicate
-  renewal, but these metrics do not prove issuer trust, a complete chain or
-  future renewal success. No certificate selection happens during a scrape.
-- Empty panels distinguish unavailable or unobserved series from zero. Optional
-  dependency metrics need a configured probe; scrape metadata and file
-  descriptors depend on the datasource and operating system. Runtime series are
-  joined to Echo targets so another application's process metrics are excluded.
+  They are not a provider billing meter. Daily allowance values describe each
+  process's current budget day and conservative reservations.
+- Burst headroom is a current token fraction; sustained use compares charged
+  token rate with configured refill. Bursts can exceed 100% refill temporarily.
+  Rejections include several causes, not only rate limiting. Peer headroom is
+  the lowest fraction across recently active groups, without identities.
+- Certificate dates and time remaining are paired per instance. ACME challenge
+  certificates are excluded. Expiry does not prove trust, complete-chain
+  validity or future renewal success. Scrapes never select or issue a certificate.
+- Missing samples are unavailable, not invented zeroes. Failed scrapes cannot
+  count as ready; historical target discovery is limited to the selected range.
+  Optional dependency metrics need a configured probe, and descriptor limits
+  depend on the operating system. Runtime metrics are joined to Echo targets
+  so another application's process data is excluded.
 
-The portable dashboard includes no operator identities, instance addresses,
-credentials or hosting configuration. Datasource access remains controlled by
-your Grafana installation.
+The dashboard deliberately omits duplicate traffic/quota views, mixed RPC/session
+latency, GC/thread internals and separate scrape-cost charts. Those underlying
+metrics remain available in the [metric reference](../docs/monitoring.md).
+
+No operator identities, instance addresses, credentials or hosting configuration
+are embedded in the dashboard. Datasource access stays controlled by Grafana.

@@ -8,7 +8,7 @@ These endpoints are documented for operators and are not advertised or fetched
 by the public UI.
 
 The [Grafana dashboard](../dashboards/README.md) provides a portable operations
-view with importable JSON, query tests and a repeatable API update workflow.
+view with importable JSON, query tests and a Makefile target for manual updates.
 
 | Endpoint | Purpose | Response |
 | --- | --- | --- |
