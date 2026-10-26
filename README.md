@@ -145,11 +145,14 @@ these exposed ports and enable all echo listeners.
 The bare binary starts only HTTP and admin by default; other listeners remain
 opt-in. All bind ports are configurable. Existing 1.x image paths are unchanged.
 
-## Version 2.0
+## Version 2
 
-Use [v2.0.0](https://github.com/PhilipSchmid/echo-observatory/releases/tag/v2.0.0)
-for a stable release. Pin `ghcr.io/philipschmid/echo-observatory:2.0.0` for
+Use [v2.1.0](https://github.com/PhilipSchmid/echo-observatory/releases/tag/v2.1.0)
+for a stable release. Pin `ghcr.io/philipschmid/echo-observatory:2.1.0` for
 repeatable container deployments.
+
+Version 2.1 adds the [Grafana operations dashboard](dashboards/README.md),
+certificate validity metrics, and rate-limit headroom and usage metrics.
 
 Version 2.0 adds the browser UI, automatic certificate management, and the
 renamed executable. Images starting with 2.0.0 use
