@@ -32,9 +32,11 @@ no changes. See [trusted PROXY protocol](configuration.md#trusted-proxy-protocol
 
 Incoming bodies/messages and outgoing echo responses now default to 64 KiB.
 Use `--max-request-size` and `--max-response-size` when a controlled test needs
-more; response output retains an absolute 1 MiB ceiling. Shared rate protection
-and a 1 GiB/day egress allowance are enabled by default. Public deployments
-should persist quota state; load tests may explicitly disable protection.
+more; response output retains an absolute 1 MiB ceiling. Shared rate and daily
+transfer quotas are opt-in with `--protection`, so self-hosted diagnostics do not
+inherit public-demo traffic limits. Public deployments should enable protection,
+choose suitable budgets and persist quota state. When upgrading from a prerelease
+that enabled protection by default, set `--protection` explicitly to retain it.
 
 The [Kubernetes example](kubernetes.md) also uses new resource names and selectors.
 Adapt your existing deployment rather than applying it as an in-place rename:

@@ -2,12 +2,10 @@
 
 [README](../README.md) · [Configuration](configuration.md) · [Usage](usage.md)
 
-This example enables all echo listeners and exposes them through a ClusterIP
-Service with ports 80/TCP, 443/TCP+UDP, 50051/TCP and 9090/TCP, matching
-the Compose profile. Admin has a separate private
-ClusterIP Service. Probes use the dedicated admin listener. The pod runs as UID 65532 with
-a read-only filesystem, no privilege escalation, and all capabilities dropped.
-External readiness checks are optional and commented out.
+This example enables all echo listeners through a ClusterIP Service on
+80/TCP, 443/TCP+UDP, 50051/TCP and 9090/TCP, matching Compose. Admin probes
+use a separate ClusterIP Service. The pod runs as UID 65532 with a read-only
+filesystem, no privilege escalation and all capabilities dropped.
 
 Copy the manifest into `echo-observatory.yaml`, adjust the image and configuration, then
 apply it to your chosen namespace:
@@ -16,8 +14,8 @@ apply it to your chosen namespace:
 kubectl apply -f echo-observatory.yaml
 ```
 
-The `main` image tag is convenient for demos. Pin a release version or image
-digest for repeatable deployments.
+The example pins the current prerelease. Use a release tag or image digest
+for repeatable deployments.
 
 ## Deployment and Service
 
@@ -30,6 +28,7 @@ metadata:
 data:
   ECHO_OBSERVATORY_MESSAGE: "demo-env"
   ECHO_OBSERVATORY_PRINT_HTTP_REQUEST_HEADERS: "true"
+  ECHO_OBSERVATORY_PROTECTION: "false"
   ECHO_OBSERVATORY_H2C: "true"
   ECHO_OBSERVATORY_TLS: "true"
   ECHO_OBSERVATORY_HTTP_ADVERTISE_PORT: "80"
@@ -75,7 +74,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: echo-observatory
-        image: ghcr.io/philipschmid/echo-observatory:main
+        image: ghcr.io/philipschmid/echo-observatory:2.0.0-pre.1
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -206,7 +205,7 @@ original client metadata with the application's opt-in
 provided manifests leave it disabled. With TLS termination at ingress, backend mutual TLS authenticates the
 ingress connection rather than the original client.
 
-## Public demo
+## Public access
 
 Serve the echo endpoints and `/ui/` subtree through a trusted HTTPS ingress,
 preserving WebSocket upgrades. If the ingress strips a path prefix, route the
@@ -214,15 +213,16 @@ request view, workbench, examples, connection guide, and echo requests through
 that same prefix.
 The UI's public HTTP examples use the URL visitors actually reached.
 
-Keep the admin listener private. The app enables shared rate and transfer
-budgets by default; each replica has its own allowance.
+Keep the admin listener private. Enable shared rate and transfer budgets with
+`ECHO_OBSERVATORY_PROTECTION=true` and choose limits for the deployment;
+each replica has its own allowance.
 Use durable quota state when restarts must preserve it, and retain network-level
 protection for traffic that never reaches the app. Publish TCP,
 gRPC, or UDP endpoints separately when needed; configured backend ports alone
 do not establish public reachability.
 
-Use synthetic data and retain credential redaction. Review server/proxy logging
-and expose only the deployment metadata you intend visitors to inspect.
+Use synthetic data and retain credential redaction. Configure log access and
+retention for your installation; see [privacy and logging](usage.md#privacy-and-logging).
 
 ## Optional settings
 
