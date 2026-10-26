@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/metrics"
 	"golang.org/x/crypto/acme"
 )
 
@@ -75,6 +76,7 @@ func TrackServerCertificate(config *tls.Config) CertificateSource {
 			snapshot.PublicKeyAlgorithm = fmt.Sprintf("Ed25519 %d bits", len(key)*8)
 		}
 		current.Store(&observedCertificate{digest: digest, info: snapshot})
+		metrics.RecordServerCertificate(leaf.NotBefore, leaf.NotAfter)
 	}
 	if config != nil {
 		if len(config.Certificates) > 0 {

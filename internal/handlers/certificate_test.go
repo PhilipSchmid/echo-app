@@ -19,6 +19,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/metrics"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/acme"
@@ -175,4 +178,56 @@ func TestTrackServerCertificateConcurrent(t *testing.T) {
 		})
 	}
 	workers.Wait()
+}
+
+func TestServerCertificateMetricsFollowSelectionAndRenewal(t *testing.T) {
+	metrics.ServerCertificateNotBefore.Reset()
+	metrics.ServerCertificateNotAfter.Reset()
+	t.Cleanup(func() {
+		metrics.ServerCertificateNotBefore.Reset()
+		metrics.ServerCertificateNotAfter.Reset()
+	})
+	first := snapshotTestCertificate(t, 1, nil)
+	renewed := snapshotTestCertificate(t, 2, nil)
+	leaf, err := x509.ParseCertificate(renewed.Certificate[0])
+	require.NoError(t, err)
+	leaf.NotAfter = leaf.NotAfter.Add(30 * 24 * time.Hour)
+	key := renewed.PrivateKey.(*ecdsa.PrivateKey)
+	renewed.Certificate[0], err = x509.CreateCertificate(rand.Reader, leaf, leaf, &key.PublicKey, key)
+	require.NoError(t, err)
+	selected := &first
+	var providerError error
+	var calls int
+	config := &tls.Config{MinVersion: tls.VersionTLS12, GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+		calls++
+		return selected, providerError
+	}}
+	source := TrackServerCertificate(config)
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(metrics.ServerCertificateNotBefore, metrics.ServerCertificateNotAfter)
+	families, err := registry.Gather()
+	require.NoError(t, err)
+	assert.Empty(t, families, "no certificate must not look like an expired certificate from 1970")
+	assert.Zero(t, calls, "scraping must never select or issue a certificate")
+	_, err = config.GetCertificate(&tls.ClientHelloInfo{SupportedProtos: []string{"h2"}})
+	require.NoError(t, err)
+	assert.Equal(t, float64(source().NotAfter.Unix()), testutil.ToFloat64(metrics.ServerCertificateNotAfter.WithLabelValues()))
+	selected = &renewed
+	_, err = config.GetCertificate(&tls.ClientHelloInfo{SupportedProtos: []string{acme.ALPNProto}})
+	require.NoError(t, err)
+	assert.NotEqual(t, float64(leaf.NotAfter.Unix()), testutil.ToFloat64(metrics.ServerCertificateNotAfter.WithLabelValues()), "challenge certificates must be ignored")
+	_, err = config.GetCertificate(&tls.ClientHelloInfo{SupportedProtos: []string{"h2"}})
+	require.NoError(t, err)
+	assert.Equal(t, float64(leaf.NotAfter.Unix()), testutil.ToFloat64(metrics.ServerCertificateNotAfter.WithLabelValues()))
+	assert.Equal(t, float64(leaf.NotBefore.Unix()), testutil.ToFloat64(metrics.ServerCertificateNotBefore.WithLabelValues()))
+	selected, providerError = &first, errors.New("provider failed")
+	_, err = config.GetCertificate(&tls.ClientHelloInfo{})
+	require.Error(t, err)
+	assert.Equal(t, float64(leaf.NotAfter.Unix()), testutil.ToFloat64(metrics.ServerCertificateNotAfter.WithLabelValues()))
+	families, err = registry.Gather()
+	require.NoError(t, err)
+	require.Len(t, families, 2)
+	for _, family := range families {
+		assert.Empty(t, family.Metric[0].Label, "dates must have no domain or certificate identity labels")
+	}
 }
