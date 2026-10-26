@@ -13,7 +13,7 @@ export function dashboard() {
   const increase = (name, labels = '') => `increase(${selector(name, labels)}[$__range])`;
   const colors = ['#8AB8F8', '#83CDBB', '#C3ACEA', '#E9B989', '#E49CB3'];
   const panels = [];
-  let id = 0;
+  let id = 1; // Keep existing panel links stable after removing introduction panel 1.
   let y = 0;
   function panel(type, title, description, queries, x, w, h, unit = 'short', instant = false) {
     const p = {
@@ -81,9 +81,6 @@ export function dashboard() {
   const publicRequests = rate('echo_observatory_requests_total', publicListener);
   const httpDuration = rate('echo_observatory_request_duration_seconds_bucket', `${httpListener},endpoint!="/ws"`);
 
-  const intro = panel('text', 'Operations overview', 'Current values first, activity over time below, and selected-period comparisons in the expandable sections.', [], 0, 24, 4);
-  intro.options = { mode: 'markdown', content: '### Echo Observatory · Operations\n**Current state** is shown in cards and tables. Trend charts show rates or changing resource use; comparison bars cover the selected time range. Admin traffic is excluded from demand. Use **Inspect → Data** for exact values or CSV.' };
-  y += 4;
   const status = stat('Readiness', 'Ready and successfully scraped targets divided by known Echo scrape targets in the selected range. Failed scrapes cannot count as ready; missing readiness samples are unavailable, never assumed healthy. See the instance table for individual states.', `sum(${ready} * on(job, instance) ${scrapeUp}) / count(${scrapeUp})`, 0, 'percentunit', colors[1]);
   status.fieldConfig.defaults.color = { mode: 'thresholds' };
   status.fieldConfig.defaults.thresholds = { mode: 'absolute', steps: [{ color: colors[4], value: null }, { color: colors[1], value: 1 }] };
