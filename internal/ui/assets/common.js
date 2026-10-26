@@ -86,7 +86,6 @@ function showCopyState(button, state, phase, message = "") {
   const context = state.ariaLabel.replace(/^Copy\s*/i, "");
   const ariaLabel = phase === "idle" ? state.ariaLabel : { copying: "Copying ", copied: "Copied ", error: "Retry copying " }[phase] + context;
   button.setAttribute("aria-label", ariaLabel);
-  button.setAttribute("title", ariaLabel);
   const status = button.closest("[data-code-block]")?.querySelector("[data-copy-status]");
   if (status) status.textContent = message;
 }
@@ -182,7 +181,7 @@ export function initTheme() {
     const dark = choice === "dark" || (choice === "system" && system.matches);
     document.documentElement.dataset.theme = choice;
     toggle.setAttribute("aria-checked", String(dark));
-    toggle.title = dark ? "Switch to light theme" : "Switch to dark theme";
+    toggle.dataset.tooltip = dark ? "Switch to light theme" : "Switch to dark theme";
     toggle.hidden = false;
   }
   render();
@@ -209,7 +208,6 @@ export async function loadConfig(uiBase) {
 export async function checkService(uiBase, indicator) {
   const label = indicator.closest?.(".instance")?.querySelector("[data-service-status-label]") || indicator.querySelector("[data-service-status-label]");
   const describe = (text) => {
-    indicator.title = text;
     const description = indicator.closest?.(".service-info")?.querySelector("[data-service-description]");
     if (description) description.textContent = text;
   };
@@ -227,24 +225,150 @@ export async function checkService(uiBase, indicator) {
   }
 }
 
-export function initServiceStatus(uiBase, serviceBase) {
-  $("service-address").textContent = serviceBase.href;
-  const indicator = $("service-status");
-  const details = indicator.closest(".service-info");
-  indicator.addEventListener("keydown", (event) => {
+export function initDisclosureHelp(indicator) {
+  const details = indicator.closest("details");
+  let automatic = false;
+  let dismissed = false;
+  const openHelp = () => {
+    if (dismissed || details.open) return;
+    automatic = true;
+    details.open = true;
+  };
+  const closeHelp = () => {
+    details.open = false;
+    automatic = false;
+    dismissed = details.matches(":hover");
+  };
+  details.addEventListener("pointerenter", (event) => {
+    if (event.pointerType === "mouse") openHelp();
+  });
+  details.addEventListener("pointerleave", (event) => {
+    if (event.pointerType !== "mouse") return;
+    dismissed = false;
+    if (automatic && !details.contains(document.activeElement)) closeHelp();
+  });
+  indicator.addEventListener("focus", () => {
+    if (indicator.matches(":focus-visible")) openHelp();
+  });
+  indicator.addEventListener("click", (event) => {
+    if (details.open && automatic) event.preventDefault();
+    automatic = false;
+    dismissed = details.open && details.matches(":hover");
+  });
+  document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && details.open) {
       event.preventDefault();
-      details.open = false;
+      closeHelp();
     }
   });
   details.addEventListener("focusout", (event) => {
-    if (!details.contains(event.relatedTarget)) details.open = false;
+    if (!details.contains(event.relatedTarget) && !details.matches(":hover")) closeHelp();
   });
   document.addEventListener("pointerdown", (event) => {
-    if (!details.contains(event.target)) details.open = false;
+    if (!details.contains(event.target)) closeHelp();
   });
+}
+
+export function initServiceStatus(uiBase, serviceBase) {
+  $("service-address").textContent = serviceBase.href;
+  const indicator = $("service-status");
+  initDisclosureHelp(indicator);
   const refresh = () => { if (document.visibilityState === "visible") checkService(uiBase, indicator).catch(() => {}); };
   window.setInterval(refresh, 30000);
   document.addEventListener("visibilitychange", refresh);
   return checkService(uiBase, indicator);
+}
+
+export function initTooltips() {
+  if ($("ui-tooltip")) return;
+  const popup = element("div", "ui-tooltip");
+  popup.id = "ui-tooltip";
+  popup.setAttribute("role", "tooltip");
+  popup.hidden = true;
+  document.body.append(popup);
+  let owner = null;
+  let hovered = null;
+  let popupHovered = false;
+  let dismissed = null;
+  let timer;
+  const trigger = (target) => target?.closest?.("[data-tooltip]");
+  const clearTimer = () => { window.clearTimeout(timer); };
+  function hide() {
+    clearTimer();
+    if (owner) {
+      const references = (owner.getAttribute("aria-describedby") || "").split(/\s+/).filter((id) => id && id !== popup.id).join(" ");
+      if (references) owner.setAttribute("aria-describedby", references);
+      else owner.removeAttribute("aria-describedby");
+    }
+    owner = null;
+    popupHovered = false;
+    popup.hidden = true;
+  }
+  function dismiss() {
+    dismissed = owner || hovered || dismissed;
+    hide();
+  }
+  function show(next) {
+    const text = next?.getAttribute("data-tooltip")?.trim();
+    if (!text || !next.isConnected) { if (owner === next) hide(); return; }
+    if (next === dismissed) return;
+    clearTimer();
+    if (owner !== next) hide();
+    owner = next;
+    popup.textContent = text;
+    popup.hidden = false;
+    const references = new Set((next.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean));
+    references.add(popup.id);
+    next.setAttribute("aria-describedby", [...references].join(" "));
+    const rect = next.getBoundingClientRect();
+    const size = popup.getBoundingClientRect();
+    const gap = 8;
+    const left = rect.left + (rect.width - size.width) / 2;
+    const top = rect.bottom + gap + size.height <= window.innerHeight - gap ? rect.bottom + gap : rect.top - size.height - gap;
+    popup.style.left = Math.max(gap, Math.min(left, window.innerWidth - size.width - gap)) + "px";
+    popup.style.top = Math.max(gap, Math.min(top, window.innerHeight - size.height - gap)) + "px";
+  }
+  function leaveSoon() {
+    clearTimer();
+    timer = window.setTimeout(() => {
+      const focused = owner?.contains(document.activeElement) && document.activeElement.matches(":focus-visible");
+      if (owner !== hovered && !popupHovered && !focused) hide();
+    }, 140);
+  }
+  document.addEventListener("pointerover", (event) => {
+    if (event.pointerType !== "mouse") return;
+    if (popup.contains(event.target)) { popupHovered = true; clearTimer(); return; }
+    const next = trigger(event.target);
+    if (next) { hovered = next; show(next); }
+  });
+  document.addEventListener("pointerout", (event) => {
+    if (event.pointerType !== "mouse") return;
+    if (popup.contains(event.target) && !popup.contains(event.relatedTarget)) { popupHovered = false; leaveSoon(); }
+    const previous = trigger(event.target);
+    if (previous && !previous.contains(event.relatedTarget)) {
+      if (hovered === previous) hovered = null;
+      if (dismissed === previous) dismissed = null;
+      leaveSoon();
+    }
+  });
+  document.addEventListener("focusin", (event) => {
+    const next = trigger(event.target);
+    if (next && event.target.matches(":focus-visible")) { dismissed = null; show(next); }
+  });
+  document.addEventListener("focusout", (event) => {
+    if (owner?.contains(event.target) && !owner.contains(event.relatedTarget)) leaveSoon();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (owner && event.key === "Escape" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.isComposing) {
+      event.preventDefault();
+      dismiss();
+    }
+  });
+  document.addEventListener("pointerdown", dismiss, true);
+  document.addEventListener("click", dismiss, true);
+  window.addEventListener("scroll", (event) => {
+    if (event.target === window || !popup.contains(event.target)) dismiss();
+  }, true);
+  window.addEventListener("resize", dismiss);
+  window.addEventListener("blur", dismiss);
 }

@@ -16,7 +16,8 @@ const { nextOptionIndex } = await loadAsset("controls.js");
 test("service indicator follows successful, failed and recovered listener checks", async (t) => {
   const settings = { http_port: "8080", max_request_size: 1048576 };
   const label = { textContent: "Checking" };
-  const indicator = { dataset: {}, querySelector: () => label, title: "" };
+  const description = { textContent: "Checking" };
+  const indicator = { dataset: {}, closest: (selector) => ({ querySelector: () => selector === ".instance" ? label : description }) };
   t.mock.method(globalThis, "fetch", async (url, options) => {
     assert.equal(url.href, "https://echo.example/ui/config.json");
     assert.equal(options.cache, "no-store");
@@ -32,7 +33,8 @@ test("service indicator follows successful, failed and recovered listener checks
   assert.deepEqual(await checkService(base, indicator), settings);
   assert.equal(indicator.dataset.state, "ready");
   assert.equal(label.textContent, "Responding");
-  assert.match(indicator.title, /Other protocol listeners may differ/);
+  assert.match(description.textContent, /Other protocol listeners may differ/);
+  assert.equal(Object.hasOwn(indicator, "title"), false);
   globalThis.fetch.mock.mockImplementation(async () => { throw new Error("offline"); });
   await assert.rejects(checkService(base, indicator), /offline/);
   assert.equal(indicator.dataset.state, "unavailable");

@@ -7,7 +7,7 @@ export function createHeaderEditor(container, addButton, onChange) {
       row.key.setAttribute("aria-label", "Header name " + (index + 1));
       row.value.setAttribute("aria-label", "Header value " + (index + 1));
       row.remove.setAttribute("aria-label", "Remove header " + (index + 1));
-      row.remove.title = "Remove header " + (index + 1);
+      row.remove.setAttribute("data-tooltip", "Remove header " + (index + 1));
     });
     addButton.disabled = rows.length >= maxHeaderRows;
   }

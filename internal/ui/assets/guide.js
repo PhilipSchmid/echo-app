@@ -1,4 +1,4 @@
-import { $, baseURLs, element, copy, setCopyLabel, initTheme, loadConfig, shellQuote } from "./common.js";
+import { $, baseURLs, element, copy, setCopyLabel, initTheme, initTooltips, loadConfig, shellQuote } from "./common.js";
 import { presets, getPreset } from "./presets.js";
 import { renderCode } from "./highlight.js";
 import { httpExamples, directCommands, createCommandPicker } from "./terminal.js";
@@ -6,6 +6,7 @@ import { httpExamples, directCommands, createCommandPicker } from "./terminal.js
 const { uiBase, serviceBase } = baseURLs(import.meta.url);
 const page = document.body.dataset.uiPage;
 initTheme();
+initTooltips();
 const commandPicker = createCommandPicker(commandBlock);
 
 function commandBlock(label, command, context) {
