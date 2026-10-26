@@ -160,3 +160,31 @@ func TestHTTPProtocolAndIPLabelsUseObservedConnection(t *testing.T) {
 		assert.Equal(t, tc.ip, ip)
 	}
 }
+
+func TestHTTPProtocolMetricDescribesClientIPSource(t *testing.T) {
+	HTTPProtocolRequestsTotal.Reset()
+	t.Cleanup(HTTPProtocolRequestsTotal.Reset)
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(HTTPProtocolRequestsTotal)
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	// net/http sets RemoteAddr to the validated original client in trusted PROXY mode.
+	request.RemoteAddr = "[2001:db8::1]:1234"
+	request.ProtoMajor = 2
+	request.Header.Set("X-Forwarded-For", "192.0.2.1")
+	InstrumentHTTP("TLS", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})).ServeHTTP(httptest.NewRecorder(), request)
+	families, err := registry.Gather()
+	require.NoError(t, err)
+	require.Len(t, families, 1)
+	family := families[0]
+	assert.Contains(t, family.GetHelp(), "client IP version")
+	assert.Contains(t, family.GetHelp(), "trusted PROXY")
+	require.Len(t, family.Metric, 1)
+	labels := make(map[string]string)
+	for _, label := range family.Metric[0].Label {
+		labels[label.GetName()] = label.GetValue()
+	}
+	assert.Equal(t, map[string]string{"listener": "TLS", "protocol": "HTTP/2", "ip_version": "IPv6"}, labels)
+	assert.Equal(t, float64(1), family.Metric[0].GetCounter().GetValue())
+}
