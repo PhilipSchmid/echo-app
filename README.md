@@ -129,8 +129,9 @@ opt-in. All bind ports are configurable. Existing 1.x image paths are unchanged.
 
 ## Version 2.0
 
-The current preview is [v2.0.0-pre.0](https://github.com/PhilipSchmid/echo-observatory/releases/tag/v2.0.0-pre.0). Stable 2.0.0 is not released yet.
-Trusted PROXY protocol support is available on `main` after this preview.
+The current preview is [v2.0.0-pre.1](https://github.com/PhilipSchmid/echo-observatory/releases/tag/v2.0.0-pre.1). Stable 2.0.0 is not released yet.
+This preview includes trusted PROXY protocol support and an optional HTTP/3
+packet-size workaround for constrained UDP paths.
 
 Version 2.0 adds the browser UI, automatic certificate management, and the
 renamed executable. Images starting with 2.0.0 use

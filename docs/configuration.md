@@ -98,7 +98,7 @@ not select these ports. The public UI does not advertise private admin settings.
 
 ## Trusted PROXY protocol
 
-Available on `main`; not included in `v2.0.0-pre.0`.
+Available starting with `v2.0.0-pre.1`.
 
 Direct connections remain the default, including on-premises installations.
 Enable PROXY protocol only when a trusted TCP proxy sends a header before the
