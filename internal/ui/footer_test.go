@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -23,6 +24,8 @@ func TestSharedFooterIsDecorativeAndPreservesProjectLinks(t *testing.T) {
 			require.Len(t, footers, 1)
 			footer := footers[0]
 			assert.Contains(t, footer, `class="site-footer"`)
+			assert.Regexp(t, `<span class="footer-version"><span class="sr-only">Version </span>[^<]+</span>`, footer)
+			assert.Contains(t, footer, template.HTMLEscapeString(applicationVersion()))
 			assert.Regexp(t, `<span class="brand-echo">Echo</span>\s+<span class="brand-observatory">Observatory</span>`, footer)
 			assert.NotContains(t, footer, "Small requests.")
 			assert.NotContains(t, footer, "Clear answers.")
@@ -58,4 +61,25 @@ func TestSharedFooterIsDecorativeAndPreservesProjectLinks(t *testing.T) {
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/ui/footer.html", nil))
 	assert.Equal(t, http.StatusNotFound, response.Code)
+}
+
+func TestFooterVersionIsEscapedText(t *testing.T) {
+	const label = `<script>alert("version")</script>`
+	page := renderPage("footer", pageView{Version: label})
+	require.NoError(t, page.err)
+	assert.Contains(t, string(page.data), template.HTMLEscapeString(label))
+	assert.NotContains(t, string(page.data), "<script>")
+}
+
+func TestFooterUsesStampedBuildVersion(t *testing.T) {
+	previous := version
+	version = "v2.1.1"
+	t.Cleanup(func() { version = previous })
+	handler := NewHandler(&config.Config{}, "HTTP")
+	for _, path := range []string{"/ui/", "/ui/workbench/", "/ui/examples/", "/ui/connect/", "/ui/privacy/"} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+		require.Equal(t, http.StatusOK, response.Code)
+		assert.Contains(t, response.Body.String(), `<span class="footer-version"><span class="sr-only">Version </span>v2.1.1</span>`)
+	}
 }
