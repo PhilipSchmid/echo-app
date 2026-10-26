@@ -25,16 +25,16 @@
     <div class="guide-intro">
       <h1>Privacy &amp; data</h1>
       <p class="intro-copy">Use sample data. This service is built to inspect requests.</p>
-      <p class="privacy-updated">Updated <time datetime="2026-10-25">25 October 2026</time></p>
+      <p class="privacy-updated">Updated <time datetime="2026-10-26">26 October 2026</time></p>
     </div>
     <div class="privacy-grid">
       <section class="privacy-card" aria-labelledby="privacy-requests">
         <h2 id="privacy-requests">Your requests</h2>
-        <p>Your IP address, URL, headers and data you send are processed to provide diagnostics and protect the service. The app keeps no persistent request history. Where the GDPR applies, we rely on legitimate interests in providing and securing the service.</p>
+        <p>Your IP address, URL, headers and data you send are processed to provide diagnostics and protect the service. The app keeps no persistent request history. Where the GDPR applies, we rely on legitimate interests in providing and securing the service (Article 6(1)(f)).</p>
       </section>
       <section class="privacy-card" aria-labelledby="privacy-logs">
         <h2 id="privacy-logs">Logs &amp; redaction</h2>
-        <p>Request and message bodies are excluded from app logs. Common credential headers are always redacted in diagnostic logs. {{if .Unsafe}}Response credential redaction is disabled on this instance.{{else if .Headers}}Common credential headers are also redacted in responses.{{else}}Request headers are not included in responses on this instance.{{end}} Redaction is not exhaustive; use sample data.</p>
+        <p>Request and message bodies are excluded from app logs. Common credential headers are always redacted in diagnostic logs. {{if not .Headers}}Request headers are not included in responses on this instance.{{else if .Unsafe}}Response credential redaction is disabled on this instance.{{else}}Common credential headers are also redacted in responses.{{end}} Redaction is not exhaustive; paths, queries and custom fields can still contain personal data.</p>
       </section>
       <section class="privacy-card" aria-labelledby="privacy-browser">
         <h2 id="privacy-browser">Cookies &amp; browser storage</h2>
@@ -51,10 +51,23 @@
       </section>
       <section class="privacy-card" aria-labelledby="privacy-recipients">
         <h2 id="privacy-recipients">Processing &amp; protection</h2>
-        <p>The demo runs in Germany. Hosting and operational providers can process technical data in the United States under recognized privacy safeguards. We do not sell data or use it for advertising. Use HTTPS; privacy cannot be guaranteed.</p>
+        <p>The public demo is hosted by Fly.io, Inc., with the application running in Germany. Hosting operations may involve technical data processing in the United States. We do not sell data or use it for advertising. Use HTTPS; privacy cannot be guaranteed.</p>
       </section>
     </div>
-    <p class="privacy-details"><a class="example-link" href="https://github.com/philipschmid/echo-observatory/blob/main/docs/privacy.md">Full privacy notice on GitHub <span aria-hidden="true">↗</span></a></p>
+    <details class="advanced privacy-details">
+      <summary>More about data handling</summary>
+      <div class="details-content">
+        <h2>Your rights</h2>
+        <p>Subject to applicable law, you can request access, correction, deletion, restriction or portability of your personal data, and object to processing based on legitimate interests. Contact <a href="mailto:privacy@container.education">privacy@container.education</a>. We may need proportionate identity verification; we do not collect extra identifiers to locate diagnostic requests no longer retained. You may complain to the <a href="https://www.edoeb.admin.ch/en/">Swiss FDPIC</a> or a <a href="https://www.edpb.europa.eu/about-edpb/about-edpb/members_en">competent EU supervisory authority</a>.</p>
+        <h2>Request and protection data</h2>
+        <p>HTTP bodies are consumed and discarded after handling. WebSocket messages are echoed over the live connection; workbench activity stays in page memory. With protection enabled, peer-prefix rate limits are held in memory. Idle entries are removed during later checks after ten minutes; restart clears them. Durable quotas store only a UTC day and aggregate byte counts. Application metric labels contain no visitor IPs, header values or arbitrary request URLs.</p>
+        <p>We do not create visitor profiles or make automated decisions with legal or similarly significant effects. Plain HTTP, raw TCP and plaintext gRPC are unencrypted; TLS protects data in transit but the service still receives what you send.</p>
+        <h2>Recipients and transfers</h2>
+        <p>Authorized operators and hosting, network and operational providers process data as needed to deliver and secure the demo. See Fly.io’s <a href="https://fly.io/legal/privacy-policy/">privacy policy</a> and <a href="https://fly.io/legal/sub-processors/">subprocessor list</a>. Fly.io describes its commitments for covered EU–US and Swiss–US transfers in its <a href="https://fly.io/legal/data-privacy-framework/">Data Privacy Framework policy</a>. Ask the privacy contact for recipient details and transfer safeguards.</p>
+        <h2>Privacy correspondence</h2>
+        <p>If you contact us, we use your email address and message to handle the request. We retain them only as needed to resolve it and meet applicable legal obligations.</p>
+      </div>
+    </details>
   </main>
   {{template "footer" .}}
 </body>
