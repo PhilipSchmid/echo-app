@@ -1,13 +1,47 @@
 package metrics
 
 import (
+	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 )
+
+func TestRandomHTTPPathsAndRPCMethodsHaveBoundedCardinality(t *testing.T) {
+	collectors := []*prometheus.CounterVec{RequestsTotal, HTTPResponsesTotal, GRPCResponsesTotal}
+	for _, collector := range collectors {
+		collector.Reset()
+		t.Cleanup(collector.Reset)
+	}
+	RequestDuration.Reset()
+	t.Cleanup(RequestDuration.Reset)
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(RequestsTotal, RequestDuration, HTTPResponsesTotal, GRPCResponsesTotal)
+	handler := InstrumentHTTP("HTTP", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	for i := range 1000 {
+		handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, fmt.Sprintf("/untrusted/%d?secret=%d", i, i), nil))
+		_, err := UnaryServerInterceptor()(context.Background(), nil, &grpc.UnaryServerInfo{FullMethod: fmt.Sprintf("/random%d.Service/Method%d", i, i)}, func(context.Context, any) (any, error) { return nil, nil })
+		require.NoError(t, err)
+	}
+	families, err := registry.Gather()
+	require.NoError(t, err)
+	for _, family := range families {
+		assert.LessOrEqual(t, len(family.Metric), 2, family.GetName())
+		for _, sample := range family.Metric {
+			for _, label := range sample.Label {
+				if (label.GetName() == "endpoint" && label.GetValue() != "") || (label.GetName() == "method" && label.GetValue() != "GET") {
+					assert.Equal(t, "other", label.GetValue())
+				}
+			}
+		}
+	}
+}
 
 func TestRequestMethodsHaveBoundedCardinality(t *testing.T) {
 	RequestsTotal.Reset()
