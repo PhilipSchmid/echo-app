@@ -449,7 +449,7 @@ docker run --rm --user 0:0 --read-only \
   -p 127.0.0.1:3000:3000 \
   -e ECHO_OBSERVATORY_EXTERNAL_READINESS_PROBE_TYPE=icmp \
   -e ECHO_OBSERVATORY_EXTERNAL_READINESS_PROBE_TARGET=127.0.0.1 \
-  ghcr.io/philipschmid/echo-observatory:2.0.0-pre.1
+  ghcr.io/philipschmid/echo-observatory:2.0.0
 ```
 
 Use HTTP or TCP checks to retain the non-root defaults. The
