@@ -5,8 +5,8 @@
 Import [echo-observatory.json](echo-observatory.json) into Grafana 11 or newer
 and select a Prometheus datasource that scrapes Echo Observatory's private admin
 listener. No extra Grafana plugins, cloud account or application changes are
-needed for the existing 2.0 metrics. New certificate and rate-pressure panels
-require a build containing those metrics; older builds leave them empty.
+needed for the existing 2.0 metrics. Certificate and rate-pressure panels
+require Echo Observatory 2.1.0 or newer; older builds leave them empty.
 
 The dashboard opens with current readiness, demand, connections and memory,
 plus an instance table showing scrape health, liveness and process uptime.

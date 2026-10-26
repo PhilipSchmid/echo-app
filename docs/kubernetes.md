@@ -14,7 +14,7 @@ apply it to your chosen namespace:
 kubectl apply -f echo-observatory.yaml
 ```
 
-The example pins version 2.0.0. Use a release tag or image digest
+The example pins version 2.1.0. Use a release tag or image digest
 for repeatable deployments.
 
 ## Deployment and Service
@@ -74,7 +74,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: echo-observatory
-        image: ghcr.io/philipschmid/echo-observatory:2.0.0
+        image: ghcr.io/philipschmid/echo-observatory:2.1.0
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
