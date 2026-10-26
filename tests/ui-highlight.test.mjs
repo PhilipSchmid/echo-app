@@ -23,6 +23,15 @@ test("shell highlighting preserves multiline commands and quoted payloads exactl
   assert.ok(tokens.some((token) => token.kind === "comment" && token.text === "# comment"));
 });
 
+test("shell highlighting keeps dotted protocol options whole without changing command text", () => {
+  const text = "curl --http1.1 --tlsv1.2 --max-time=15 --header 'X-Sample: 1.2' 'https://echo.test/'";
+  for (const language of ["bash", "shell", "sh"]) {
+    const tokens = codeTokens(text, language);
+    assert.equal(tokens.map((token) => token.text).join(""), text);
+    assert.deepEqual(tokens.filter((token) => token.kind === "option").map((token) => token.text), ["--http1.1", "--tlsv1.2", "--max-time", "--header"]);
+  }
+});
+
 test("auto detection highlights JSON only and unsupported or malformed content stays plain", () => {
   assert.ok(codeTokens('{"ok":true}').some((token) => token.kind === "key"));
   for (const [text, language] of [["plain text", "auto"], ['{"unfinished":', "json"], ["<html>sample</html>", "html"], ["", "auto"]]) {

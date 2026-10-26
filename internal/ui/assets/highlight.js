@@ -10,7 +10,7 @@ export function codeTokens(text, language = "auto") {
   if (language === "json") {
     pattern = /(?<key>"(?:\\.|[^"\\])*"(?=\s*:))|(?<string>"(?:\\.|[^"\\])*")|(?<number>-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(?<literal>\b(?:true|false|null)\b)|(?<punctuation>[{}\[\],:])/g;
   } else if (["bash", "shell", "sh"].includes(language)) {
-    pattern = /(?<comment>#[^\n]*)|(?<string>'[^']*'|"(?:\\[\s\S]|[^"\\])*")|(?<variable>\$(?:\{[^}]*\}|[a-zA-Z_]\w*|[0-9?@#*!$-]))|(?<option>--?[a-zA-Z][\w-]*)|(?<operator>\\\r?\n|&&|\|\||[|;&<>])|(?<escape>\\[\s\S])|(?<word>[^\s'"$\\|;&<>]+)/g;
+    pattern = /(?<comment>#[^\n]*)|(?<string>'[^']*'|"(?:\\[\s\S]|[^"\\])*")|(?<variable>\$(?:\{[^}]*\}|[a-zA-Z_]\w*|[0-9?@#*!$-]))|(?<option>--?[a-zA-Z][\w.-]*)|(?<operator>\\\r?\n|&&|\|\||[|;&<>])|(?<escape>\\[\s\S])|(?<word>[^\s'"$\\|;&<>]+)/g;
   } else return plain;
   const tokens = [];
   let offset = 0;
