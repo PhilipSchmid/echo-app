@@ -1,6 +1,6 @@
 # Usage
 
-[README](../README.md) · [Configuration](configuration.md) · [Kubernetes](kubernetes.md) · [Privacy](privacy.md)
+[README](../README.md) · [Configuration](configuration.md) · [Kubernetes](kubernetes.md)
 
 ## Connect to the listeners
 
@@ -79,9 +79,9 @@ transport ports and IP addresses by layer. Expand the application row to inspect
 headers. TLS appears in a separate connection-security row. This view uses
 socket metadata; it does not capture packets or expose link-layer frames.
 
-The UI starts enabled, shares the
-HTTP, HTTPS and HTTP/3 listeners, and leaves `/` as a JSON metadata endpoint.
-All three serve the same UI pages and assets. With a trusted certificate, HTTPS
+The UI is enabled by default on each configured HTTP listener; `/` remains a
+JSON metadata endpoint. HTTP, HTTPS and HTTP/3 serve the same pages and assets.
+With a trusted certificate, HTTPS
 responses advertise HTTP/3 on the configured public UDP port. The browser may
 choose HTTP/3 on subsequent requests; it can also continue using HTTP/2.
 The UI reports the protocol actually received by the application. Behind a
@@ -101,12 +101,12 @@ Available examples follow the instance's enabled features, including
 `--response-controls` and header output. Visit `/ui/connect/` for terminal
 commands and the listener reference.
 
-Your request’s **Connection security** row includes certificate insights when
-HTTPS, HTTP/3, or gRPC TLS is enabled. Open them to inspect the latest public server certificate:
+The **Connection security** row shows certificate details when
+HTTPS, HTTP/3 or gRPC TLS is enabled. Inspect the current server certificate:
 issuer, subject, DNS/IP names, UTC validity dates, and SHA-256 fingerprint. More
-details include its serial number, public key, and signature algorithm. Self-signed
-and ACME staging certificates expand custom-trust instructions; production
-Let’s Encrypt certificates normally need no custom CA. The read-only
+details include its serial number, public key, and signature algorithm. A short
+note explains client trust for self-signed, ACME staging and supplied certificates;
+production Let’s Encrypt certificates normally need no custom CA. The read-only
 `/ui/certificate.json` snapshot follows certificates selected by the app and
 refreshes when the section is reopened. It does not trigger certificate issuance
 or establish what your browser trusts. On a plain HTTP page, these fields
@@ -127,9 +127,6 @@ Private health, readiness and metrics remain in the
 The UI footer links to `/ui/privacy/` and the
 [source code](https://github.com/philipschmid/echo-observatory).
 
-Use sample data on public deployments. Requests reach the server, and server or
-proxy logs may record traffic. The UI does not persist request history.
-
 Requests and WebSocket connections use the page's origin. The browser controls
 protocol negotiation and restricted headers, and must trust the TLS certificate
 for HTTPS and WSS. Use terminal clients for raw TCP, gRPC, and explicit protocol
@@ -140,10 +137,11 @@ return the usual metadata responses.
 
 ## Search discovery
 
-For a public deployment, set the service's public base URL, without `/ui/`:
+For a public deployment, set your service's public base URL, without `/ui/`.
+Replace the example domain below with your own:
 
 ```bash
-ECHO_OBSERVATORY_PUBLIC_URL=https://echo.container.education/ ./echo-observatory
+ECHO_OBSERVATORY_PUBLIC_URL=https://echo.example.com/ ./echo-observatory
 ```
 
 With the UI enabled, `/robots.txt` advertises `/sitemap.xml`. The sitemap lists
@@ -211,10 +209,22 @@ diagnostic responses use `Cache-Control: no-store`.
 
 ### Privacy and logging
 
-Use synthetic data. Request and connection metadata may appear in application,
-proxy, or hosting logs; the header-name filter is not exhaustive. See
-[Privacy](privacy.md) for request handling, browser preferences, logging and
-contact details.
+The app keeps no persistent request history and does not log HTTP bodies or
+WebSocket messages. Routine request diagnostics require `debug` or `trace`;
+they can contain client addresses, paths and headers. Common credential headers
+stay redacted in logs even with `--unsafe-headers`, but custom fields can still
+contain sensitive data. Use synthetic data.
+
+The UI sets no cookies and loads fonts and assets from the same service. Only
+the chosen theme and curl/wget preference enter tab session storage; request
+history stays in page memory. No analytics or external IP lookup is included.
+
+Configure application, proxy and infrastructure logging for your own installation,
+including retention and who can access it. The embedded `/ui/privacy/` page
+describes app behavior and labels the public demo's operator details separately.
+Public self-hosted instances need a notice that matches their own operator and
+data handling. The [public demo's notice](https://echo.container.education/ui/privacy/)
+is available on the website.
 
 ## IPv4 and IPv6
 
@@ -439,7 +449,7 @@ docker run --rm --user 0:0 --read-only \
   -p 127.0.0.1:3000:3000 \
   -e ECHO_OBSERVATORY_EXTERNAL_READINESS_PROBE_TYPE=icmp \
   -e ECHO_OBSERVATORY_EXTERNAL_READINESS_PROBE_TARGET=127.0.0.1 \
-  ghcr.io/philipschmid/echo-observatory:main
+  ghcr.io/philipschmid/echo-observatory:2.0.0-pre.1
 ```
 
 Use HTTP or TCP checks to retain the non-root defaults. The

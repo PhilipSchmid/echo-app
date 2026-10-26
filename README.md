@@ -12,12 +12,12 @@ preserves original client addresses behind a TCP proxy while TLS stays in the ap
 ## Connect to Echo Observatory
 
 ```mermaid
-%%{init: {"themeVariables": {"fontFamily": "Arial", "edgeLabelBackground": "#f5f8fe"}, "flowchart": {"nodeSpacing": 24, "rankSpacing": 48, "padding": 18}}}%%
+%%{init: {"themeVariables": {"fontFamily": "Arial", "edgeLabelBackground": "#f5f8fe"}, "flowchart": {"nodeSpacing": 24, "rankSpacing": 48, "padding": 18, "curve": "bumpY"}}}%%
 flowchart TB
     accTitle: Echo Observatory connection map
     accDescr: HTTP/1.1 and HTTP/2.0 clients use exposed HTTP port 80 or HTTPS port 443. Plain HTTP/2.0 requires --h2c. WebSocket uses HTTP/1.1 on either port, and the browser UI is available at /ui/. HTTP/3 uses UDP 443, TCP clients use 9090, gRPC clients use 50051, and Prometheus and Kubernetes probes use the admin listener on 3000.
 
-    web("<b>HTTP / WebSocket</b><br/>curl · browser · proxy")
+    web("<b>Web clients</b><br/>browser · curl")
     socket("<b>TCP</b><br/>nc · socket clients")
     rpc("<b>gRPC</b><br/>grpcurl · SDKs")
     ops("<b>Operations</b><br/>Prometheus · Kubernetes")
@@ -33,7 +33,7 @@ flowchart TB
 
     web --> http
     web --> https
-    web -->|"HTTP/3 only"| quic
+    web --> quic
     socket --> tcp
     rpc --> grpc
     ops --> admin
@@ -43,7 +43,7 @@ flowchart TB
     class web,socket,rpc,ops client;
     class http,https,quic,tcp,grpc,admin listener;
     style app fill:#fafcff,stroke:#d5e1f2,color:#263f66,stroke-width:1px,rx:16px,ry:16px;
-    linkStyle default stroke:#819bc1,stroke-width:1.5px;
+    linkStyle default stroke:#819bc1,stroke-width:2px;
 ```
 
 The map shows the standard exposed deployment ports.
@@ -73,11 +73,29 @@ curl -fsS http://localhost:3000/ready
 The container runs as UID/GID `65532`, with a read-only filesystem and all
 capabilities dropped. Admin port 3000 is published only on loopback.
 For binary builds and unprivileged development ports, see [development](docs/development.md).
+Self-hosted defaults impose no rate or daily transfer quota; public instances
+can opt in with [`--protection`](docs/configuration.md#abuse-protection).
+
+## Browser UI
+
+Try the [live demo](https://echo.container.education/ui/) to inspect your request,
+TLS connection and TCP/IP layers, or send a request from the workbench.
+
+![Your request and connection layers in dark mode](docs/images/request-dark.png)
+
+<details>
+<summary>Workbench: a JSON POST with a custom header, HTTP 201 and a 150 ms delay</summary>
+
+The sample checkout payload is synthetic. The response shows request metadata,
+the negotiated protocol and measured duration.
+
+![Workbench sending a checkout request and receiving HTTP 201 over HTTP/2](docs/images/workbench-dark.png)
+
+</details>
 
 ## Example response
 
-With `--tls --print-http-request-headers`, a locally tested request through a
-reverse proxy returned this HTTPS response (abridged):
+An abridged HTTPS response with `--tls --print-http-request-headers`:
 
 ```json
 {
@@ -129,9 +147,8 @@ opt-in. All bind ports are configurable. Existing 1.x image paths are unchanged.
 
 ## Version 2.0
 
-The current preview is [v2.0.0-pre.1](https://github.com/PhilipSchmid/echo-observatory/releases/tag/v2.0.0-pre.1). Stable 2.0.0 is not released yet.
-This preview includes trusted PROXY protocol support and an optional HTTP/3
-packet-size workaround for constrained UDP paths.
+The latest published preview is [v2.0.0-pre.1](https://github.com/PhilipSchmid/echo-observatory/releases/tag/v2.0.0-pre.1).
+Stable 2.0.0 is not released yet; the docs describe the current source checkout.
 
 Version 2.0 adds the browser UI, automatic certificate management, and the
 renamed executable. Images starting with 2.0.0 use
@@ -147,16 +164,16 @@ See [upgrading to 2.0](docs/migration-v2.md) for configuration and metrics chang
   and validation.
 - [Monitoring](docs/monitoring.md): private health endpoints, metric reference,
   and PromQL examples.
-- [Privacy](docs/privacy.md): request handling, browser storage, logging and
-  contact details.
+- [Privacy](https://echo.container.education/ui/privacy/): the public demo's data
+  handling and contact details. Self-hosted operators can review
+  [privacy and logging](docs/usage.md#privacy-and-logging).
 - [Kubernetes](docs/kubernetes.md): deployment, services, probes, and pod security.
 - [Development](docs/development.md): builds, tests, integration checks, and images.
 
 Runs on-premises and offline too: use the default self-signed certificate or
 supply your own PEM certificate and key. ACME is optional.
 
-Keep the admin listener private. Common credential headers are redacted by default;
-`--unsafe-headers` disables that protection. Use synthetic data and review the
-[privacy guidance](docs/privacy.md) before operating a public instance.
+Keep the admin listener private and use synthetic data. Common credential headers
+are redacted by default; `--unsafe-headers` reveals them in returned diagnostics.
 
 [Apache 2.0 license](LICENSE).

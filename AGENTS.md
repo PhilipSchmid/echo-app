@@ -59,8 +59,13 @@ The application is designed for debugging, testing, and demonstrating various ne
 ├── cmd/echo-observatory/          # Main application entry point
 ├── internal/
 │   ├── config/            # Configuration management
+│   ├── connection/        # Client and socket metadata
 │   ├── handlers/          # Protocol handlers (HTTP, TCP, gRPC, QUIC)
+│   ├── health/            # Health and external readiness checks
+│   ├── metrics/           # Prometheus instrumentation
+│   ├── protection/        # Optional rate and transfer budgets
 │   ├── server/            # Server implementations
+│   ├── ui/                # Embedded browser interface and assets
 │   └── utils/             # Utility functions (cert generation, etc.)
 ├── proto/                 # Protocol buffer definitions
 ├── Dockerfile             # Container image definition
@@ -196,7 +201,7 @@ Co-Authored-By: Codex <noreply@anthropic.com>
 
 The CI pipeline runs on every push and pull request:
 
-1. **Linting**: `golangci-lint run`
+1. **Linting**: `golangci-lint run --enable errcheck --timeout 5m`
 2. **Formatting**: `gofmt -l .`
 3. **Tests**: `go test -race ./...`
 4. **Build**: `go build ./...`
@@ -217,8 +222,6 @@ All checks must pass before merging.
 2. **Fix systematically** - Address all occurrences at once, not incrementally
 3. **Test thoroughly** - Run tests with race detector after every significant change
 4. **Validate locally** - Ensure linter returns success (exit code 0) before committing
-
-This workflow prevents CI failures by catching issues locally before they reach the remote repository.
 
 ## Security Considerations
 
@@ -271,7 +274,7 @@ go test -cover ./...
 go test -run TestHTTPServer_StartAndStop ./internal/server
 
 # Run linter
-golangci-lint run --timeout 5m
+golangci-lint run --enable errcheck --timeout 5m
 
 # Format code
 gofmt -w .
@@ -280,6 +283,12 @@ gofmt -w .
 ## Configuration
 
 The application uses environment variables and command-line flags:
+
+See [Configuration](docs/configuration.md) for all flags and defaults. The binary
+starts HTTP/UI and admin listeners by default. Additional protocols, ACME, PROXY
+protocol and rate/transfer budgets are opt-in. Keep self-hosted defaults separate
+from public-demo overrides. Every new flag must have matching CLI and loader
+defaults, tests and reference documentation.
 
 - `ECHO_OBSERVATORY_MESSAGE`: Custom message to echo back
 - `ECHO_OBSERVATORY_NODE`: Node identifier

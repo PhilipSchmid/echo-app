@@ -1,10 +1,25 @@
 # Configuration
 
-[Back to README](../README.md) · [Usage examples](usage.md) · [Privacy](privacy.md)
+[Back to README](../README.md) · [Usage examples](usage.md) · [Privacy and logging](usage.md#privacy-and-logging)
 
 Set environment variables or command-line flags. Explicit flags override the
 matching environment variables. Run `./echo-observatory --help` for the flag list.
 Version 2.0 uses the `ECHO_OBSERVATORY_` prefix; see [upgrading from 1.x](migration-v2.md).
+
+## Self-hosted defaults
+
+With no options, the binary serves HTTP/WebSocket and the UI on port 8080,
+plus admin health, readiness and metrics on port 3000. Keep the admin port private.
+Additional protocols are opt-in, so a simple install opens no extra listeners.
+The [Compose profile](usage.md#connect-to-the-listeners) enables all protocols
+with the standard exposed ports and offline, self-signed certificates.
+
+No rate or daily transfer quota applies unless `--protection` is enabled.
+Request/response size limits, connection/concurrency limits and timeouts still
+apply independently. Header output and response simulation remain opt-in;
+credential redaction stays enabled. ACME, external probes, PROXY protocol,
+search indexing and port advertisements require explicit configuration.
+The defaults work offline without a domain or writable state directory.
 
 ## Identity and diagnostics
 
@@ -22,23 +37,31 @@ Version 2.0 uses the `ECHO_OBSERVATORY_` prefix; see [upgrading from 1.x](migrat
 Returned diagnostics redact common credential headers by default using name
 matching, including password, passphrase, and credential names. Server diagnostic
 logs always apply this filter, even with `--unsafe-headers`. It is not an
-exhaustive content filter; see [privacy and logging](privacy.md).
+exhaustive content filter; see [privacy and logging](usage.md#privacy-and-logging).
 `--unsafe-headers` does not enable HTTP header output by itself; also set
 `--print-http-request-headers` when needed.
 
 ## Abuse protection
 
-One guard shares budgets across public listeners. The admin listener is excluded.
+Opt in with `--protection` when exposing an instance publicly or when you need
+traffic budgets. One guard shares budgets across echo/UI listeners; the admin
+listener is excluded. The rate, allowance and state-file options below apply
+only when protection is enabled; setting one does not enable protection itself.
 
 | Environment variable | Flag | Default | Behavior |
 | --- | --- | --- | --- |
-| `ECHO_OBSERVATORY_PROTECTION` | `--protection` | `true` | Enable shared operation, connection and transfer budgets. |
+| `ECHO_OBSERVATORY_PROTECTION` | `--protection` | `false` | Enable shared operation, connection and transfer budgets. |
 | `ECHO_OBSERVATORY_REQUEST_RATE` | `--request-rate` | `20` | Sustained operations/second and, independently, new connections/second. |
 | `ECHO_OBSERVATORY_PEER_REQUEST_RATE` | `--peer-request-rate` | `5` | Operations and connections/second per client address (socket peer by default, validated original address in PROXY mode); `0` disables peer limits. IPv6 clients share a `/64`. |
 | `ECHO_OBSERVATORY_INGRESS_BYTES_PER_SECOND` | `--ingress-bytes-per-second` | `262144` | Sustained incoming public transport bytes/second: 256 KiB/s. |
 | `ECHO_OBSERVATORY_EGRESS_BYTES_PER_SECOND` | `--egress-bytes-per-second` | `1048576` | Sustained outgoing public transport bytes/second: 1 MiB/s. |
 | `ECHO_OBSERVATORY_DAILY_EGRESS_BYTES` | `--daily-egress-bytes` | `1073741824` | Shared outgoing transport allowance per UTC day: 1 GiB. |
 | `ECHO_OBSERVATORY_TRANSFER_STATE_FILE` | `--transfer-state-file` | Empty | Optional private persistent daily-budget file; empty resets allowance on process restart. |
+
+Choose budgets for your deployment. For public instances, use a private writable
+`--transfer-state-file` when restarts must preserve the daily allowance. These
+are application limits, not a provider billing cap; network overhead and traffic
+that never reaches the app remain outside their control.
 
 ## Listeners
 
@@ -63,6 +86,7 @@ needed for a test.
 | `ECHO_OBSERVATORY_QUIC_ADVERTISE_PORT` | `--quic-advertise-port` | empty | Public UDP port advertised in HTTPS `Alt-Svc` responses. Requires HTTPS and QUIC; set only to a reachable mapped port. Deployment profiles use `443`. |
 | `ECHO_OBSERVATORY_QUIC_PORT` | `--quic-port` | `4433` | HTTP/3 port, over UDP. |
 | `ECHO_OBSERVATORY_QUIC_HOST` | `--quic-host` | Empty | Optional QUIC bind IP or hostname; empty binds to all available interfaces. |
+| `ECHO_OBSERVATORY_UI_HTTP3_IPV4_ONLY` | `--ui-http3-ipv4-only` | `false` | Show a provider-neutral IPv4-only notice in the UI's HTTP/3 examples when the hosting provider lacks IPv6 UDP support. Informational only; does not change listener binding or IPv6 support. |
 | `ECHO_OBSERVATORY_QUIC_DISABLE_PATH_MTU_DISCOVERY` | `--quic-disable-path-mtu-discovery` | `false` | Keep outgoing QUIC packets at the conservative initial size instead of increasing it after probes. Use on paths that intermittently drop larger UDP packets. |
 | `ECHO_OBSERVATORY_METRICS` | `--metrics` | `true` | Enable the admin listener with `/metrics`, `/health`, and `/ready`. |
 | `ECHO_OBSERVATORY_METRICS_PORT` | `--metrics-port` | `3000` | Admin HTTP port, over TCP. |
@@ -227,13 +251,10 @@ incomplete calls close after the grace period and must reconnect.
 
 HTTP/3 permits at most 128 QUIC connections, 32 bidirectional streams per
 connection, and 64 KiB of request headers. Request bodies and responses have
-30-second stream deadlines after headers are decoded. quic-go grows header
-buffers as bytes arrive instead of allocating the advertised frame length.
-Its current server API has no separate deadline for incomplete request headers.
+30-second stream deadlines after headers are decoded. Incomplete request headers
+have no separate deadline.
 With protection enabled, connections close after 120 seconds, including active
 incomplete headers; clients reconnect as needed.
-These limits reduce
-resource use but do not guarantee availability under a denial-of-service attack.
 With protection enabled, QUIC uses Retry address validation and charges at least
 64 ingress bytes per datagram to bound floods of tiny packets.
 
@@ -260,5 +281,6 @@ mapping. Advertisement is off by default to avoid guessing proxy mappings.
 No application flag is needed for IPv6: wildcard TCP and UDP listeners use the
 host's available address families. `--quic-host=::1` restricts QUIC to IPv6
 loopback when desired; a link-local bind can include its zone, such as
-`--quic-host=fe80::1%eth0`, using an address/interface present on the host. DNS, container networks, Service address families and
-firewalls still determine external reachability; see [IPv4 and IPv6](usage.md#ipv4-and-ipv6).
+`--quic-host=fe80::1%eth0`, using an address/interface present on the host.
+DNS, container networks, Service address families and firewalls determine
+external reachability; see [IPv4 and IPv6](usage.md#ipv4-and-ipv6).

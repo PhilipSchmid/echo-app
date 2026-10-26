@@ -64,8 +64,7 @@ their first event.
 | `echo_observatory_websocket_message_bytes_total` | Counter | Message payload bytes with the same labels; excludes frame overhead and control frames. |
 
 Standard `go_*`, `process_*` and `promhttp_*` metrics cover runtime, process and
-scrape behavior where supported by the platform. There is no duplicate custom
-CPU or memory collector.
+scrape behavior where supported by the platform.
 
 ## Labels and interpretation
 
@@ -101,7 +100,8 @@ traffic. No packet capture is performed.
 Rejection reasons are `request_limit`, `connection_limit`, `session_limit`,
 `request_rate`, `peer_rate`, `connection_rate`, `ingress_rate`, `egress_rate`,
 `daily_egress`, `state_error` and `closed`; unknown reasons share `other`.
-Quota gauges describe the shared guard for this process. Durable reservations
+Rate and daily quotas are opt-in with `--protection`. Quota gauges describe
+the shared guard for this process. Durable reservations
 are conservative, so the reserved gauge can exceed successfully sent transport
 bytes. The in-memory allowance resets on restart; durable state survives it.
 Separate replicas have separate budgets.

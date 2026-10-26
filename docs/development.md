@@ -97,11 +97,11 @@ Results are saved in
 
 `make test-ui` uses Node.js 22 or newer's built-in test runner for the browser
 client's URL handling, example presets, copied commands, and clipboard feedback.
-It needs no npm
-packages and is also run in CI; building and running Echo Observatory still require only Go.
+It needs no npm packages and runs in CI. Building and running Echo Observatory
+requires only Go.
 
-Use Go 1.26.9+ with CI's pinned golangci-lint v2.13.2; that linter cannot read
-Go 1.27 compiler export data. Local Go 1.27 lint checks pass with v2.15.0.
+For checks that match CI, use a patched Go 1.26 toolchain and golangci-lint
+v2.13.2. If you build with a newer Go release, use a linter that supports it.
 
 Useful focused commands:
 
@@ -121,10 +121,9 @@ CI also runs staticcheck and the vulnerability scanner:
 go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 ```
 
-Use a patched Go toolchain. The pinned scanner supports both the Go 1.26
-release toolchain and Go 1.27 used by the container build. CI checks module
-tidiness and formatting, runs race and wire tests, and builds five platform
-targets.
+Use a patched Go toolchain. CI checks module tidiness and formatting, runs race
+and wire tests, and builds five platform targets. The container build uses
+the toolchain pinned in the Dockerfile.
 
 ### Accessibility
 
@@ -188,8 +187,17 @@ workflow owns version tags and stable `latest`; both test an image before public
 Prereleases publish only their full version tag, leaving stable aliases alone.
 Use `2.0.0-pre.1` for the prerelease; `latest` is reserved for stable releases.
 Starting with 2.0.0, releases use `ghcr.io/philipschmid/echo-observatory`.
-Legacy 1.x tags retain `ghcr.io/philipschmid/echo-app`. After the new package is
-first published, set its GHCR visibility to public for anonymous pulls.
+Legacy 1.x tags retain `ghcr.io/philipschmid/echo-app`.
+
+## Contributing
+
+Keep changes focused and include a regression test for new behavior or bug fixes.
+Run the checks above before opening a pull request. Protocol changes need wire
+tests; UI changes need keyboard and responsive-layout checks as well as unit tests.
+When adding a flag, update the loader default and configuration reference together;
+`TestFlagDefaultsMatchConfiguration` checks that CLI and loader defaults agree.
+Keep external services opt-in and UI assets bundled so self-hosted installations
+can run offline.
 
 Run `make help` for the complete target list. `make clean` removes local binaries,
 the build directory, and coverage files, and clears the Go test cache.
