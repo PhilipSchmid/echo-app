@@ -67,7 +67,7 @@ var (
 		Help: "Socket bytes received or successfully sent, including TLS/QUIC framing; excludes IP/TCP/UDP headers and traffic outside the app.",
 	}, []string{"listener", "direction"})
 	HTTPProtocolRequestsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "echo_observatory_http_protocol_requests_total", Help: "Completed HTTP requests by negotiated HTTP protocol and socket peer IP version; never uses forwarded claims.",
+		Name: "echo_observatory_http_protocol_requests_total", Help: "Completed HTTP requests by negotiated HTTP protocol and client IP version; uses the socket peer by default or the validated original client with trusted PROXY protocol, never HTTP forwarding headers.",
 	}, []string{"listener", "protocol", "ip_version"})
 	GRPCResponsesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "echo_observatory_grpc_responses_total", Help: "Completed gRPC calls by method and final gRPC status code.",
@@ -154,7 +154,7 @@ func RecordError(listener, errorType string) {
 func RecordRejection(listener, reason string) {
 	switch reason {
 	case "request_limit", "connection_limit", "session_limit", "request_rate", "peer_rate", "connection_rate",
-		"ingress_rate", "egress_rate", "daily_egress", "state_error", "closed":
+		"ingress_rate", "egress_rate", "daily_egress", "state_error", "closed", "proxy_peer", "proxy_header":
 	default:
 		reason = "other"
 	}

@@ -92,6 +92,7 @@ func TestProtectionRejectionReasonsAreBounded(t *testing.T) {
 	registry.MustRegister(RejectionsTotal, ErrorsTotal)
 	reasons := []string{
 		"request_limit", "connection_limit", "session_limit",
+		"proxy_peer", "proxy_header",
 		protection.ErrRequestRate.Error(), protection.ErrPeerRate.Error(), protection.ErrConnectionRate.Error(),
 		protection.ErrIngressRate.Error(), protection.ErrEgressRate.Error(), protection.ErrDailyEgress.Error(),
 		protection.ErrState.Error(), protection.ErrClosed.Error(),
