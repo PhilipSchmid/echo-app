@@ -68,6 +68,8 @@ func ValidateOptions(o Options) error {
 type bucket struct {
 	rate, burst, tokens float64
 	updated             time.Time
+	consumed            float64
+	rejections          uint64
 }
 
 func newBucket(rate, burst float64, now time.Time) bucket {
@@ -79,7 +81,16 @@ func (b *bucket) available(n int64, now time.Time) bool {
 		b.tokens = math.Min(b.burst, b.tokens+now.Sub(b.updated).Seconds()*b.rate)
 		b.updated = now
 	}
-	return float64(n) <= b.tokens
+	if float64(n) > b.tokens {
+		b.rejections++
+		return false
+	}
+	return true
+}
+
+func (b *bucket) consume(n float64) {
+	b.tokens -= n
+	b.consumed += n
 }
 
 type peerBudget struct {
@@ -215,9 +226,9 @@ func (g *Guard) allow(peer string, connection bool) error {
 		if !pb.available(1, now) {
 			return ErrPeerRate
 		}
-		pb.tokens--
+		pb.consume(1)
 	}
-	b.tokens--
+	b.consume(1)
 	return nil
 }
 
@@ -241,7 +252,7 @@ func (g *Guard) AllowProxyConnection() error {
 	if !g.connections.available(1, g.now()) {
 		return ErrConnectionRate
 	}
-	g.connections.tokens--
+	g.connections.consume(1)
 	return nil
 }
 
@@ -263,7 +274,7 @@ func (g *Guard) AllowPeerConnection(peer string) error {
 	if !b.available(1, now) {
 		return ErrPeerRate
 	}
-	b.tokens--
+	b.consume(1)
 	return nil
 }
 
@@ -280,7 +291,7 @@ func (g *Guard) AllowIngress(n int) error {
 	if n < 0 || !g.ingress.available(int64(n), g.now()) {
 		return ErrIngressRate
 	}
-	g.ingress.tokens -= float64(n)
+	g.ingress.consume(float64(n))
 	return nil
 }
 
@@ -332,7 +343,7 @@ func (g *Guard) ReserveEgress(n int) error {
 		available += reservation
 	}
 	g.state, g.available = state, available-amount
-	g.egress.tokens -= float64(n)
+	g.egress.consume(float64(n))
 	return nil
 }
 

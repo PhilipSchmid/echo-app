@@ -8,6 +8,7 @@ import (
 // RegisterProtection exposes this process's shared budgets. Call once at startup.
 func RegisterProtection(g *protection.Guard) {
 	prometheus.MustRegister(protectionGauges(g)...)
+	prometheus.MustRegister(newRateCollector(g))
 }
 
 func protectionGauges(g *protection.Guard) []prometheus.Collector {
