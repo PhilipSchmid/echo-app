@@ -23,6 +23,88 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestSelfHostedDefaultsKeepLimitsWithoutPublicQuotas(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test builds and launches the application")
+	}
+	binary := filepath.Join(t.TempDir(), "echo-observatory")
+	buildCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	output, err := exec.CommandContext(buildCtx, "go", "build", "-race", "-o", binary, "../cmd/echo-observatory").CombinedOutput()
+	require.NoError(t, err, "build: %s", output)
+	httpPort, adminPort := unusedPort(t), unusedPort(t)
+	for adminPort == httpPort {
+		adminPort = unusedPort(t)
+	}
+	cmd := exec.Command(binary, "--http-port="+httpPort, "--metrics-port="+adminPort)
+	for _, value := range os.Environ() {
+		if !strings.HasPrefix(value, "ECHO_OBSERVATORY_") {
+			cmd.Env = append(cmd.Env, value)
+		}
+	}
+	logFile, err := os.Create(filepath.Join(t.TempDir(), "server.log"))
+	require.NoError(t, err)
+	cmd.Stdout, cmd.Stderr = logFile, logFile
+	process := &protectedCLI{cmd: cmd, done: make(chan error, 1)}
+	t.Cleanup(func() {
+		process.stop(t)
+		_ = logFile.Close()
+		if t.Failed() {
+			data, _ := os.ReadFile(logFile.Name())
+			t.Logf("server log:\n%s", data)
+		}
+	})
+	require.NoError(t, cmd.Start())
+	go func() { process.done <- cmd.Wait() }()
+	client := &http.Client{Timeout: time.Second}
+	t.Cleanup(client.CloseIdleConnections)
+	adminURL, publicURL := "http://127.0.0.1:"+adminPort, "http://127.0.0.1:"+httpPort
+	require.Eventually(t, func() bool {
+		response, err := client.Get(adminURL + "/ready")
+		if err != nil {
+			return false
+		}
+		_, _ = io.Copy(io.Discard, response.Body)
+		_ = response.Body.Close()
+		return response.StatusCode == http.StatusOK
+	}, 10*time.Second, 20*time.Millisecond)
+
+	// Exceed the public-demo burst allowance using one client address.
+	for range 200 {
+		response, err := client.Get(publicURL + "/")
+		require.NoError(t, err)
+		_, _ = io.Copy(io.Discard, response.Body)
+		_ = response.Body.Close()
+		require.Equal(t, http.StatusOK, response.StatusCode)
+	}
+	response, err := client.Post(publicURL+"/", "application/octet-stream", strings.NewReader(strings.Repeat("x", 65537)))
+	require.NoError(t, err)
+	_ = response.Body.Close()
+	assert.Equal(t, http.StatusRequestEntityTooLarge, response.StatusCode, "the default 64 KiB request limit still applies")
+
+	for path, want := range map[string]string{
+		"/metrics": "echo_observatory_protection_enabled 0",
+		"/health":  "healthy",
+		"/ready":   "ready",
+	} {
+		response, err := client.Get(adminURL + path)
+		require.NoError(t, err)
+		body, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+		_ = response.Body.Close()
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, response.StatusCode)
+		assert.Contains(t, string(body), want)
+	}
+	response, err = client.Get(publicURL + "/ui/")
+	require.NoError(t, err)
+	defer func() { _ = response.Body.Close() }()
+	body, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	assert.Contains(t, string(body), "Your request, as received.")
+	assert.Equal(t, "noindex", response.Header.Get("X-Robots-Tag"))
+}
+
 func TestProtectionBudgetPersistsAndAdminRemainsAvailable(t *testing.T) {
 	if testing.Short() {
 		t.Skip("integration test builds and restarts the application")

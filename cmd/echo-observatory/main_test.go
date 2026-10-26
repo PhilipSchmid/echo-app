@@ -5,12 +5,32 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/PhilipSchmid/echo-observatory/v2/internal/config"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
+
+func TestFlagDefaultsMatchConfiguration(t *testing.T) {
+	previous := pflag.CommandLine
+	pflag.CommandLine = pflag.NewFlagSet("defaults", pflag.ContinueOnError)
+	viper.Reset()
+	t.Cleanup(func() { pflag.CommandLine = previous; viper.Reset() })
+	defineFlags()
+	_, err := config.Load()
+	require.NoError(t, err)
+	// Do not bind flags: compare the CLI defaults with the independent loader defaults.
+	pflag.CommandLine.VisitAll(func(flag *pflag.Flag) {
+		t.Run(flag.Name, func(t *testing.T) {
+			require.Equal(t, flag.DefValue, fmt.Sprint(viper.Get(flag.Name)))
+		})
+	})
+}
 
 func captureCertificateLogs(t *testing.T) *bytes.Buffer {
 	t.Helper()
